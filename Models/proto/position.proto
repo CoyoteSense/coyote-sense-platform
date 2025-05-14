@@ -1,0 +1,13 @@
+syntax = "proto3";
+package trading;
+
+message Position {
+  string account_id = 1;
+  string symbol = 2;
+  string exchange = 3;
+  double quantity = 4;
+  double avg_price = 5;
+  double unrealized_pnl = 6;
+  string position_side = 7;
+  map<string, string> extra_params = 8;
+}

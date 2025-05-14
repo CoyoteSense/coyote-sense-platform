@@ -1,0 +1,11 @@
+syntax = "proto3";
+package trading;
+
+message HFTMetrics {
+  int64 sent_timestamp = 1;
+  int64 ack_timestamp = 2;
+  int64 exchange_timestamp = 3;
+  int32 gateway_latency_micros = 4;
+  int32 exchange_latency_micros = 5;
+  map<string, string> extra_params = 6;
+}

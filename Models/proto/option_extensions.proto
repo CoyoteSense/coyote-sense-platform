@@ -1,0 +1,15 @@
+syntax = "proto3";
+package trading;
+
+message OptionExtension {
+  double strike = 1;
+  string expiry = 2;
+  string right = 3; // call/put
+  string underlying = 4;
+  double delta = 5;
+  double gamma = 6;
+  double theta = 7;
+  double vega = 8;
+  double rho = 9;
+  map<string, string> extra_params = 10;
+}
