@@ -1,0 +1,15 @@
+syntax = "proto3";
+package trading;
+
+message Trade {
+  string trade_id = 1;
+  string order_id = 2;
+  string account_id = 3;
+  string symbol = 4;
+  double price = 5;
+  int64 quantity = 6;
+  string side = 7;
+  int64 timestamp = 8;
+  string venue = 9;
+  map<string, string> extra_params = 10;
+}

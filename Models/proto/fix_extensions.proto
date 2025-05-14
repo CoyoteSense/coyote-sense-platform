@@ -1,0 +1,11 @@
+syntax = "proto3";
+package trading;
+
+message FixField {
+  int32 tag = 1;
+  string value = 2;
+}
+
+message FixExtension {
+  repeated FixField fields = 1;
+}

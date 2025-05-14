@@ -1,0 +1,14 @@
+syntax = "proto3";
+package trading;
+
+message Account {
+  string account_id = 1;
+  string broker = 2;
+  string user_id = 3;
+  string type = 4; // margin, cash, cross, isolated, etc.
+  double balance = 5;
+  string currency = 6;
+  double margin = 7;
+  double available = 8;
+  map<string, string> extra_params = 9;
+}

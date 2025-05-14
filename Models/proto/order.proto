@@ -1,0 +1,103 @@
+syntax = "proto3";
+package trading;
+
+enum OrderSide {
+  SIDE_UNSPECIFIED = 0;
+  BUY = 1;
+  SELL = 2;
+  SELL_SHORT = 3;
+  BUY_TO_COVER = 4;
+}
+
+enum OrderType {
+  ORDER_TYPE_UNSPECIFIED = 0;
+  LIMIT = 1;
+  MARKET = 2;
+  STOP_MARKET = 3;
+  STOP_LIMIT = 4;
+  MARKET_IF_TOUCHED = 5;
+  LIMIT_IF_TOUCHED = 6;
+  TRAILING_STOP = 7;
+  FOK = 8;
+  IOC = 9;
+  OCO = 10;
+  STOP_LOSS = 11;
+  TAKE_PROFIT = 12;
+}
+
+enum TimeInForce {
+  TIF_UNSPECIFIED = 0;
+  DAY = 1;
+  GTC = 2;
+  IOC = 3;
+  FOK = 4;
+  GTD = 5;
+  GTX = 6;
+}
+
+enum OrderStatus {
+  STATUS_UNSPECIFIED = 0;
+  NEW = 1;
+  PARTIALLY_FILLED = 2;
+  FILLED = 3;
+  CANCELED = 4;
+  REJECTED = 5;
+  EXPIRED = 6;
+  PENDING_NEW = 7;
+  PENDING_CANCEL = 8;
+  PENDING_MODIFY = 9;
+  SUSPENDED = 10;
+}
+
+message OrderRequest {
+  string order_id = 1;
+  string account_id = 2;
+  string symbol = 3;
+  string exchange = 4;
+  OrderSide side = 5;
+  OrderType type = 6;
+  double price = 7;
+  double stop_price = 8;
+  int64 quantity = 9;
+  TimeInForce time_in_force = 10;
+  string client_tag = 11;
+  string oco_group = 12;
+  string user_id = 13;
+  map<string, string> extra_params = 14;
+  double iceberg_qty = 15;
+  bool reduce_only = 16;
+  bool post_only = 17;
+  string strategy_id = 18;
+  string parent_order_id = 19;
+  string margin_type = 20;
+  string position_side = 21;
+}
+
+message OrderReport {
+  string order_id = 1;
+  OrderStatus status = 2;
+  int64 filled_quantity = 3;
+  double avg_fill_price = 4;
+  string exchange_order_id = 5;
+  string oco_group = 6;
+  string client_tag = 7;
+  string status_text = 8;
+  map<string, string> extra_params = 9;
+}
+
+message ModifyOrderRequest {
+  string order_id = 1;
+  double new_price = 2;
+  double new_stop_price = 3;
+  int64 new_quantity = 4;
+  TimeInForce new_time_in_force = 5;
+  map<string, string> extra_params = 6;
+}
+
+message CancelOrderRequest {
+  string order_id = 1;
+}
+
+message MultiOrderRequest {
+  repeated OrderRequest orders = 1;
+}

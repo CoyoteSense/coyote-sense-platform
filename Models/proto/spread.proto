@@ -1,0 +1,15 @@
+syntax = "proto3";
+package trading;
+
+message SpreadLeg {
+  string symbol = 1;
+  int64 ratio = 2;
+}
+
+message SpreadOrder {
+  string spread_id = 1;
+  repeated SpreadLeg legs = 2;
+  double net_price = 3;
+  string account_id = 4;
+  string strategy_id = 5;
+}

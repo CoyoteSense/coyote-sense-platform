@@ -1,0 +1,27 @@
+syntax = "proto3";
+package trading;
+
+enum SecurityType {
+  SECURITY_TYPE_UNSPECIFIED = 0;
+  STOCK = 1;
+  FUTURE = 2;
+  OPTION = 3;
+  FOREX = 4;
+  CRYPTO = 5;
+  CFD = 6;
+  ETF = 7;
+  BOND = 8;
+}
+
+message Instrument {
+  string symbol = 1;
+  string exchange = 2;
+  SecurityType type = 3;
+  string currency = 4;
+  string description = 5;
+  string underlying = 6;
+  string expiry = 7;
+  double strike = 8;
+  string option_right = 9; // call/put
+  map<string, string> extra_params = 10;
+}

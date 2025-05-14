@@ -1,0 +1,12 @@
+syntax = "proto3";
+package trading;
+
+message CryptoExtension {
+  string wallet_address = 1;
+  string margin_type = 2;
+  bool reduce_only = 3;
+  bool post_only = 4;
+  double leverage = 5;
+  string network = 6;
+  map<string, string> extra_params = 7;
+}

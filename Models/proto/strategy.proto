@@ -1,0 +1,18 @@
+syntax = "proto3";
+package trading;
+
+enum StrategyType {
+  STRATEGY_UNSPECIFIED = 0;
+  MARKET_MAKING = 1;
+  STAT_ARBITRAGE = 2;
+  NEWS_TRADING = 3;
+  HFT = 4;
+  CUSTOM = 5;
+}
+
+message Strategy {
+  string strategy_id = 1;
+  StrategyType type = 2;
+  string description = 3;
+  map<string, string> parameters = 4;
+}
