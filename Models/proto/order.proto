@@ -11,18 +11,20 @@ enum OrderSide {
 
 enum OrderType {
   ORDER_TYPE_UNSPECIFIED = 0;
-  LIMIT = 1;
-  MARKET = 2;
-  STOP_MARKET = 3;
-  STOP_LIMIT = 4;
-  MARKET_IF_TOUCHED = 5;
-  LIMIT_IF_TOUCHED = 6;
-  TRAILING_STOP = 7;
-  FOK = 8;
-  IOC = 9;
-  OCO = 10;
-  STOP_LOSS = 11;
-  TAKE_PROFIT = 12;
+  LIMIT = 1;                    // Limit Order
+  MARKET = 2;                   // Market Order
+  STOP_MARKET = 3;              // Stop (Market) Order
+  STOP_LIMIT = 4;               // Stop-Limit Order
+  MARKET_IF_TOUCHED = 5;        // MIT: Market If Touched
+  LIMIT_IF_TOUCHED = 6;         // LIT: Limit If Touched
+  TRAILING_STOP = 7;            // Trailing Stop (Market)
+  TRAILING_STOP_LIMIT = 8;      // Trailing Stop Limit
+  QTS = 9;                      // Quote to Settle / Quote-Triggered Stop (custom, rarely used)
+  FOK = 10;                     // Fill or Kill
+  IOC = 11;                     // Immediate or Cancel
+  OCO = 12;                     // One Cancels Other (grouping type)
+  STOP_LOSS = 13;               // (alt label, for some crypto APIs)
+  TAKE_PROFIT = 14;             // (take profit, for some crypto APIs)
 }
 
 enum TimeInForce {
