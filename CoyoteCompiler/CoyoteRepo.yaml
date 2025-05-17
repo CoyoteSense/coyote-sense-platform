@@ -1,0 +1,30 @@
+repoVersion: "1.0"
+units:
+  - id: redis-broker
+    version: "7.2"
+    description: "Primary Redis event broker for pub/sub channels"
+    baseImage: "redis:7.2"
+
+  - id: cpp-trading-engine
+    version: "1.0"
+    description: "C++ high-frequency trading engine (core trading logic)"
+    baseImage: "ubuntu:22.04"
+    build:
+      context: "./services/cpp-engine"
+      dockerfile: "Dockerfile"
+
+  - id: ai-analytics
+    version: "2.1"
+    description: "Python-based AI analytics unit for trading and finance insights"
+    baseImage: "python:3.11-slim"
+    build:
+      context: "./services/python-ai"
+      dockerfile: "Dockerfile"
+
+  - id: payment-gateway
+    version: "1.0"
+    description: "Finance/payment integration unit (optional, for payment processing and financial operations)"
+    baseImage: "python:3.11-slim"
+    build:
+      context: "./services/payment-gateway"
+      dockerfile: "Dockerfile"

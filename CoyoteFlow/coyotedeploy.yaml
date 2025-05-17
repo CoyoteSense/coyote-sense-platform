@@ -1,0 +1,24 @@
+deploy:
+  environment: "kubernetes"    # or "docker-compose"
+
+  resources:
+    redis-broker:
+      image: "redis:7.2"
+      replicas: 3
+      hostNetwork: true
+      cpu: "500m"
+      memory: "512Mi"
+
+    cpp-trading-engine:
+      image: "myrepo/cpp-engine:latest"
+      replicas: 2
+      hostNetwork: true
+      cpu: "2000m"
+      memory: "2Gi"
+
+    ai-analytics:
+      image: "myrepo/python-ai:latest"
+      replicas: 1
+      hostNetwork: false
+      cpu: "4000m"
+      memory: "4Gi"

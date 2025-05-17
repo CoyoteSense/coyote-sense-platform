@@ -1,0 +1,20 @@
+project:
+  name: "MyAlgoProject"
+  description: "HFT algorithm using Redis + actors"
+  version: "1.0"
+
+units:
+  - id: redis-broker
+    type: infraUnit
+    mandatory: true
+    channels: [ orders, signals, events ]
+
+  - id: cpp-trading-engine
+    type: unit
+    actor: true
+    depends_on: [ redis-broker ]
+
+  - id: ai-analytics
+    type: unit
+    actor: true
+    depends_on: [ redis-broker ]

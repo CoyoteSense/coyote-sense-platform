@@ -1,0 +1,10 @@
+runtime:
+  mode: production       # one of [production, simulation, recording, playback, debug]
+  simulation:
+    speedFactor: 1.0     # only in simulation
+  recording:
+    outputPath: "/mnt/data/recordings/session1.log"
+  playback:
+    inputPath: "/mnt/data/recordings/session1.log"
+  debug:
+    logLevel: "DEBUG"
