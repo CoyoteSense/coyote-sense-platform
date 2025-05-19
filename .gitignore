@@ -1,0 +1,75 @@
+# CMake generated files
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+CMakeScripts/
+CTestTestfile.cmake
+Testing/
+install_manifest.txt
+
+# Build directories
+build/
+out/
+bin/
+lib/
+*.dir/
+*.o
+*.obj
+*.so
+*.a
+*.dll
+*.exe
+*.app
+*.dylib
+*.pdb
+
+# IDEs and editors
+# CLion
+.idea/
+cmake-build-*/
+
+# Visual Studio
+*.sln
+*.vcxproj*
+*.user
+*.VC.db
+*.VC.opendb
+*.ncb
+*.sdf
+*.opensdf
+
+# Xcode
+*.xcodeproj
+*.xcworkspace
+*.xcuser*
+*.xcuserdata
+*.DS_Store
+
+# VSCode
+.vscode/
+
+# Mac OS files
+.DS_Store
+
+# Windows files
+Thumbs.db
+Desktop.ini
+
+# Other temp files
+*.log
+*.tmp
+*.swp
+*.bak
+
+# CTest output
+Testing/
+LastTest.log
+
+# Ninja build system
+.ninja_deps
+.ninja_log
+
+# Compilation database
+compile_commands.json
+.vs/
