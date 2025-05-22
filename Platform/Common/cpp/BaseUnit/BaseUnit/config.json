@@ -1,0 +1,42 @@
+{
+  "redis": {
+    "host": "localhost",
+    "port": 6379,
+    "password": "",
+    "connectionTimeout": 5000,
+    "commandTimeout": 1000,
+    "enableSSL": false
+  },
+  "unit": {
+    "id": "trading-unit-001",
+    "type": "TradingUnit",
+    "logLevel": "INFO",
+    "heartbeatInterval": 30000,
+    "enableMetrics": true,
+    "workingDirectory": "."
+  },
+  "keyvault": {
+    "url": "https://vault:8201",
+    "unitRole": "trading-unit",
+    "caPath": "",
+    "clientCertPath": "",
+    "clientKeyPath": "",
+    "enableMutualTLS": false,
+    "tokenRefreshInterval": 300000
+  },
+  "trading": {
+    "exchangeConnections": [
+      {
+        "name": "binance",
+        "enabled": true,
+        "apiKey": "{{vault:binance/api_key}}",
+        "apiSecret": "{{vault:binance/api_secret}}"
+      }
+    ],
+    "riskLimits": {
+      "maxPositionSize": 1000000,
+      "maxDailyLoss": 50000,
+      "maxOrderSize": 100000
+    }
+  }
+}
