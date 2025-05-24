@@ -10,9 +10,10 @@
 #include <nlohmann/json.hpp>
 
 // Infrastructure includes
-#include "../../Infra/RedisClient.h"
-#include "../../Infra/SecureStore.h"
-#include "../../Infra/ConfigReader.h"
+#include "../../Infra/IRedisClient.h"
+#include "../../Infra/ISecureStore.h"
+#include "../../Infra/IConfigReader.h"
+#include "../../Infra/IHttpClient.h"
 
 // Forward declarations
 namespace trading {
@@ -52,6 +53,13 @@ public:
 class BaseUnit {
 public:
     explicit BaseUnit(const std::string& configPath);
+    
+    // Dependency injection constructor
+    BaseUnit(std::unique_ptr<infra::ICoyoteConfig> config,
+             std::shared_ptr<infra::IRedisClient> redisClient,
+             std::shared_ptr<infra::ISecureStore> secureStore,
+             std::shared_ptr<infra::IHttpClient> httpClient);
+             
     virtual ~BaseUnit();
 
     // Lifecycle methods
@@ -66,10 +74,8 @@ public:
     
     void subscribeToChannel(const std::string& channel, 
                            std::function<void(const std::string&, const std::string&)> callback);
-    void unsubscribeFromChannel(const std::string& channel);
-
-    // Configuration and credentials
-    const infra::CoyoteConfig& getConfig() const { return *m_config; }
+    void unsubscribeFromChannel(const std::string& channel);    // Configuration and credentials
+    const infra::ICoyoteConfig& getConfig() const { return *m_config; }
     std::string getSecret(const std::string& path);
     
     // Logging and monitoring
@@ -95,21 +101,21 @@ protected:
     // Helper methods for derived classes
     void setState(UnitState state);
     void registerForSystemChannels();
-    void handleSystemCommand(const std::string& command, const nlohmann::json& payload);
-
-    // Component access for derived classes
-    std::shared_ptr<infra::RedisClient> getRedisClient() { return m_redisClient; }
+    void handleSystemCommand(const std::string& command, const nlohmann::json& payload);    // Component access for derived classes
+    std::shared_ptr<infra::IRedisClient> getRedisClient() { return m_redisClient; }
     std::shared_ptr<infra::ISecureStore> getSecureStore() { return m_secureStore; }
+    std::shared_ptr<infra::IHttpClient> getHttpClient() { return m_httpClient; }
 
 private:
     // Configuration
-    std::unique_ptr<infra::CoyoteConfig> m_config;
+    std::unique_ptr<infra::ICoyoteConfig> m_config;
     std::string m_unitId;
     std::string m_unitType;
     
     // Core components
-    std::shared_ptr<infra::RedisClient> m_redisClient;
+    std::shared_ptr<infra::IRedisClient> m_redisClient;
     std::shared_ptr<infra::ISecureStore> m_secureStore;
+    std::shared_ptr<infra::IHttpClient> m_httpClient;
     
     // State management
     std::atomic<UnitState> m_state;

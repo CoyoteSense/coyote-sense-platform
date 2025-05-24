@@ -1,4 +1,8 @@
 ﻿#include "BaseUnit.h"
+#include "../../Infra/ConfigReader.h"
+#include "../../Infra/RedisClient.h"
+#include "../../Infra/SecureStore.h"
+#include "../../Infra/HttpClient.h"
 #include <iostream>
 #include <sstream>
 #include <iomanip>
@@ -19,7 +23,43 @@ const std::string BaseUnit::ALERTS_CHANNEL = "alerts";
 const std::string BaseUnit::METRICS_CHANNEL = "metrics";
 
 BaseUnit::BaseUnit(const std::string& configPath) 
-    : m_config(std::make_unique<infra::CoyoteConfig>(configPath)),
+    : m_state(UnitState::INITIALIZING),
+      m_running(false) {
+    
+    // Create configuration reader using factory
+    auto configReader = infra::ConfigReaderFactory::create(configPath);
+    m_config = std::make_unique<infra::CoyoteConfig>(std::move(configReader));
+    
+    const auto& unitConfig = m_config->getUnitConfig();
+    m_unitId = unitConfig.unitId;
+    m_unitType = unitConfig.unitType;
+    
+    if (m_unitId.empty()) {
+        // Generate a unique unit ID if not provided
+        m_unitId = m_unitType + "-" + std::to_string(std::chrono::system_clock::now().time_since_epoch().count());
+    }
+    
+    // Create infrastructure components using factories
+    const auto& redisConfig = m_config->getRedisConfig();
+    m_redisClient = infra::RedisClientFactory::create(redisConfig);
+    
+    const auto& keyVaultConfig = m_config->getKeyVaultConfig();
+    m_secureStore = infra::SecureStoreFactory::create(keyVaultConfig);
+    
+    m_httpClient = infra::HttpClientFactory::create();
+    
+    logInfo("BaseUnit created: " + m_unitId + " (type: " + m_unitType + ")");
+}
+
+// Dependency injection constructor
+BaseUnit::BaseUnit(std::unique_ptr<infra::ICoyoteConfig> config,
+                   std::shared_ptr<infra::IRedisClient> redisClient,
+                   std::shared_ptr<infra::ISecureStore> secureStore,
+                   std::shared_ptr<infra::IHttpClient> httpClient)
+    : m_config(std::move(config)),
+      m_redisClient(std::move(redisClient)),
+      m_secureStore(std::move(secureStore)),
+      m_httpClient(std::move(httpClient)),
       m_state(UnitState::INITIALIZING),
       m_running(false) {
     
@@ -32,7 +72,7 @@ BaseUnit::BaseUnit(const std::string& configPath)
         m_unitId = m_unitType + "-" + std::to_string(std::chrono::system_clock::now().time_since_epoch().count());
     }
     
-    logInfo("BaseUnit created: " + m_unitId + " (type: " + m_unitType + ")");
+    logInfo("BaseUnit created with dependency injection: " + m_unitId + " (type: " + m_unitType + ")");
 }
 
 BaseUnit::~BaseUnit() {
@@ -302,12 +342,13 @@ void BaseUnit::setState(UnitState state) {
 }
 
 bool BaseUnit::connectToRedis() {
-    const auto& redisConfig = m_config->getRedisConfig();
-    
-    m_redisClient = std::make_shared<infra::RedisClient>(redisConfig.host, redisConfig.port);
+    if (!m_redisClient) {
+        logError("Redis client not initialized");
+        return false;
+    }
     
     if (!m_redisClient->connect()) {
-        logError("Failed to connect to Redis at " + redisConfig.host + ":" + std::to_string(redisConfig.port));
+        logError("Failed to connect to Redis");
         return false;
     }
     
@@ -316,25 +357,22 @@ bool BaseUnit::connectToRedis() {
 }
 
 bool BaseUnit::authenticateWithVault() {
-    const auto& vaultConfig = m_config->getKeyVaultConfig();
-    
-    if (vaultConfig.url.empty() || vaultConfig.unitRole.empty()) {
-        logWarning("KeyVault configuration incomplete, skipping authentication");
-        return true; // Not a failure if KeyVault is not configured
+    if (!m_secureStore) {
+        logWarning("Secure store not initialized, skipping authentication");
+        return true; // Not a failure if secure store is not configured
     }
     
-    m_secureStore = std::make_shared<infra::KeyVaultClient>(vaultConfig.url, vaultConfig.unitRole);
-    
-    // For demo purposes, use a default secret. In production, this would come from environment or file
-    std::string credentials = "default-secret-id";
-    
-    if (!m_secureStore->authenticate(vaultConfig.unitRole, credentials)) {
-        logError("Failed to authenticate with KeyVault");
+    // For components created via factory, authentication should already be handled
+    // Just verify the connection is working by trying to get a test secret
+    try {
+        auto testResult = m_secureStore->getSecret("test-connection");
+        // If this doesn't throw, authentication is working
+        logInfo("Authenticated with secure store successfully");
+        return true;
+    } catch (const std::exception& e) {
+        logError("Failed to authenticate with secure store: " + std::string(e.what()));
         return false;
     }
-    
-    logInfo("Authenticated with KeyVault successfully");
-    return true;
 }
 
 void BaseUnit::registerForSystemChannels() {

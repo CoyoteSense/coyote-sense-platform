@@ -1,251 +1,361 @@
 #include "SecureStore.h"
-#include <iostream>
-#include <sstream>
-#include <curl/curl.h>
+#include "HttpClient.h"
 #include <nlohmann/json.hpp>
-#include <chrono>
-#include <cstring>
+#include <stdexcept>
+#include <iomanip>
+#include <sstream>
 
 namespace coyote {
 namespace infra {
 
-// Helper for CURL response
-struct CurlResponse {
-    std::string data;
-    long responseCode = 0;
-};
+// KeyVaultSecureStore implementation
+KeyVaultSecureStore::KeyVaultSecureStore(const SecureStoreConfig& config, 
+                                        std::unique_ptr<IHttpClient> httpClient)
+    : config_(config)
+    , http_client_(std::move(httpClient))
+    , metrics_(std::make_unique<SecureStoreMetrics>())
+    , cache_ttl_(config.cache_ttl_minutes)
+{
+    if (!http_client_) {
+        throw std::invalid_argument("HTTP client cannot be null");
+    }
+    
+    if (config_.key_vault_url.empty()) {
+        throw std::invalid_argument("Key Vault URL cannot be empty");
+    }
 
-static size_t WriteCallback(void* contents, size_t size, size_t nmemb, CurlResponse* response) {
-    size_t totalSize = size * nmemb;
-    response->data.append(static_cast<char*>(contents), totalSize);
-    return totalSize;
+    // Set up HTTP client defaults
+    std::unordered_map<std::string, std::string> defaultHeaders = {
+        {"Content-Type", "application/json"},
+        {"Accept", "application/json"}
+    };
+    http_client_->setDefaultHeaders(defaultHeaders);
+    http_client_->setUserAgent("CoyoteSense-SecureStore/1.0");
 }
 
-KeyVaultClient::KeyVaultClient(const std::string& vaultUrl, const std::string& unitId)
-    : m_vaultUrl(vaultUrl), m_unitId(unitId), m_useMutualTLS(false) {
-    
-    // Initialize CURL globally (should be done once per application)
-    static bool curlInitialized = false;
-    if (!curlInitialized) {
-        curl_global_init(CURL_GLOBAL_DEFAULT);
-        curlInitialized = true;
+bool KeyVaultSecureStore::getSecret(const std::string& secretName, std::string& value, const std::string& version) {
+    auto start_time = std::chrono::steady_clock::now();
+    metrics_->incrementTotalRequests();
+
+    try {
+        // Check cache first
+        {
+            std::lock_guard<std::mutex> lock(cache_mutex_);
+            if (isCacheValid(secretName)) {
+                value = secret_cache_[secretName];
+                metrics_->incrementCacheHits();
+                metrics_->incrementSuccessfulRequests();
+                return true;
+            }
+            metrics_->incrementCacheMisses();
+        }        
+        std::string url = buildSecretUrl(secretName, version);
+        
+        auto request = std::make_unique<HttpRequest>();
+        request->setUrl(url);
+        request->setMethod(HttpMethod::GET);
+        request->addHeader("Authorization", "Bearer " + access_token_);
+        request->setTimeout(config_.request_timeout_seconds);
+        
+        auto response = http_client_->execute(*request);
+        
+        auto end_time = std::chrono::steady_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+        metrics_->updateResponseTime(duration.count());
+
+        if (response->isSuccess() && response->getStatusCode() == 200) {
+            // Parse JSON response
+            nlohmann::json root;
+            root = nlohmann::json::parse(response->getBody());
+            if (root.contains("value")) {
+                value = root["value"].get<std::string>();
+                updateCache(secretName, value);
+                metrics_->incrementSuccessfulRequests();
+                metrics_->setConnected(true);
+                return true;
+            }
+        }
+        
+        metrics_->incrementFailedRequests();
+        metrics_->setConnected(false);
+        return false;
+        
+    } catch (const std::exception& e) {
+        auto end_time = std::chrono::steady_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+        metrics_->updateResponseTime(duration.count());
+        metrics_->incrementFailedRequests();
+        metrics_->setConnected(false);
+        return false;
     }
 }
 
-KeyVaultClient::~KeyVaultClient() {
-    clearSensitiveData();
-}
+bool KeyVaultSecureStore::setSecret(const std::string& secretName, const std::string& value) {
+    auto start_time = std::chrono::steady_clock::now();
+    metrics_->incrementTotalRequests();
 
-bool KeyVaultClient::authenticate(const std::string& unitId, const std::string& credentials) {
     try {
-        nlohmann::json authPayload;
-        authPayload["role"] = unitId;
-        authPayload["secret_id"] = credentials;
+        refreshTokenIfNeeded();
+        
+        std::string url = buildSecretUrl(secretName);
+        
+        nlohmann::json jsonBody;
+        jsonBody["value"] = value;
+        std::string body = jsonBody.dump();
+        
+        auto request = std::make_unique<HttpRequest>();
+        request->setUrl(url);
+        request->setMethod(HttpMethod::PUT);
+        request->addHeader("Authorization", "Bearer " + access_token_);
+        request->setBody(body);
+        request->setTimeout(config_.request_timeout_seconds);
+        
+        auto response = http_client_->execute(*request);
+        
+        auto end_time = std::chrono::steady_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+        metrics_->updateResponseTime(duration.count());
 
-        std::string response = makeHttpRequest("POST", "/v1/auth", authPayload.dump());
-        if (response.empty()) {
-            return false;
-        }
-
-        auto jsonResponse = nlohmann::json::parse(response);
-        if (jsonResponse.contains("auth") && jsonResponse["auth"].contains("client_token")) {
-            m_authToken = jsonResponse["auth"]["client_token"];
-            std::cout << "Successfully authenticated with KeyVault" << std::endl;
+        if (response->isSuccess() && (response->getStatusCode() == 200 || response->getStatusCode() == 201)) {
+            updateCache(secretName, value);
+            metrics_->incrementSuccessfulRequests();
+            metrics_->setConnected(true);
             return true;
         }
-
-        std::cerr << "Authentication failed: no token in response" << std::endl;
+        
+        metrics_->incrementFailedRequests();
+        metrics_->setConnected(false);
         return false;
-
+        
     } catch (const std::exception& e) {
-        std::cerr << "Authentication error: " << e.what() << std::endl;
-        return false;
-    }
-}
-
-std::string KeyVaultClient::getAuthToken() const {
-    return m_authToken;
-}
-
-bool KeyVaultClient::refreshToken() {
-    if (m_authToken.empty()) {
-        return false;
-    }
+        
+bool KeyVaultSecureStore::deleteSecret(const std::string& secretName) {
+    auto start_time = std::chrono::steady_clock::now();
+    metrics_->incrementTotalRequests();
 
     try {
-        std::string response = makeHttpRequest("POST", "/v1/auth/token/renew-self", "{}");
-        if (response.empty()) {
-            return false;
-        }
+        refreshTokenIfNeeded();
+        
+        std::string url = buildSecretUrl(secretName);
+        
+        auto request = std::make_unique<HttpRequest>();
+        request->setUrl(url);
+        request->setMethod(HttpMethod::DELETE);
+        request->addHeader("Authorization", "Bearer " + access_token_);
+        request->setTimeout(config_.request_timeout_seconds);
+        
+        auto response = http_client_->execute(*request);
+        
+        auto end_time = std::chrono::steady_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+        metrics_->updateResponseTime(duration.count());
 
-        auto jsonResponse = nlohmann::json::parse(response);
-        if (jsonResponse.contains("auth") && jsonResponse["auth"].contains("client_token")) {
-            // Clear old token from memory
-            std::memset(m_authToken.data(), 0, m_authToken.size());
-            m_authToken = jsonResponse["auth"]["client_token"];
+        if (response->isSuccess() && response->getStatusCode() == 200) {
+            // Remove from cache
+            {
+                std::lock_guard<std::mutex> lock(cache_mutex_);
+                secret_cache_.erase(secretName);
+                cache_timestamps_.erase(secretName);
+            }
+            metrics_->incrementSuccessfulRequests();
+            metrics_->setConnected(true);
             return true;
         }
-
+        
+        metrics_->incrementFailedRequests();
+        metrics_->setConnected(false);
         return false;
-
+        
     } catch (const std::exception& e) {
-        std::cerr << "Token refresh error: " << e.what() << std::endl;
+        auto end_time = std::chrono::steady_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+        metrics_->updateResponseTime(duration.count());
+        metrics_->incrementFailedRequests();
+        metrics_->setConnected(false);
         return false;
     }
 }
 
-std::string KeyVaultClient::getSecret(const std::string& path) {
-    if (m_authToken.empty()) {
-        std::cerr << "Not authenticated with KeyVault" << std::endl;
-        return "";
-    }
+std::vector<std::string> KeyVaultSecureStore::listSecrets() {
+    std::vector<std::string> secrets;
+    auto start_time = std::chrono::steady_clock::now();
+    metrics_->incrementTotalRequests();
 
     try {
-        std::string endpoint = "/v1/secret/" + path;
-        std::string response = makeHttpRequest("GET", endpoint);
+        refreshTokenIfNeeded();
         
-        if (response.empty()) {
-            return "";
+        std::string url = config_.key_vault_url + "/secrets?api-version=" + config_.api_version;
+        
+        auto request = std::make_unique<HttpRequest>();
+        request->setUrl(url);
+        request->setMethod(HttpMethod::GET);
+        request->addHeader("Authorization", "Bearer " + access_token_);
+        request->setTimeout(config_.request_timeout_seconds);
+        
+        auto response = http_client_->execute(*request);
+        
+        auto end_time = std::chrono::steady_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+        metrics_->updateResponseTime(duration.count());
+
+        if (response->isSuccess() && response->getStatusCode() == 200) {
+            nlohmann::json root = nlohmann::json::parse(response->getBody());
+            if (root.contains("value") && root["value"].is_array()) {
+                for (const auto& item : root["value"]) {
+                    if (item.contains("id")) {
+                        std::string id = item["id"].get<std::string>();
+                        // Extract secret name from the full ID
+                        size_t lastSlash = id.find_last_of('/');
+                        if (lastSlash != std::string::npos) {
+                            secrets.push_back(id.substr(lastSlash + 1));
+                        }
+                    }
+                }
+            }
+            metrics_->incrementSuccessfulRequests();
+            metrics_->setConnected(true);
+        } else {
+            metrics_->incrementFailedRequests();
+            metrics_->setConnected(false);
         }
-
-        auto jsonResponse = nlohmann::json::parse(response);
-        if (jsonResponse.contains("data") && jsonResponse["data"].contains("value")) {
-            return jsonResponse["data"]["value"];
+        
+    bool KeyVaultSecureStore::hasSecret(const std::string& secretName) {
+    // Check cache first
+    {
+        std::lock_guard<std::mutex> lock(cache_mutex_);
+        if (isCacheValid(secretName)) {
+            return true;
         }
-
-        std::cerr << "Secret not found or invalid format: " << path << std::endl;
-        return "";
-
-    } catch (const std::exception& e) {
-        std::cerr << "Error retrieving secret '" << path << "': " << e.what() << std::endl;
-        return "";
     }
+    
+    // Try to get the secret
+    std::string value;
+    return getSecret(secretName, value);
 }
 
-bool KeyVaultClient::setSecret(const std::string& path, const std::string& value) {
-    if (m_authToken.empty()) {
-        std::cerr << "Not authenticated with KeyVault" << std::endl;
-        return false;
-    }
+bool KeyVaultSecureStore::isConnected() const {
+    return metrics_->isConnected();
+}
 
+bool KeyVaultSecureStore::testConnection() {
     try {
-        nlohmann::json payload;
-        payload["data"]["value"] = value;
-
-        std::string endpoint = "/v1/secret/" + path;
-        std::string response = makeHttpRequest("POST", endpoint, payload.dump());
+        refreshTokenIfNeeded();
         
-        return !response.empty();
-
-    } catch (const std::exception& e) {
-        std::cerr << "Error setting secret '" << path << "': " << e.what() << std::endl;
-        return false;
-    }
-}
-
-bool KeyVaultClient::deleteSecret(const std::string& path) {
-    if (m_authToken.empty()) {
-        std::cerr << "Not authenticated with KeyVault" << std::endl;
-        return false;
-    }
-
-    try {
-        std::string endpoint = "/v1/secret/" + path;
-        std::string response = makeHttpRequest("DELETE", endpoint);
+        // Try to list secrets as a connection test
+        std::string url = config_.key_vault_url + "/secrets?api-version=" + config_.api_version + "&maxresults=1";
         
-        return !response.empty();
-
+        auto request = std::make_unique<HttpRequest>();
+        request->setUrl(url);
+        request->setMethod(HttpMethod::GET);
+        request->addHeader("Authorization", "Bearer " + access_token_);
+        request->setTimeout(5); // Short timeout for connection test
+        
+        auto response = http_client_->execute(*request);
+        
+        bool connected = response->isSuccess() && response->getStatusCode() == 200;
+        metrics_->setConnected(connected);
+        return connected;
+        
     } catch (const std::exception& e) {
-        std::cerr << "Error deleting secret '" << path << "': " << e.what() << std::endl;
+        metrics_->setConnected(false);
         return false;
     }
 }
 
-bool KeyVaultClient::isConnected() const {
-    return !m_authToken.empty();
+void KeyVaultSecureStore::clearCache() {
+    std::lock_guard<std::mutex> lock(cache_mutex_);
+    secret_cache_.clear();
+    cache_timestamps_.clear();
 }
 
-void KeyVaultClient::disconnect() {
-    clearSensitiveData();
+std::shared_ptr<ISecureStoreMetrics> KeyVaultSecureStore::getMetrics() {
+    return metrics_;
 }
 
-std::string KeyVaultClient::makeHttpRequest(const std::string& method, const std::string& endpoint, 
-                                           const std::string& payload) {
-    CURL* curl = curl_easy_init();
-    if (!curl) {
-        std::cerr << "Failed to initialize CURL" << std::endl;
-        return "";
-    }
-
-    CurlResponse response;
-    std::string url = m_vaultUrl + endpoint;
+// Private helper methods
+std::string KeyVaultSecureStore::getAccessToken() {
+    // Implementation depends on authentication method (managed identity, service principal, etc.)
     
-    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
-    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 30L);
-    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
-    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 2L);
-
-    // Set HTTP method
-    if (method == "POST") {
-        curl_easy_setopt(curl, CURLOPT_POST, 1L);
-        if (!payload.empty()) {
-            curl_easy_setopt(curl, CURLOPT_POSTFIELDS, payload.c_str());
+    if (!config_.client_id.empty() && !config_.client_secret.empty()) {
+        // Service principal authentication
+        std::string url = "https://login.microsoftonline.com/" + config_.tenant_id + "/oauth2/v2.0/token";
+        
+        auto request = std::make_unique<HttpRequest>();
+        request->setUrl(url);
+        request->setMethod(HttpMethod::POST);
+        request->addHeader("Content-Type", "application/x-www-form-urlencoded");
+        
+        std::stringstream body;
+        body << "grant_type=client_credentials"
+             << "&client_id=" << config_.client_id
+             << "&client_secret=" << config_.client_secret
+             << "&scope=https://vault.azure.net/.default";
+        
+        request->setBody(body.str());
+        request->setTimeout(config_.request_timeout_seconds);
+        
+        auto response = http_client_->execute(*request);
+        
+        if (response->isSuccess() && response->getStatusCode() == 200) {
+            nlohmann::json root = nlohmann::json::parse(response->getBody());
+            if (root.contains("access_token")) {
+                // Calculate expiry time
+                int expiresIn = root.value("expires_in", 3600);
+                token_expiry_ = std::chrono::steady_clock::now() + std::chrono::seconds(expiresIn - 300); // 5 min buffer
+                
+                return root["access_token"].get<std::string>();
+            }
         }
-    } else if (method == "DELETE") {
-        curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "DELETE");
     }
-
-    // Set headers
-    struct curl_slist* headers = nullptr;
-    headers = curl_slist_append(headers, "Content-Type: application/json");
     
-    if (!m_authToken.empty()) {
-        std::string authHeader = "Authorization: Bearer " + m_authToken;
-        headers = curl_slist_append(headers, authHeader.c_str());
-    }
-    
-    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-
-    // Mutual TLS configuration
-    if (m_useMutualTLS) {
-        if (!m_caPath.empty()) {
-            curl_easy_setopt(curl, CURLOPT_CAINFO, m_caPath.c_str());
-        }
-        if (!m_clientCertPath.empty()) {
-            curl_easy_setopt(curl, CURLOPT_SSLCERT, m_clientCertPath.c_str());
-        }
-        if (!m_clientKeyPath.empty()) {
-            curl_easy_setopt(curl, CURLOPT_SSLKEY, m_clientKeyPath.c_str());
-        }
-    }
-
-    // Perform the request
-    CURLcode res = curl_easy_perform(curl);
-    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &response.responseCode);
-
-    curl_slist_free_all(headers);
-    curl_easy_cleanup(curl);
-
-    if (res != CURLE_OK) {
-        std::cerr << "CURL error: " << curl_easy_strerror(res) << std::endl;
-        return "";
-    }
-
-    if (response.responseCode < 200 || response.responseCode >= 300) {
-        std::cerr << "HTTP error: " << response.responseCode << std::endl;
-        return "";
-    }
-
-    return response.data;
+    throw std::runtime_error("Failed to obtain access token");
 }
 
-void KeyVaultClient::clearSensitiveData() {
-    if (!m_authToken.empty()) {
-        std::memset(m_authToken.data(), 0, m_authToken.size());
-        m_authToken.clear();
+bool KeyVaultSecureStore::isTokenExpired() const {
+    return std::chrono::steady_clock::now() >= token_expiry_;
+}
+
+void KeyVaultSecureStore::refreshTokenIfNeeded() {
+    std::lock_guard<std::mutex> lock(token_mutex_);
+    if (access_token_.empty() || isTokenExpired()) {
+        access_token_ = getAccessToken();
     }
+}
+
+std::string KeyVaultSecureStore::buildSecretUrl(const std::string& secretName, const std::string& version) const {
+    std::string url = config_.key_vault_url + "/secrets/" + secretName;
+    if (!version.empty()) {
+        url += "/" + version;
+    }
+    url += "?api-version=" + config_.api_version;
+    return url;
+}
+
+bool KeyVaultSecureStore::isCacheValid(const std::string& key) const {
+    auto it = cache_timestamps_.find(key);
+    if (it == cache_timestamps_.end()) {
+        return false;
+    }
+    
+    auto age = std::chrono::steady_clock::now() - it->second;
+    return age < cache_ttl_;
+}
+
+void KeyVaultSecureStore::updateCache(const std::string& key, const std::string& value) {
+    std::lock_guard<std::mutex> lock(cache_mutex_);
+    secret_cache_[key] = value;
+    cache_timestamps_[key] = std::chrono::steady_clock::now();
+}
+
+// SecureStoreFactory implementation
+std::unique_ptr<ISecureStore> SecureStoreFactory::create(const SecureStoreConfig& config) {
+    auto httpClient = std::make_unique<CurlHttpClient>();
+    return createKeyVault(config, std::move(httpClient));
+}
+
+std::unique_ptr<ISecureStore> SecureStoreFactory::createKeyVault(const SecureStoreConfig& config, 
+                                                               std::unique_ptr<IHttpClient> httpClient) {
+    return std::make_unique<KeyVaultSecureStore>(config, std::move(httpClient));
 }
 
 } // namespace infra

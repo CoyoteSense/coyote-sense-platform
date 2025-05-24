@@ -19,14 +19,15 @@ find_package(CURL REQUIRED)
 # Find nlohmann/json
 find_package(nlohmann_json REQUIRED)
 
+# Find yaml-cpp
+find_package(yaml-cpp REQUIRED)
+
 # Create infrastructure library
 add_library(CoyoteInfra STATIC
     RedisClient.cpp
-    RedisClient.h
     SecureStore.cpp
-    SecureStore.h
     ConfigReader.cpp
-    ConfigReader.h
+    HttpClient.cpp
 )
 
 # Set include directories
@@ -38,6 +39,7 @@ target_link_libraries(CoyoteInfra
     ${HIREDIS_LIBRARIES}
     CURL::libcurl
     nlohmann_json::nlohmann_json
+    yaml-cpp
 )
 
 # Platform-specific settings
