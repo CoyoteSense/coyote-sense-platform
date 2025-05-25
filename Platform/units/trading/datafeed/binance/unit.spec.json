@@ -1,0 +1,26 @@
+{
+  "$schema": "https://coyote.ai/schemas/unit-spec-v1.json",
+  "unitId": "datafeed-binance",
+  "version": "0.0.1",
+  "category": "trading",
+  "description": "TODO: datafeed-binance description",
+  "language": "cpp",
+  "entry": "worker/",
+  "imageName": "ghcr.io/coyote/datafeed-binance",
+  "modes": [
+    "production",
+    "recording",
+    "replay",
+    "simulation",
+    "debug",
+    "testing"
+  ],
+  "channels": {
+    "subscribe": [],
+    "publish": []
+  },
+  "resources": {
+    "cpu": "100m",
+    "memory": "128Mi"
+  }
+}

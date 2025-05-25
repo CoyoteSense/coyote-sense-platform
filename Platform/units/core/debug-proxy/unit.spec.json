@@ -1,0 +1,21 @@
+{
+  "$schema": "https://coyote.ai/schemas/unit-spec-v1.json",
+  "unitId": "debug-proxy",
+  "version": "0.0.1",
+  "category": "core",
+  "description": "TODO: debug-proxy description",
+  "language": "cpp",
+  "entry": "worker/",
+  "imageName": "ghcr.io/coyote/debug-proxy",
+  "modes": [
+    "debug"
+  ],
+  "channels": {
+    "subscribe": [],
+    "publish": []
+  },
+  "resources": {
+    "cpu": "100m",
+    "memory": "128Mi"
+  }
+}

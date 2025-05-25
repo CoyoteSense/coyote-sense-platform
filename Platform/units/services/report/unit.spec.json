@@ -1,0 +1,26 @@
+{
+  "$schema": "https://coyote.ai/schemas/unit-spec-v1.json",
+  "unitId": "report",
+  "version": "0.0.1",
+  "category": "services",
+  "description": "TODO: report description",
+  "language": "cpp",
+  "entry": "worker/",
+  "imageName": "ghcr.io/coyote/report",
+  "modes": [
+    "production",
+    "recording",
+    "replay",
+    "simulation",
+    "debug",
+    "testing"
+  ],
+  "channels": {
+    "subscribe": [],
+    "publish": []
+  },
+  "resources": {
+    "cpu": "100m",
+    "memory": "128Mi"
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "$schema": "https://coyote.ai/schemas/unit-spec-v1.json",
+  "unitId": "fix-quickfix",
+  "version": "0.0.1",
+  "category": "trading",
+  "description": "TODO: fix-quickfix description",
+  "language": "cpp",
+  "entry": "worker/",
+  "imageName": "ghcr.io/coyote/fix-quickfix",
+  "modes": [
+    "production",
+    "recording",
+    "replay",
+    "simulation",
+    "debug",
+    "testing"
+  ],
+  "channels": {
+    "subscribe": [],
+    "publish": []
+  },
+  "resources": {
+    "cpu": "100m",
+    "memory": "128Mi"
+  }
+}

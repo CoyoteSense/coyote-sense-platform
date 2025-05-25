@@ -1,0 +1,26 @@
+{
+  "$schema": "https://coyote.ai/schemas/unit-spec-v1.json",
+  "unitId": "https",
+  "version": "0.0.1",
+  "category": "api",
+  "description": "TODO: https description",
+  "language": "cpp",
+  "entry": "worker/",
+  "imageName": "ghcr.io/coyote/https",
+  "modes": [
+    "production",
+    "recording",
+    "replay",
+    "simulation",
+    "debug",
+    "testing"
+  ],
+  "channels": {
+    "subscribe": [],
+    "publish": []
+  },
+  "resources": {
+    "cpu": "100m",
+    "memory": "128Mi"
+  }
+}

@@ -1,0 +1,1 @@
+// msg record impl placeholder

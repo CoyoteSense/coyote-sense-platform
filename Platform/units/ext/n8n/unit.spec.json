@@ -1,0 +1,26 @@
+{
+  "$schema": "https://coyote.ai/schemas/unit-spec-v1.json",
+  "unitId": "n8n",
+  "version": "0.0.1",
+  "category": "ext",
+  "description": "TODO: n8n description",
+  "language": "cpp",
+  "entry": "worker/",
+  "imageName": "ghcr.io/coyote/n8n",
+  "modes": [
+    "production",
+    "recording",
+    "replay",
+    "simulation",
+    "debug",
+    "testing"
+  ],
+  "channels": {
+    "subscribe": [],
+    "publish": []
+  },
+  "resources": {
+    "cpu": "100m",
+    "memory": "128Mi"
+  }
+}

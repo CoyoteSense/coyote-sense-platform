@@ -1,0 +1,1 @@
+// placeholder interface for log (cpp)

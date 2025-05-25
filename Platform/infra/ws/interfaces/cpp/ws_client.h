@@ -1,0 +1,1 @@
+// placeholder interface for ws (cpp)
