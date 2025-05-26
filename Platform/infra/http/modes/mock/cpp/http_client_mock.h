@@ -1,6 +1,6 @@
 #pragma once
 
-#include "interfaces/cpp/http_client.h"
+#include "http_client.h"
 #include <queue>
 #include <mutex>
 #include <unordered_map>

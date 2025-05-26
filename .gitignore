@@ -10,6 +10,7 @@ install_manifest.txt
 
 # Build directories
 build/
+build-vcpkg/
 out/
 bin/
 lib/

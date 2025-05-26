@@ -5,8 +5,8 @@ FROM node:18-alpine
 WORKDIR /app
 
 # Install dependencies for test server
-COPY package.json package-lock.json ./
-RUN npm ci --only=production
+COPY package.json ./
+RUN npm install --production
 
 # Copy test server source
 COPY test-server/ ./
