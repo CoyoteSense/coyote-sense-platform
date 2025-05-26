@@ -1,0 +1,78 @@
+version: '3.8'
+
+services:
+  # Test web server - common for all languages
+  test-server:
+    build:
+      context: .
+      dockerfile: test-server.Dockerfile
+    container_name: coyote-http-test-server
+    ports:
+      - "8080:8080"  # HTTP
+      - "8443:8443"  # HTTPS
+    environment:
+      - HTTP_PORT=8080
+      - HTTPS_PORT=8443
+      - NODE_ENV=test
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - test-network
+
+  # C++ HTTP Client Integration Tests
+  cpp-tests:
+    build:
+      context: ../..
+      dockerfile: tests/integration/cpp-tests.Dockerfile
+    container_name: coyote-http-cpp-tests
+    depends_on:
+      test-server:
+        condition: service_healthy
+    environment:
+      - TEST_SERVER_HOST=test-server
+      - TEST_SERVER_HTTP_PORT=8080
+      - TEST_SERVER_HTTPS_PORT=8443
+      - COYOTE_RUNTIME_MODE=production
+    networks:
+      - test-network
+    volumes:
+      - ./results:/test-results
+
+  # Future: JavaScript HTTP Client Tests (placeholder)
+  # js-http-tests:
+  #   build:
+  #     context: .
+  #     dockerfile: js-tests.Dockerfile
+  #   depends_on:
+  #     test-server:
+  #       condition: service_healthy
+  #   environment:
+  #     - TEST_SERVER_HOST=test-server
+  #     - TEST_SERVER_HTTP_PORT=8080
+  #   networks:
+  #     - test-network
+
+  # Future: Python HTTP Client Tests (placeholder)
+  # python-http-tests:
+  #   build:
+  #     context: .
+  #     dockerfile: python-tests.Dockerfile
+  #   depends_on:
+  #     test-server:
+  #       condition: service_healthy
+  #   environment:
+  #     - TEST_SERVER_HOST=test-server
+  #     - TEST_SERVER_HTTP_PORT=8080
+  #   networks:
+  #     - test-network
+
+networks:
+  test-network:
+    driver: bridge
+
+volumes:
+  test-results:
