@@ -1,0 +1,11 @@
+{
+  "name": "coyote-http-client",
+  "version": "1.0.0",
+  "description": "Coyote HTTP Client Infrastructure with factory pattern and mock support",  "dependencies": [
+    "gtest",
+    {
+      "name": "curl",
+      "platform": "!uwp"
+    }
+  ]
+}
