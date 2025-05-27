@@ -40,7 +40,11 @@ COPY interfaces/ ./interfaces/
 RUN mkdir -p build && cd build && \
     cmake .. \
         -DCMAKE_BUILD_TYPE=Release && \
-    make -j$(nproc)
+    make -j$(nproc) && \
+    echo "Files in build directory:" && \
+    ls -la && \
+    echo "Files in build directory (find all):" && \
+    find . -type f | sort
 
 # Stage 2: Runtime environment
 FROM ubuntu:22.04 AS runtime
@@ -59,15 +63,24 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 # Copy built binaries from builder stage
-COPY --from=builder /workspace/build/ ./
+COPY --from=builder /workspace/build/integration_tests ./
+COPY --from=builder /workspace/build/libintegration_tests.* ./
+
+# List files to see what's available
+RUN ls -la
 
 # Create results directory
 RUN mkdir -p /test-results
 
 # Set environment variables for tests
 ENV TEST_SERVER_HOST=test-server
-ENV TEST_SERVER_HTTP_PORT=3001
+ENV TEST_SERVER_HTTP_PORT=8080
+ENV TEST_SERVER_HTTPS_PORT=8443
 ENV COYOTE_RUNTIME_MODE=production
+
+# Debug: Add a health check to verify test server is reachable
+RUN echo "#!/bin/sh\ncurl -f http://\$TEST_SERVER_HOST:\$TEST_SERVER_HTTP_PORT/health || exit 1" > /app/healthcheck.sh && \
+    chmod +x /app/healthcheck.sh
 
 # Default command runs the integration tests
 CMD ["./integration_tests"]

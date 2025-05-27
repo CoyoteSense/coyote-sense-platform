@@ -9,7 +9,7 @@ namespace test_helpers {
  * @param name The environment variable name
  * @param value The value to set
  */
-void SetEnvironmentVariable(const std::string& name, const std::string& value);
+void SetTestEnvironmentVariable(const std::string& name, const std::string& value);
 
 /**
  * Get an environment variable with optional default value
@@ -17,7 +17,7 @@ void SetEnvironmentVariable(const std::string& name, const std::string& value);
  * @param default_value Default value if not found
  * @return The environment variable value or default
  */
-std::string GetEnvironmentVariable(const std::string& name, const std::string& default_value = "");
+std::string GetTestEnvironmentVariable(const std::string& name, const std::string& default_value = "");
 
 /**
  * Remove an environment variable

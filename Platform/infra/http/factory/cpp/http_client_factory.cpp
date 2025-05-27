@@ -1,6 +1,6 @@
 #include "http_client_factory.h"
-#include "../../modes/real/cpp/http_client_real.h"
-#include "../../modes/mock/cpp/http_client_mock.h"
+#include "http_client_real.h"
+#include "http_client_mock.h"
 #include <cstdlib>
 #include <algorithm>
 #include <stdexcept>

@@ -24,5 +24,19 @@ include(build-scripts/cpp/CMakeLists.txt)
 # Include tests if requested
 if(BUILD_HTTP_CLIENT_TESTS)
     enable_testing()
-    add_subdirectory(tests/cpp cpp_tests)
+    
+    # Find GTest via vcpkg
+    find_package(GTest CONFIG REQUIRED)
+    
+    if(TARGET GTest::gtest)
+        message(STATUS "Found GTest. Building unit tests.")
+        add_subdirectory(tests/cpp cpp_tests)
+        
+        # Integration tests (optional, requires Docker)
+        if(BUILD_INTEGRATION_TESTS)
+            add_subdirectory(tests/integration integration_tests)
+        endif()
+    else()
+        message(FATAL_ERROR "GTest not found. Please install via vcpkg: vcpkg install gtest")
+    endif()
 endif()

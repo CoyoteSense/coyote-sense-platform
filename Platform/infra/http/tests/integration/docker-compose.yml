@@ -16,10 +16,10 @@ services:
       - NODE_ENV=test
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
     networks:
       - test-network
 
@@ -41,6 +41,16 @@ services:
       - test-network
     volumes:
       - ./results:/test-results
+    command: /bin/bash -c "curl -f http://test-server:8080/health && ./integration_tests"
+
+  # Future: JavaScript HTTP Client Tests (placeholder)
+  # js-http-tests:
+  #   build:
+  #     context: .
+  #     dockerfile: js-tests.Dockerfile
+  #   depends_on:
+  #     test-server:
+  #       condition: service_healthy
 
   # Future: JavaScript HTTP Client Tests (placeholder)
   # js-http-tests:

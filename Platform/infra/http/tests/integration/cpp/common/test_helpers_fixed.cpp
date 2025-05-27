@@ -33,13 +33,11 @@
 #include <netdb.h>
 #include <fcntl.h>
 #include <errno.h>
-#include <sys/socket.h>
-#include <sys/types.h>
 #endif
 
 namespace test_helpers {
 
-void SetTestEnvironmentVariable(const std::string& name, const std::string& value) {
+void SetEnvironmentVariable(const std::string& name, const std::string& value) {
 #ifdef _WIN32
     ::SetEnvironmentVariableA(name.c_str(), value.c_str());
 #else
@@ -47,7 +45,7 @@ void SetTestEnvironmentVariable(const std::string& name, const std::string& valu
 #endif
 }
 
-std::string GetTestEnvironmentVariable(const std::string& name, const std::string& default_value) {
+std::string GetEnvironmentVariable(const std::string& name, const std::string& default_value) {
     const char* value = std::getenv(name.c_str());
     return value ? std::string(value) : default_value;
 }
@@ -208,50 +206,25 @@ std::string GenerateRandomString(size_t length) {
 }
 
 std::string ExtractJsonValue(const std::string& json_str, const std::string& key) {
-    // Simple JSON value extraction (not a full parser)
-    std::string search_key = "\"" + key + "\"";
-    size_t key_pos = json_str.find(search_key);
-    if (key_pos == std::string::npos) {
-        return "";
+    // Use regex for more reliable extraction
+    std::regex pattern("\"" + key + "\"\\s*:\\s*\"([^\"]*)\"");
+    std::smatch match;
+    
+    if (std::regex_search(json_str, match, pattern) && match.size() > 1) {
+        return match[1].str();
     }
-
-    size_t colon_pos = json_str.find(":", key_pos);
-    if (colon_pos == std::string::npos) {
-        return "";
-    }
-
-    size_t value_start = colon_pos + 1;
-    while (value_start < json_str.length() && 
-           (json_str[value_start] == ' ' || json_str[value_start] == '\t')) {
-        value_start++;
-    }
-
-    if (value_start >= json_str.length()) {
-        return "";
-    }
-
-    size_t value_end;
-    if (json_str[value_start] == '"') {
-        // String value
-        value_start++; // Skip opening quote
-        value_end = json_str.find('"', value_start);
-        if (value_end == std::string::npos) {
-            return "";
-        }
-    } else {
-        // Non-string value
-        value_end = json_str.find_first_of(",}", value_start);
-        if (value_end == std::string::npos) {
-            value_end = json_str.length();
-        }
+    
+    // Try non-string pattern (number, boolean, etc.)
+    std::regex non_string_pattern("\"" + key + "\"\\s*:\\s*([^,}\\]]+)");
+    if (std::regex_search(json_str, match, non_string_pattern) && match.size() > 1) {
+        std::string result = match[1].str();
         // Trim whitespace
-        while (value_end > value_start && 
-               (json_str[value_end - 1] == ' ' || json_str[value_end - 1] == '\t')) {
-            value_end--;
-        }
+        result.erase(0, result.find_first_not_of(" \t\n\r\f\v"));
+        result.erase(result.find_last_not_of(" \t\n\r\f\v") + 1);
+        return result;
     }
-
-    return json_str.substr(value_start, value_end - value_start);
+    
+    return "";
 }
 
 std::string UrlEncode(const std::string& value) {
@@ -265,7 +238,7 @@ std::string UrlEncode(const std::string& value) {
             escaped << c;
         } else {
             // Percent-encode other characters
-            escaped << '%' << std::setw(2) << static_cast<unsigned char>(c);
+            escaped << '%' << std::setw(2) << static_cast<int>(static_cast<unsigned char>(c));
         }
     }
 

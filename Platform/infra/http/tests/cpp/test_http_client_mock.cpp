@@ -1,5 +1,6 @@
 // Unit tests for HTTP Client Mock
-#include "simple_test_framework.h"
+#include <gtest/gtest.h>
+#include <gmock/gmock.h>
 #include "../../modes/mock/cpp/http_client_mock.h"
 #include "../../factory/cpp/http_client_factory.h"
 #include <chrono>
@@ -9,12 +10,26 @@
 using namespace coyote::infra;
 using namespace coyote::infra::mocks;
 
+// Test fixture for HTTP Client Mock tests
+class HttpClientMockTest : public ::testing::Test {
+protected:
+    void SetUp() override {
+        client_ = std::make_unique<HttpClientMock>();
+    }
+
+    void TearDown() override {
+        // Clean up any resources
+    }
+
+    std::unique_ptr<HttpClientMock> client_;
+};
+
 // Basic functionality tests
 TEST(HttpClientMock, DefaultResponseIsSuccessful) {
   auto client = std::make_unique<HttpClientMock>();
   auto response = client->Get("http://example.com");
   
-  ASSERT_NOT_NULL(response.get());
+  ASSERT_NE(response.get(), nullptr);
   ASSERT_TRUE(response->IsSuccess());
   ASSERT_EQ(response->GetStatusCode(), 200);
   EXPECT_FALSE(response->GetBody().empty());
@@ -92,7 +107,7 @@ TEST_F(HttpClientMockTest, RequestRecordingWhenEnabled) {
   client_->Get("http://example.com/path1");
   client_->Post("http://example.com/path2", "test body");
   
-  auto requests = client_->GetRecordedRequests();
+  const auto& requests = client_->GetRecordedRequests();
   EXPECT_EQ(requests.size(), 2);
   
   EXPECT_EQ(requests[0]->GetUrl(), "http://example.com/path1");
@@ -109,7 +124,7 @@ TEST_F(HttpClientMockTest, RequestRecordingWhenDisabled) {
   
   client_->Get("http://example.com");
   
-  auto requests = client_->GetRecordedRequests();
+  const auto& requests = client_->GetRecordedRequests();
   EXPECT_EQ(requests.size(), 0);
 }
 
@@ -255,7 +270,7 @@ TEST_F(HttpClientMockTest, ThreadSafetyBasic) {
     thread.join();
   }
   
-  auto requests = client_->GetRecordedRequests();
+  const auto& requests = client_->GetRecordedRequests();
   EXPECT_EQ(requests.size(), num_threads * requests_per_thread);
 }
 

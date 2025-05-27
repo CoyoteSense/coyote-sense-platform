@@ -1,18 +1,11 @@
 // Main test runner for HTTP Client tests
-#include "simple_test_framework.h"
+#include <gtest/gtest.h>
 #include <iostream>
 
-int main() {
+int main(int argc, char **argv) {
     std::cout << "HTTP Client C++ Test Suite" << std::endl;
     std::cout << "============================" << std::endl;
     
-    int result = g_test_runner.run_all();
-    
-    if (result == 0) {
-        std::cout << "\nAll tests passed!" << std::endl;
-    } else {
-        std::cout << "\n" << result << " test(s) failed!" << std::endl;
-    }
-    
-    return result;
+    ::testing::InitGoogleTest(&argc, argv);
+    return RUN_ALL_TESTS();
 }

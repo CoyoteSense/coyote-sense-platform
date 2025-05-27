@@ -1,6 +1,6 @@
 // Integration tests for HTTP Client - tests against real web server
 #include <gtest/gtest.h>
-#include "../../../factory/cpp/http_client_factory.h"
+#include "http_client_factory.h"
 #include "../common/test_helpers.h"
 #include <thread>
 #include <chrono>
@@ -8,15 +8,14 @@
 using namespace coyote::infra;
 
 class HttpClientIntegrationTest : public ::testing::Test {
- protected:
-  void SetUp() override {
+ protected:  void SetUp() override {
     // Set environment to use real HTTP client
-    test_helpers::SetEnvironmentVariable("COYOTE_RUNTIME_MODE", "production");
+    test_helpers::SetTestEnvironmentVariable("COYOTE_RUNTIME_MODE", "real");
     
     // Get test server configuration from environment
-    test_server_host_ = test_helpers::GetEnvironmentVariable("TEST_SERVER_HOST", "localhost");
-    test_server_http_port_ = test_helpers::GetEnvironmentVariable("TEST_SERVER_HTTP_PORT", "8080");
-    test_server_https_port_ = test_helpers::GetEnvironmentVariable("TEST_SERVER_HTTPS_PORT", "8443");
+    test_server_host_ = test_helpers::GetTestEnvironmentVariable("TEST_SERVER_HOST", "localhost");
+    test_server_http_port_ = test_helpers::GetTestEnvironmentVariable("TEST_SERVER_HTTP_PORT", "8080");
+    test_server_https_port_ = test_helpers::GetTestEnvironmentVariable("TEST_SERVER_HTTPS_PORT", "8443");
     
     base_url_ = "http://" + test_server_host_ + ":" + test_server_http_port_;
     base_https_url_ = "https://" + test_server_host_ + ":" + test_server_https_port_;
