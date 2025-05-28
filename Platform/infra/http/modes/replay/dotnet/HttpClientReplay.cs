@@ -55,7 +55,9 @@ public class ReplayHttpClient : BaseHttpClient
         _logger = logger;
 
         _ = LoadRecordingsAsync();
-    }    public override async Task<IHttpResponse> ExecuteAsync(IHttpRequest request, CancellationToken cancellationToken = default)
+    }    
+    
+    public override async Task<IHttpResponse> ExecuteAsync(IHttpRequest request, CancellationToken cancellationToken = default)
     {
         _logger.LogDebug("Replay HTTP client executing {Method} request to {Url}", request.Method, request.Url);
 
@@ -73,7 +75,9 @@ public class ReplayHttpClient : BaseHttpClient
             Headers = response.Headers ?? new Dictionary<string, string>(),
             ErrorMessage = response.ErrorMessage
         });
-    }public override async Task<bool> PingAsync(string url, CancellationToken cancellationToken = default)
+    }
+    
+    public override async Task<bool> PingAsync(string url, CancellationToken cancellationToken = default)
     {
         _logger.LogDebug("Replay HTTP client ping to {Url}", url);
         
