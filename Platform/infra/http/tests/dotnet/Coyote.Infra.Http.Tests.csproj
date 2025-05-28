@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
+    <PackageReference Include="xunit" Version="2.6.1" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.5.3">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="8.0.0" />
+    <PackageReference Include="Moq" Version="4.20.69" />
+    <PackageReference Include="FluentAssertions" Version="6.12.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\interfaces\dotnet\Coyote.Infra.Http.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\factory\dotnet\*.cs" />
+    <Compile Include="..\..\modes\mock\dotnet\*.cs" />
+    <Compile Include="..\..\modes\real\dotnet\*.cs" />
+    <Compile Include="..\..\modes\replay\dotnet\*.cs" />
+    <Compile Include="..\..\modes\simulation\dotnet\*.cs" />
+    <Compile Include="..\..\modes\record\dotnet\*.cs" />
+    <Compile Include="..\..\modes\debug\dotnet\*.cs" />
+  </ItemGroup>
+
+</Project>
