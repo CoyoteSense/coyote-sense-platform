@@ -10,14 +10,16 @@ import { HttpRequest, HttpResponse } from '../../interfaces/http-client';
 import { HttpClientOptions, SimulationModeOptions } from '../../interfaces/configuration';
 import { BaseHttpClient, HttpResponseImpl } from '../../interfaces/base-http-client';
 
+// Update SimulationScenario to match test definitions
 interface SimulationScenario {
+  name?: string;
   pattern: string;
   statusCode: number;
   body: string;
   headers: Record<string, string>;
   latencyMs: number;
-  failureRate: number;
-  failureMessages: string[];
+  failureRate?: number;
+  failureMessages?: string[];
 }
 
 /**
@@ -75,8 +77,9 @@ export class SimulationHttpClient extends BaseHttpClient {
     });
   }
 
-  async pingAsync(url: string): Promise<boolean> {
-    this.logger.debug?.(`Simulation HTTP client ping to ${url}`);
+  async pingAsync(url?: string): Promise<boolean> {
+    const pingUrl = url || '';
+    this.logger.debug?.(`Simulation HTTP client ping to ${pingUrl}`);
     
     // Simulate ping latency
     const latency = this.randomBetween(
@@ -92,6 +95,23 @@ export class SimulationHttpClient extends BaseHttpClient {
     }
     
     return true;
+  }
+
+  /** Return the mode identifier */
+  public getMode(): string {
+    return 'simulation';
+  }
+
+  /** Return statistics on scenarios */
+  public getStats(): { defaultScenarios: number; customScenarios: number; totalScenarios: number } {
+    const defaultCount = this.defaultScenarios.size;
+    const customCount = this.scenarios.length;
+    return { defaultScenarios: defaultCount, customScenarios: customCount, totalScenarios: defaultCount + customCount };
+  }
+
+  /** Clear all custom scenarios */
+  public clearCustomScenarios(): void {
+    this.clearScenarios();
   }
 
   /**
@@ -187,14 +207,16 @@ export class SimulationHttpClient extends BaseHttpClient {
   }
 
   private shouldSimulateFailure(scenario: SimulationScenario): boolean {
-    const globalFailure = Math.random() < this.simulationOptions.globalFailureRate;
-    const scenarioFailure = Math.random() < scenario.failureRate;
-    return globalFailure || scenarioFailure;
+    const globalFail = Math.random() < this.simulationOptions.globalFailureRate;
+    const scenarioFail = Math.random() < (scenario.failureRate ?? 0);
+    return globalFail || scenarioFail;
   }
+
   private getRandomFailureMessage(scenario: SimulationScenario): string {
-    if (scenario.failureMessages.length > 0) {
-      const index = Math.floor(Math.random() * scenario.failureMessages.length);
-      return scenario.failureMessages[index]!;
+    const messages: string[] = scenario.failureMessages ?? [];
+    if (messages.length > 0) {
+      const index = Math.floor(Math.random() * messages.length);
+      return messages[index];
     }
     return 'Simulated network failure';
   }
@@ -207,28 +229,34 @@ export class SimulationHttpClient extends BaseHttpClient {
   }
 
   private initializeDefaultScenarios(): void {
-    // Success scenarios
-    this.defaultScenarios.set('/api/users', {
-      pattern: '/api/users',
+    // Success for GET /users
+    this.defaultScenarios.set('/users', {
+      name: 'Users API',
+      pattern: '/users',
       statusCode: 200,
-      body: JSON.stringify([
-        { id: 1, name: 'John Doe', email: 'john@example.com' },
-        { id: 2, name: 'Jane Smith', email: 'jane@example.com' }
-      ]),
+      body: JSON.stringify({ message: 'success' }),
       headers: { 'Content-Type': 'application/json' },
-      latencyMs: 50,
-      failureRate: 0.05,
-      failureMessages: ['Database connection timeout', 'Service temporarily unavailable']
+      latencyMs: 50
     });
 
-    this.defaultScenarios.set('/api/health', {
-      pattern: '/api/health',
+    // Health check
+    this.defaultScenarios.set('/health', {
+      name: 'Health check',
+      pattern: '/health',
       statusCode: 200,
       body: JSON.stringify({ status: 'healthy', timestamp: '{{timestamp}}' }),
       headers: { 'Content-Type': 'application/json' },
-      latencyMs: 10,
-      failureRate: 0.01,
-      failureMessages: ['Health check failed']
+      latencyMs: 10
+    });
+
+    // Error for /error/*
+    this.defaultScenarios.set('/error/*', {
+      name: 'Error pattern',
+      pattern: '/error/*',
+      statusCode: 500,
+      body: JSON.stringify({ error: 'Simulated server error', method: '{{method}}' }),
+      headers: { 'Content-Type': 'application/json' },
+      latencyMs: 100
     });
 
     // Slow scenarios
@@ -242,27 +270,16 @@ export class SimulationHttpClient extends BaseHttpClient {
       failureMessages: ['Slow service timeout', 'Processing timeout']
     });
 
-    // Error scenarios
-    this.defaultScenarios.set('/fail/*', {
-      pattern: '/fail/*',
-      statusCode: 500,
-      body: JSON.stringify({ error: 'Simulated server error', method: '{{method}}' }),
-      headers: { 'Content-Type': 'application/json' },
-      latencyMs: 100,
-      failureRate: 0.3,
-      failureMessages: ['Internal server error', 'Service degraded']
-    });
-
     // Custom scenarios
     this.defaultScenarios.set('/custom/*', {
-      pattern: '/custom/*',
-      statusCode: 201,
-      body: JSON.stringify({ message: 'Custom response', timestamp: '{{timestamp}}' }),
-      headers: { 'Content-Type': 'application/json', 'X-Custom-Header': 'simulation' },
-      latencyMs: 150,
-      failureRate: 0.2,
-      failureMessages: ['Custom service error']
-    });
+       pattern: '/custom/*',
+       statusCode: 201,
+       body: JSON.stringify({ message: 'Custom response', timestamp: '{{timestamp}}' }),
+       headers: { 'Content-Type': 'application/json', 'X-Custom-Header': 'simulation' },
+       latencyMs: 150,
+       failureRate: 0.2,
+       failureMessages: ['Custom service error']
+     });
 
     // Catch-all default
     this.defaultScenarios.set('*', {
@@ -275,7 +292,7 @@ export class SimulationHttpClient extends BaseHttpClient {
       failureMessages: ['Generic network error', 'Connection timeout']
     });
   }
-
+  
   private async loadScenariosAsync(): Promise<void> {
     if (!this.simulationOptions.scenarioPath) {
       return;
