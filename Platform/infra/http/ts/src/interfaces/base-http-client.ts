@@ -213,15 +213,14 @@ export abstract class BaseHttpClient implements CoyoteHttpClient {
 
     return result;
   }
-
-  dispose(): void {
+  async dispose(): Promise<void> {
     if (!this.disposed) {
       this.disposed = true;
-      this.onDispose();
+      await this.onDispose();
     }
   }
 
-  protected onDispose(): void {
+  protected async onDispose(): Promise<void> {
     // Override in derived classes for cleanup
   }
 }

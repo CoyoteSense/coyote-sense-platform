@@ -17,8 +17,7 @@ describe('Basic Integration Tests', () => {
     expect(response.statusCode).toBe(200);
     expect(response.isSuccess).toBe(true);
     expect(response.body).toBe('{"message":"Mock response"}');
-  });
-  test('DebugHttpClient should wrap inner client via RealHttpClient', async () => {
+  });  test('DebugHttpClient should wrap inner client via MockHttpClient', async () => {
     const mockLogger = {
       debug: jest.fn(),
       info: jest.fn(),
@@ -26,7 +25,9 @@ describe('Basic Integration Tests', () => {
       error: jest.fn(),
     } as any;
     
-    const debugClient = new DebugHttpClient(DEFAULT_HTTP_OPTIONS, DEFAULT_DEBUG_OPTIONS, mockLogger);
+    // Create a mock client as the inner client
+    const mockClient = new MockHttpClient(DEFAULT_HTTP_OPTIONS, DEFAULT_MOCK_OPTIONS);
+    const debugClient = new DebugHttpClient(mockClient, DEFAULT_DEBUG_OPTIONS, mockLogger);
     
     const request: HttpRequest = {
       method: HttpMethod.POST,

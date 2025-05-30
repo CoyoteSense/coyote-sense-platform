@@ -57,10 +57,12 @@ describe('DebugHttpClient (Fixed)', () => {
       expect(debugClient).toBeInstanceOf(DebugHttpClient);
     });
   });
-
   describe('executeAsync', () => {
     it('should execute request and log details when verbose logging enabled', async () => {
-      const debugClient = new DebugHttpClient(httpOptions, debugOptions, mockLogger);      const request: HttpRequest = {
+      const mockInnerClient = new MockHttpClient(DEFAULT_MOCK_OPTIONS, mockLogger);
+      const debugClient = new DebugHttpClient(mockInnerClient, debugOptions, mockLogger);
+
+      const request: HttpRequest = {
         method: HttpMethod.GET,
         url: 'https://httpbin.org/get',
         headers: { 'Authorization': 'Bearer token123' }
@@ -68,11 +70,15 @@ describe('DebugHttpClient (Fixed)', () => {
 
       const response = await debugClient.executeAsync(request);
 
-      expect(response.statusCode).toBeGreaterThanOrEqual(200);
+      expect(response.statusCode).toBe(200);
 
-      // Verify request logging
-      expect(mockLogger.info).toHaveBeenCalledWith(
-        expect.stringContaining('DEBUG HTTP Request: GET https://httpbin.org/get')
+      // Verify request logging - the actual implementation logs with '[HTTP Request]' format
+      expect(mockLogger.debug).toHaveBeenCalledWith(
+        '[HTTP Request]',
+        expect.objectContaining({
+          method: 'GET',
+          url: 'https://httpbin.org/get'
+        })
       );
     });
 
@@ -96,10 +102,9 @@ describe('DebugHttpClient (Fixed)', () => {
         call[0] && call[0].includes('DEBUG HTTP Request')
       );
       expect(infoCalls.length).toBe(0);
-    });
-
-    it('should log headers when logHeaders is enabled', async () => {
-      const debugClient = new DebugHttpClient(httpOptions, debugOptions, mockLogger);
+    });    it('should log headers when logHeaders is enabled', async () => {
+      const mockInnerClient = new MockHttpClient(DEFAULT_MOCK_OPTIONS, mockLogger);
+      const debugClient = new DebugHttpClient(mockInnerClient, debugOptions, mockLogger);
 
       const request: HttpRequest = {
         method: HttpMethod.POST,
@@ -113,17 +118,19 @@ describe('DebugHttpClient (Fixed)', () => {
 
       await debugClient.executeAsync(request);
 
-      // Verify header logging
-      expect(mockLogger.info).toHaveBeenCalledWith(
-        expect.stringContaining('DEBUG Request Header: Content-Type = application/json')
-      );
-      expect(mockLogger.info).toHaveBeenCalledWith(
-        expect.stringContaining('DEBUG Request Header: Authorization = Bearer token123')
+      // Verify header logging - the actual implementation logs with '[HTTP Request Headers]' format
+      expect(mockLogger.debug).toHaveBeenCalledWith(
+        '[HTTP Request Headers]',
+        expect.objectContaining({
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer token123'
+        })
       );
     });
 
     it('should log request body when logBodies is enabled', async () => {
-      const debugClient = new DebugHttpClient(httpOptions, debugOptions, mockLogger);
+      const mockInnerClient = new MockHttpClient(DEFAULT_MOCK_OPTIONS, mockLogger);
+      const debugClient = new DebugHttpClient(mockInnerClient, debugOptions, mockLogger);
 
       const requestBody = '{"name": "test", "value": 123}';
       const request: HttpRequest = {
@@ -135,20 +142,22 @@ describe('DebugHttpClient (Fixed)', () => {
 
       await debugClient.executeAsync(request);
 
-      // Verify body logging
-      expect(mockLogger.info).toHaveBeenCalledWith(
-        expect.stringContaining(`DEBUG Request Body: ${requestBody}`)
+      // Verify body logging - the actual implementation logs with '[HTTP Request Body]' format
+      expect(mockLogger.debug).toHaveBeenCalledWith(
+        '[HTTP Request Body]',
+        expect.objectContaining({ body: requestBody })
       );
-    });
-
-    it('should not log headers when logHeaders is disabled', async () => {
+    });    it('should not log headers when logHeaders is disabled', async () => {
       const optionsWithoutHeaders: DebugModeOptions = {
         verboseLogging: true,
         logBodies: true,
         logHeaders: false,
       };
 
-      const debugClient = new DebugHttpClient(httpOptions, optionsWithoutHeaders, mockLogger);      const request: HttpRequest = {
+      const mockInnerClient = new MockHttpClient(DEFAULT_MOCK_OPTIONS, mockLogger);
+      const debugClient = new DebugHttpClient(mockInnerClient, optionsWithoutHeaders, mockLogger);
+
+      const request: HttpRequest = {
         method: HttpMethod.GET,
         url: 'https://httpbin.org/get',
         headers: { 'Authorization': 'Bearer token' }
@@ -157,8 +166,8 @@ describe('DebugHttpClient (Fixed)', () => {
       await debugClient.executeAsync(request);
 
       // Check that header logs are not present
-      const headerCalls = (mockLogger.info as jest.Mock).mock.calls.filter(call => 
-        call[0] && call[0].includes('DEBUG Request Header')
+      const headerCalls = (mockLogger.debug as jest.Mock).mock.calls.filter(call => 
+        call[0] && call[0].includes('[HTTP Request Headers]')
       );
       expect(headerCalls.length).toBe(0);
     });
@@ -170,7 +179,8 @@ describe('DebugHttpClient (Fixed)', () => {
         logHeaders: true,
       };
 
-      const debugClient = new DebugHttpClient(httpOptions, optionsWithoutBodies, mockLogger);
+      const mockInnerClient = new MockHttpClient(DEFAULT_MOCK_OPTIONS, mockLogger);
+      const debugClient = new DebugHttpClient(mockInnerClient, optionsWithoutBodies, mockLogger);
 
       const request: HttpRequest = {
         method: HttpMethod.POST,
@@ -188,17 +198,18 @@ describe('DebugHttpClient (Fixed)', () => {
       expect(bodyCalls.length).toBe(0);
     });
   });
-
   describe('pingAsync', () => {
     it('should execute ping and log the result', async () => {
-      const debugClient = new DebugHttpClient(httpOptions, debugOptions, mockLogger);
+      const mockInnerClient = new MockHttpClient(DEFAULT_MOCK_OPTIONS, mockLogger);
+      const debugClient = new DebugHttpClient(mockInnerClient, debugOptions, mockLogger);
 
       const result = await debugClient.pingAsync('https://httpbin.org/status/200');
 
       expect(typeof result).toBe('boolean');
+      expect(result).toBe(true);
 
-      // Verify ping logging is handled by the underlying real client
-      // Debug client wraps but doesn't add specific ping logging
+      // Verify ping logging is handled by the underlying mock client
+      expect(mockLogger.debug).toHaveBeenCalledWith('Mock HTTP client ping to https://httpbin.org/status/200');
     });
   });
 

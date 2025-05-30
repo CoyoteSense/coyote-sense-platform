@@ -1,7 +1,7 @@
 import { RealHttpClient } from '../src/modes/real/real-http-client';
 import { DEFAULT_HTTP_OPTIONS } from '../src/interfaces/configuration';
 
-describe('RealHttpClient', () => {
+describe('RealHttpClient Simple Tests', () => {
   test('should create instance', () => {
     const client = new RealHttpClient(DEFAULT_HTTP_OPTIONS);
     expect(client).toBeDefined();

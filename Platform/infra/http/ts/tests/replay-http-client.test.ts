@@ -6,7 +6,7 @@
 
 import { ReplayHttpClient } from '../src/modes/replay/replay-http-client';
 import { HttpMethod, HttpRequest, HttpResponse } from '../src/interfaces/http-client';
-import { ReplayModeOptions, HttpClientOptions, DEFAULT_HTTP_OPTIONS } from '../src/interfaces/configuration';
+import { ReplayModeOptions, HttpClientOptions, DEFAULT_HTTP_OPTIONS, ReplayHttpConfig } from '../src/interfaces/configuration';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
@@ -75,9 +75,7 @@ describe('ReplayHttpClient', () => {
         'recording3.json',
         'recording1.json', 
         'recording2.json'
-      ] as any);
-
-      mockFs.stat.mockImplementation((filePath: string) => {
+      ] as any);      mockFs.stat.mockImplementation((filePath: any) => {
         const filename = path.basename(filePath.toString());
         if (filename === 'recording1.json') {
           return Promise.resolve({ birthtime: new Date('2024-01-01T10:00:00.000Z') } as any);
@@ -87,9 +85,7 @@ describe('ReplayHttpClient', () => {
           return Promise.resolve({ birthtime: new Date('2024-01-01T10:02:00.000Z') } as any);
         }
         return Promise.reject(new Error('File not found'));
-      });
-
-      mockFs.readFile.mockImplementation((filePath: string) => {
+      });      mockFs.readFile.mockImplementation((filePath: any) => {
         const filename = path.basename(filePath.toString());
         if (filename === 'recording1.json') {
           return Promise.resolve(JSON.stringify(recording1));
@@ -123,9 +119,7 @@ describe('ReplayHttpClient', () => {
     it('should skip invalid recording files', async () => {
       mockFs.readdir.mockResolvedValue(['valid.json', 'invalid.json', 'another.json'] as any);
       
-      mockFs.stat.mockResolvedValue({ birthtime: new Date() } as any);
-
-      mockFs.readFile.mockImplementation((filePath: string) => {
+      mockFs.stat.mockResolvedValue({ birthtime: new Date() } as any);      mockFs.readFile.mockImplementation((filePath: any) => {
         const filename = path.basename(filePath.toString());
         if (filename === 'valid.json') {
           return Promise.resolve(JSON.stringify({
@@ -182,8 +176,7 @@ describe('ReplayHttpClient', () => {
       };
 
       mockFs.readdir.mockResolvedValue(['rec1.json', 'rec2.json'] as any);
-      mockFs.stat.mockResolvedValue({ birthtime: new Date() } as any);
-      mockFs.readFile.mockImplementation((filePath: string) => {
+      mockFs.stat.mockResolvedValue({ birthtime: new Date() } as any);      mockFs.readFile.mockImplementation((filePath: any) => {
         const filename = path.basename(filePath.toString());
         if (filename === 'rec1.json') {
           return Promise.resolve(JSON.stringify(recording1));
@@ -283,11 +276,9 @@ describe('ReplayHttpClient', () => {
       const request: HttpRequest = {
         method: HttpMethod.GET,
         url: '/api/test'
-      };
-
-      const response = await clientWithoutFallback.sendAsync(request);
+      };      const response = await clientWithoutFallback.sendAsync(request);
       expect(response.statusCode).toBe(404);
-      expect(response.body).toContain('No recording found');
+      expect(response.body).toContain('Recording not found');
     });
 
     it('should match requests ignoring case and whitespace in non-strict mode', async () => {

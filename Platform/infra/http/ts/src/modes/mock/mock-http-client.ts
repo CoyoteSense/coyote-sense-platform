@@ -5,7 +5,7 @@
  */
 
 import { HttpRequest, HttpResponse } from '../../interfaces/http-client';
-import { HttpClientOptions, MockModeOptions } from '../../interfaces/configuration';
+import { HttpClientOptions, MockModeOptions, MockHttpConfig, DEFAULT_HTTP_OPTIONS, DEFAULT_MOCK_OPTIONS } from '../../interfaces/configuration';
 import { BaseHttpClient, HttpResponseImpl } from '../../interfaces/base-http-client';
 
 interface MockResponse {
@@ -23,10 +23,39 @@ export class MockHttpClient extends BaseHttpClient {
   private readonly logger?: Console;
   private readonly predefinedResponses: Map<string, MockResponse> = new Map();
 
-  constructor(options: HttpClientOptions, mockOptions: MockModeOptions, logger?: Console) {
-    super(options);
-    this.mockOptions = { ...mockOptions };
-    this.logger = logger || console;
+  // Constructor overloads
+  constructor(options: HttpClientOptions, mockOptions: MockModeOptions, logger?: Console);
+  constructor(config: MockHttpConfig, logger?: Console);
+  constructor(
+    optionsOrConfig: HttpClientOptions | MockHttpConfig,
+    mockOptionsOrLogger?: MockModeOptions | Console,
+    logger?: Console
+  ) {
+    // Determine which constructor overload was used
+    if ((optionsOrConfig as HttpClientOptions).defaultTimeoutMs !== undefined && 
+        (mockOptionsOrLogger as MockModeOptions)?.defaultStatusCode !== undefined) {
+      // First overload: (options, mockOptions, logger?)
+      super(optionsOrConfig as HttpClientOptions);
+      this.mockOptions = { ...(mockOptionsOrLogger as MockModeOptions) };
+      this.logger = logger || console;
+    } else {
+      // Second overload: (config, logger?)
+      const config = optionsOrConfig as MockHttpConfig;
+      super({
+        defaultTimeoutMs: config.defaultTimeoutMs || DEFAULT_HTTP_OPTIONS.defaultTimeoutMs,
+        userAgent: config.userAgent || DEFAULT_HTTP_OPTIONS.userAgent,
+        defaultHeaders: config.defaultHeaders || DEFAULT_HTTP_OPTIONS.defaultHeaders,
+        maxRetries: config.maxRetries || DEFAULT_HTTP_OPTIONS.maxRetries,
+        ...(config.baseUrl && { baseUrl: config.baseUrl })
+      });
+      this.mockOptions = {
+        defaultStatusCode: config.defaultStatusCode || config.mock?.defaultStatusCode || DEFAULT_MOCK_OPTIONS.defaultStatusCode,
+        defaultBody: config.defaultBody || config.mock?.defaultBody || DEFAULT_MOCK_OPTIONS.defaultBody,
+        defaultHeaders: config.defaultHeaders || config.mock?.defaultHeaders || DEFAULT_MOCK_OPTIONS.defaultHeaders,
+        simulateLatencyMs: config.simulateLatencyMs || config.mock?.simulateLatencyMs || DEFAULT_MOCK_OPTIONS.simulateLatencyMs,
+      };
+      this.logger = (mockOptionsOrLogger as Console) || console;
+    }
   }
 
   async executeAsync(request: HttpRequest): Promise<HttpResponse> {
@@ -52,12 +81,19 @@ export class MockHttpClient extends BaseHttpClient {
 
     this.logger?.debug?.(
       `Mock HTTP client returning status ${response.statusCode} for ${request.url}`
-    );    return new HttpResponseImpl({
+    );
+
+    return new HttpResponseImpl({
       statusCode: response.statusCode,
       body: response.body,
       headers: response.headers,
       errorMessage: response.statusCode >= 400 ? `Mock error response ${response.statusCode}` : undefined,
     });
+  }
+
+  // Alias for executeAsync to match expected interface
+  async sendAsync(request: HttpRequest): Promise<HttpResponse> {
+    return this.executeAsync(request);
   }
 
   async pingAsync(url: string): Promise<boolean> {
@@ -161,5 +197,10 @@ export class MockHttpClient extends BaseHttpClient {
 
   private delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  protected override async onDispose(): Promise<void> {
+    // Mock HTTP client doesn't need special cleanup
+    await super.onDispose();
   }
 }

@@ -77,6 +77,14 @@ export interface DebugModeOptions {
   logBodies: boolean;
   /** Log headers */
   logHeaders: boolean;
+  /** Log requests */
+  logRequests?: boolean;
+  /** Log responses */
+  logResponses?: boolean;
+  /** Log timing information */
+  logTiming?: boolean;
+  /** Log level */
+  logLevel?: string;
 }
 
 export interface HttpClientModeOptions {
@@ -116,7 +124,7 @@ export const DEFAULT_HTTP_OPTIONS: HttpClientOptions = {
 
 export const DEFAULT_MOCK_OPTIONS: MockModeOptions = {
   defaultStatusCode: 200,
-  defaultBody: '{"message": "Mock response"}',
+  defaultBody: '{"message":"Mock response"}',
   defaultHeaders: {
     'Content-Type': 'application/json'
   },
@@ -148,3 +156,71 @@ export const DEFAULT_DEBUG_OPTIONS: DebugModeOptions = {
   logBodies: true,
   logHeaders: true
 };
+
+// Specific configuration interfaces for HTTP client types
+export interface MockHttpConfig extends Partial<HttpClientOptions> {
+  /** Mock mode specific options */
+  mock?: MockModeOptions;
+  /** Default status code for mock responses (direct property) */
+  defaultStatusCode?: number;
+  /** Default response body (direct property) */
+  defaultBody?: string;
+  /** Simulate network latency in milliseconds (direct property) */
+  simulateLatencyMs?: number;
+}
+
+export interface RecordHttpConfig extends Partial<HttpClientOptions> {
+  /** Record mode specific options */
+  record?: RecordModeOptions;
+  /** Directory to store recorded responses */
+  recordingDirectory?: string;
+  /** Whether to overwrite existing recordings */
+  overwriteExisting?: boolean;
+  /** Include request headers in recordings */
+  includeHeaders?: boolean;
+  /** Pretty print JSON in recordings */
+  prettyPrint?: boolean;
+  /** Include timestamp in recordings */
+  includeTimestamp?: boolean;
+  /** Filename template for recordings */
+  filenameTemplate?: string;
+}
+
+export interface ReplayHttpConfig extends Partial<HttpClientOptions> {
+  /** Directory containing recorded responses */
+  recordingDirectory?: string;
+  /** Whether to enforce strict URL matching */
+  strictMatching?: boolean;
+  /** Fallback response when no recording found */
+  fallbackResponse?: {
+    statusCode: number;
+    body: string;
+    headers: Record<string, string>;
+  };
+  /** Replay mode specific options (alternative structure) */
+  replay?: ReplayModeOptions;
+}
+
+export interface DebugHttpConfig extends Partial<HttpClientOptions> {
+  /** Debug mode specific options */
+  debug?: DebugModeOptions;
+  /** Enable verbose logging (direct property) */
+  verboseLogging?: boolean;
+  /** Log request/response bodies (direct property) */
+  logBodies?: boolean;
+  /** Log headers (direct property) */
+  logHeaders?: boolean;
+  /** Log requests (direct property) */
+  logRequests?: boolean;
+  /** Log responses (direct property) */
+  logResponses?: boolean;
+  /** Log timing information (direct property) */
+  logTiming?: boolean;
+  /** Log level */
+  logLevel?: string;
+}
+
+export interface SimulationHttpConfig extends Partial<HttpClientOptions> {
+  /** Simulation mode specific options */
+  simulation?: SimulationModeOptions;
+}

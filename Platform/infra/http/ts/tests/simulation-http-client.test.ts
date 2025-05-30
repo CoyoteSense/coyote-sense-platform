@@ -5,7 +5,7 @@
  * and behaviors for testing and development.
  */
 
-import { SimulationHttpClient } from '../src/modes/simulation/simulation-http-client';
+import { SimulationHttpClient, SimulationHttpConfig } from '../src/modes/simulation/simulation-http-client';
 import { HttpMethod, HttpRequest, HttpResponse } from '../src/interfaces/http-client';
 import { SimulationModeOptions, HttpClientOptions, DEFAULT_HTTP_OPTIONS, DEFAULT_SIMULATION_OPTIONS } from '../src/interfaces/configuration';
 import * as fs from 'fs/promises';
@@ -335,12 +335,11 @@ describe('SimulationHttpClient', () => {
         }
       ];
 
-      mockFs.readFile.mockResolvedValueOnce(JSON.stringify(scenarioData));
-
-      const configWithFile: SimulationHttpConfig = {
+      mockFs.readFile.mockResolvedValueOnce(JSON.stringify(scenarioData));      const configWithFile: SimulationHttpConfig = {
         scenarioFile: '/test/scenarios.json',
         globalLatencyMs: 0,
         globalFailureRate: 0.0,
+        pingFailureRate: 0.0,
         defaultScenario: {
           statusCode: 200,
           body: '',
@@ -358,12 +357,11 @@ describe('SimulationHttpClient', () => {
     });
 
     it('should handle file loading errors gracefully', async () => {
-      mockFs.readFile.mockRejectedValueOnce(new Error('File not found'));
-
-      const configWithBadFile: SimulationHttpConfig = {
+      mockFs.readFile.mockRejectedValueOnce(new Error('File not found'));      const configWithBadFile: SimulationHttpConfig = {
         scenarioFile: '/nonexistent/scenarios.json',
         globalLatencyMs: 0,
         globalFailureRate: 0.0,
+        pingFailureRate: 0.0,
         defaultScenario: {
           statusCode: 200,
           body: '',

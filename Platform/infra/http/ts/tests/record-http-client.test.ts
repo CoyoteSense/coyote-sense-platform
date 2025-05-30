@@ -7,7 +7,7 @@
 import { RecordHttpClient } from '../src/modes/record/record-http-client';
 import { MockHttpClient } from '../src/modes/mock/mock-http-client';
 import { HttpMethod, HttpRequest, HttpResponse, HttpClient } from '../src/interfaces/http-client';
-import { RecordModeOptions, MockModeOptions } from '../src/interfaces/configuration';
+import { RecordModeOptions, MockModeOptions, MockHttpConfig, RecordHttpConfig } from '../src/interfaces/configuration';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
@@ -63,7 +63,7 @@ describe('RecordHttpClient', () => {
     });
 
     it('should use default configuration when not provided', () => {
-      const defaultRecordClient = new RecordHttpClient(innerClient, undefined, mockLogger);
+      const defaultRecordClient = new RecordHttpClient(innerClient, { recordingDirectory: './test-recordings' }, mockLogger);
       expect(defaultRecordClient).toBeDefined();
     });
 
@@ -83,18 +83,15 @@ describe('RecordHttpClient', () => {
       const response = await recordClient.sendAsync(request);
 
       expect(response.statusCode).toBe(200);
-      expect(response.body).toBe('{"success": true}');
-
-      // Verify file was written
+      expect(response.body).toBe('{"success": true}');      // Verify file was written
       expect(mockFs.writeFile).toHaveBeenCalledWith(
-        expect.stringMatching(/\/test\/recordings\/recording_\d+_GET_.*\.json$/),
+        expect.stringMatching(/[\/\\]test[\/\\]recordings[\/\\]recording_\d+_GET_.*\.json$/),
         expect.stringContaining('"request"'),
         'utf8'
-      );
-
-      // Verify the recorded content structure
+      );// Verify the recorded content structure
       const writeCall = mockFs.writeFile.mock.calls[0];
-      const recordedContent = JSON.parse(writeCall[1] as string);
+      expect(writeCall).toBeDefined();
+      const recordedContent = JSON.parse(writeCall![1] as string);
       
       expect(recordedContent).toHaveProperty('request');
       expect(recordedContent).toHaveProperty('response');
@@ -113,7 +110,7 @@ describe('RecordHttpClient', () => {
       };
 
       const errorInnerClient = new MockHttpClient(errorConfig, mockLogger);
-      const errorRecordClient = new RecordHttpClient(errorInnerClient, undefined, mockLogger);
+      const errorRecordClient = new RecordHttpClient(errorInnerClient, { recordingDirectory: './test-recordings' }, mockLogger);
 
       const request: HttpRequest = {
         method: HttpMethod.GET,
@@ -122,11 +119,11 @@ describe('RecordHttpClient', () => {
 
       const response = await errorRecordClient.sendAsync(request);
 
-      expect(response.statusCode).toBe(404);
-      expect(mockFs.writeFile).toHaveBeenCalled();
+      expect(response.statusCode).toBe(404);      expect(mockFs.writeFile).toHaveBeenCalled();
 
       const writeCall = mockFs.writeFile.mock.calls[0];
-      const recordedContent = JSON.parse(writeCall[1] as string);
+      expect(writeCall).toBeDefined();
+      const recordedContent = JSON.parse(writeCall![1] as string);
       expect(recordedContent.response.statusCode).toBe(404);
       expect(recordedContent.response.body).toBe('{"error": "Not found"}');
     });
@@ -160,12 +157,11 @@ describe('RecordHttpClient', () => {
         method: HttpMethod.GET,
         url: '/api/test',
         headers: { 'Secret': 'should-not-be-recorded' }
-      };
-
-      await clientWithoutHeaders.sendAsync(request);
+      };      await clientWithoutHeaders.sendAsync(request);
 
       const writeCall = mockFs.writeFile.mock.calls[0];
-      const recordedContent = JSON.parse(writeCall[1] as string);
+      expect(writeCall).toBeDefined();
+      const recordedContent = JSON.parse(writeCall![1] as string);
       
       expect(recordedContent.request).not.toHaveProperty('headers');
       expect(recordedContent.response).not.toHaveProperty('headers');
@@ -184,10 +180,9 @@ describe('RecordHttpClient', () => {
         url: '/api/test'
       };
 
-      await clientWithoutPrettyPrint.sendAsync(request);
-
-      const writeCall = mockFs.writeFile.mock.calls[0];
-      const recordedJson = writeCall[1] as string;
+      await clientWithoutPrettyPrint.sendAsync(request);      const writeCall = mockFs.writeFile.mock.calls[0];
+      expect(writeCall).toBeDefined();
+      const recordedJson = writeCall![1] as string;
       
       // Should be compact JSON (no pretty printing)
       expect(recordedJson).not.toContain('\n  ');
@@ -233,11 +228,11 @@ describe('RecordHttpClient', () => {
         expect.stringMatching(/custom_PUT_\d+\.json$/),
         expect.any(String),
         'utf8'
-      );
+            );
     });
 
     it('should pass through all data from inner client', async () => {
-      const sendSpy = jest.spyOn(innerClient, 'sendAsync');
+      const executeSpy = jest.spyOn(innerClient, 'executeAsync');
 
       const request: HttpRequest = {
         method: HttpMethod.POST,
@@ -248,7 +243,7 @@ describe('RecordHttpClient', () => {
 
       const response = await recordClient.sendAsync(request);
 
-      expect(sendSpy).toHaveBeenCalledWith(request);
+      expect(executeSpy).toHaveBeenCalledWith(request);
       expect(response).toEqual(expect.objectContaining({
         statusCode: 200,
         body: '{"success": true}',
@@ -270,12 +265,11 @@ describe('RecordHttpClient', () => {
       const request: HttpRequest = {
         method: HttpMethod.GET,
         url: '/api/test'
-      };
-
-      await clientWithoutTimestamp.sendAsync(request);
+      };      await clientWithoutTimestamp.sendAsync(request);
 
       const writeCall = mockFs.writeFile.mock.calls[0];
-      const recordedContent = JSON.parse(writeCall[1] as string);
+      expect(writeCall).toBeDefined();
+      const recordedContent = JSON.parse(writeCall![1] as string);
       
       expect(recordedContent).not.toHaveProperty('timestamp');
     });
@@ -288,16 +282,18 @@ describe('RecordHttpClient', () => {
       await recordClient.dispose();
 
       expect(disposeSpy).toHaveBeenCalled();
-    });
-
-    it('should handle dispose errors gracefully', async () => {
-      const errorClient: IHttpClient = {
-        sendAsync: jest.fn(),
-        getMode: jest.fn().mockReturnValue('mock'),
+    });    it('should handle dispose errors gracefully', async () => {
+      const errorClient: HttpClient = {
+        executeAsync: jest.fn(),
+        pingAsync: jest.fn(),
+        getAsync: jest.fn(),
+        postJsonAsync: jest.fn(),
+        putJsonAsync: jest.fn(),
+        deleteAsync: jest.fn(),
         dispose: jest.fn().mockRejectedValue(new Error('Dispose error'))
       };
 
-      const errorRecordClient = new RecordHttpClient(errorClient, undefined, mockLogger);
+      const errorRecordClient = new RecordHttpClient(errorClient, { recordingDirectory: './test-recordings' }, mockLogger);
 
       await expect(errorRecordClient.dispose()).resolves.not.toThrow();
     });

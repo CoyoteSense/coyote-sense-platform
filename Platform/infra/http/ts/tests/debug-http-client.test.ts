@@ -7,7 +7,7 @@
 import { DebugHttpClient } from '../src/modes/debug/debug-http-client';
 import { MockHttpClient } from '../src/modes/mock/mock-http-client';
 import { HttpMethod, HttpRequest, HttpResponse, HttpClient } from '../src/interfaces/http-client';
-import { DebugModeOptions, MockModeOptions, DEFAULT_HTTP_OPTIONS, DEFAULT_DEBUG_OPTIONS, DEFAULT_MOCK_OPTIONS } from '../src/interfaces/configuration';
+import { DebugModeOptions, MockModeOptions, DebugHttpConfig, DEFAULT_HTTP_OPTIONS, DEFAULT_DEBUG_OPTIONS, DEFAULT_MOCK_OPTIONS } from '../src/interfaces/configuration';
 
 describe('DebugHttpClient', () => {
   let debugClient: DebugHttpClient;
@@ -30,7 +30,7 @@ describe('DebugHttpClient', () => {
       ...DEFAULT_DEBUG_OPTIONS
     };
 
-    debugClient = new DebugHttpClient(DEFAULT_HTTP_OPTIONS, debugConfig, mockLogger);
+    debugClient = new DebugHttpClient(innerClient, debugConfig, mockLogger);
   });
 
   describe('constructor', () => {    it('should create debug client with inner client', () => {
@@ -43,18 +43,16 @@ describe('DebugHttpClient', () => {
   });
 
   describe('executeAsync', () => {
-    it('should log request and response when logging enabled', async () => {
-      const request: HttpRequest = {
+    it('should log request and response when logging enabled', async () => {      const request: HttpRequest = {
         method: HttpMethod.GET,
         url: '/api/users/123',
-        headers: { 'Authorization': 'Bearer token123' },
-        body: undefined
+        headers: { 'Authorization': 'Bearer token123' }
       };
 
       const response = await debugClient.executeAsync(request);
 
       expect(response.statusCode).toBe(200);
-      expect(response.body).toBe('mock response');
+      expect(response.body).toBe('{"message":"Mock response"}');
 
       // Verify request logging
       expect(mockLogger.debug).toHaveBeenCalledWith(
@@ -105,15 +103,11 @@ describe('DebugHttpClient', () => {
         const duration = parseInt(loggedDuration);
         expect(duration).toBeLessThan(endTime - startTime + 100); // Add some buffer
       }
-    });
-
-    it('should not log headers when logHeaders is false', async () => {
-      const configWithoutHeaders: DebugHttpConfig = {
-        logRequests: true,
-        logResponses: true,
-        logHeaders: false,
-        logTiming: true,
-        logLevel: 'debug'
+    });    it('should not log headers when logHeaders is false', async () => {
+      const configWithoutHeaders: DebugModeOptions = {
+        verboseLogging: true,
+        logBodies: true,
+        logHeaders: false
       };
 
       const clientWithoutHeaders = new DebugHttpClient(innerClient, configWithoutHeaders, mockLogger);
@@ -131,15 +125,14 @@ describe('DebugHttpClient', () => {
         call[0].includes('[HTTP Request Headers]') || call[0].includes('[HTTP Response Headers]')
       );
       expect(headerCalls.length).toBe(0);
-    });
-
-    it('should not log requests when logRequests is false', async () => {
-      const configWithoutRequests: DebugHttpConfig = {
+    });    it('should not log requests when logRequests is false', async () => {
+      const configWithoutRequests: DebugModeOptions = {
+        verboseLogging: true,
+        logBodies: false,
+        logHeaders: false,
         logRequests: false,
         logResponses: true,
-        logHeaders: false,
-        logTiming: false,
-        logLevel: 'debug'
+        logTiming: false
       };
 
       const clientWithoutRequests = new DebugHttpClient(innerClient, configWithoutRequests, mockLogger);
@@ -161,13 +154,13 @@ describe('DebugHttpClient', () => {
       
       expect(requestCalls.length).toBe(0);
       expect(responseCalls.length).toBe(1);
-    });
-
-    it('should use different log levels', async () => {
-      const infoConfig: DebugHttpConfig = {
+    });    it('should use different log levels', async () => {
+      const infoConfig: DebugModeOptions = {
+        verboseLogging: true,
+        logBodies: false,
+        logHeaders: false,
         logRequests: true,
         logResponses: true,
-        logHeaders: false,
         logTiming: false,
         logLevel: 'info'
       };
@@ -184,17 +177,18 @@ describe('DebugHttpClient', () => {
       // Verify info level logging
       expect(mockLogger.info).toHaveBeenCalled();
       expect(mockLogger.debug).not.toHaveBeenCalled();
-    });
-
-    it('should handle errors from inner client', async () => {
+    });    it('should handle errors from inner client', async () => {
       // Create a mock client that throws an error
-      const errorClient: IHttpClient = {
-        sendAsync: jest.fn().mockRejectedValue(new Error('Network error')),
-        getMode: jest.fn().mockReturnValue('mock'),
-        dispose: jest.fn().mockResolvedValue(undefined)
-      };
+      const errorClient: HttpClient = {
+        executeAsync: jest.fn().mockRejectedValue(new Error('Network error')),
+        pingAsync: jest.fn(),
+        getAsync: jest.fn(),
+        postJsonAsync: jest.fn(),
+        putJsonAsync: jest.fn(),
+        deleteAsync: jest.fn(),
+        dispose: jest.fn().mockResolvedValue(undefined)      };
 
-      const errorDebugClient = new DebugHttpClient(errorClient, undefined, mockLogger);
+      const errorDebugClient = new DebugHttpClient(errorClient, { verboseLogging: true, logBodies: true, logHeaders: true }, mockLogger);
 
       const request: HttpRequest = {
         method: HttpMethod.GET,
@@ -208,10 +202,8 @@ describe('DebugHttpClient', () => {
         expect.stringContaining('[HTTP Error]'),
         expect.any(Error)
       );
-    });
-
-    it('should pass through all request properties to inner client', async () => {
-      const sendSpy = jest.spyOn(innerClient, 'sendAsync');
+    });    it('should pass through all request properties to inner client', async () => {
+      const sendSpy = jest.spyOn(innerClient, 'executeAsync');
 
       const request: HttpRequest = {
         method: HttpMethod.PUT,
@@ -236,16 +228,18 @@ describe('DebugHttpClient', () => {
       await debugClient.dispose();
 
       expect(disposeSpy).toHaveBeenCalled();
-    });
-
-    it('should handle dispose errors gracefully', async () => {
-      const errorClient: IHttpClient = {
-        sendAsync: jest.fn(),
-        getMode: jest.fn().mockReturnValue('mock'),
+    });    it('should handle dispose errors gracefully', async () => {
+      const errorClient: HttpClient = {
+        executeAsync: jest.fn(),
+        pingAsync: jest.fn(),
+        getAsync: jest.fn(),
+        postJsonAsync: jest.fn(),
+        putJsonAsync: jest.fn(),
+        deleteAsync: jest.fn(),
         dispose: jest.fn().mockRejectedValue(new Error('Dispose error'))
       };
 
-      const errorDebugClient = new DebugHttpClient(errorClient, undefined, mockLogger);
+      const errorDebugClient = new DebugHttpClient(errorClient, { verboseLogging: true, logBodies: true, logHeaders: true }, mockLogger);
 
       await expect(errorDebugClient.dispose()).resolves.not.toThrow();
       expect(mockLogger.error).toHaveBeenCalledWith(

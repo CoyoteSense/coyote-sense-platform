@@ -50,7 +50,7 @@ describe('DebugHttpClient', () => {
       ...DEFAULT_DEBUG_OPTIONS
     };
 
-    debugClient = new DebugHttpClient(DEFAULT_HTTP_OPTIONS, debugOptions, innerClient);
+    debugClient = new DebugHttpClient(innerClient, debugOptions, mockLogger);
   });
 
   describe('constructor', () => {
@@ -60,7 +60,7 @@ describe('DebugHttpClient', () => {
     });
 
     it('should use default configuration when none provided', () => {
-      const defaultDebugClient = new DebugHttpClient(DEFAULT_HTTP_OPTIONS, DEFAULT_DEBUG_OPTIONS, innerClient);
+      const defaultDebugClient = new DebugHttpClient(innerClient, DEFAULT_DEBUG_OPTIONS, mockLogger);
       expect(defaultDebugClient).toBeDefined();
     });
   });
@@ -117,7 +117,7 @@ describe('DebugHttpClient', () => {
         logHeaders: false
       };
 
-      const clientWithoutHeaders = new DebugHttpClient(DEFAULT_HTTP_OPTIONS, configWithoutHeaders, innerClient);
+      const clientWithoutHeaders = new DebugHttpClient(innerClient, configWithoutHeaders, mockLogger);
 
       const request: HttpRequest = {
         method: HttpMethod.GET,
@@ -144,7 +144,7 @@ describe('DebugHttpClient', () => {
         logRequests: false
       };
 
-      const clientWithoutRequests = new DebugHttpClient(DEFAULT_HTTP_OPTIONS, configWithoutRequests, innerClient);
+      const clientWithoutRequests = new DebugHttpClient(innerClient, configWithoutRequests, mockLogger);
 
       const request: HttpRequest = {
         method: HttpMethod.GET,
@@ -168,7 +168,7 @@ describe('DebugHttpClient', () => {
         logLevel: 'info'
       };
 
-      const infoClient = new DebugHttpClient(DEFAULT_HTTP_OPTIONS, infoConfig, innerClient);
+      const infoClient = new DebugHttpClient(innerClient, infoConfig, mockLogger);
 
       const request: HttpRequest = {
         method: HttpMethod.GET,
@@ -184,13 +184,16 @@ describe('DebugHttpClient', () => {
   });
 
   describe('error handling', () => {
-    it('should handle errors from inner client', async () => {
-      const errorClient: HttpClient = {
+    it('should handle errors from inner client', async () => {      const errorClient: HttpClient = {
         executeAsync: jest.fn().mockRejectedValue(new Error('Network error')),
-        dispose: jest.fn()
-      };
+        pingAsync: jest.fn(),
+        getAsync: jest.fn(),
+        postJsonAsync: jest.fn(),
+        putJsonAsync: jest.fn(),
+        deleteAsync: jest.fn(),
+        dispose: jest.fn()      };
 
-      const errorDebugClient = new DebugHttpClient(DEFAULT_HTTP_OPTIONS, DEFAULT_DEBUG_OPTIONS, errorClient);
+      const errorDebugClient = new DebugHttpClient(errorClient, DEFAULT_DEBUG_OPTIONS, mockLogger);
 
       const request: HttpRequest = {
         method: HttpMethod.GET,
@@ -230,17 +233,24 @@ describe('DebugHttpClient', () => {
       await debugClient.dispose();
 
       expect(disposeSpy).toHaveBeenCalled();
-    });
-
-    it('should handle dispose errors', async () => {
+    });    it('should handle dispose errors', async () => {
       const errorClient: HttpClient = {
         executeAsync: jest.fn(),
+        pingAsync: jest.fn(),
+        getAsync: jest.fn(),
+        postJsonAsync: jest.fn(),
+        putJsonAsync: jest.fn(),
+        deleteAsync: jest.fn(),
         dispose: jest.fn().mockRejectedValue(new Error('Dispose error'))
       };
 
-      const errorDebugClient = new DebugHttpClient(DEFAULT_HTTP_OPTIONS, DEFAULT_DEBUG_OPTIONS, errorClient);
+      const errorDebugClient = new DebugHttpClient(errorClient, DEFAULT_DEBUG_OPTIONS, mockLogger);
 
-      await expect(errorDebugClient.dispose()).rejects.toThrow('Dispose error');
+      // The dispose method now catches and logs errors instead of re-throwing them
+      await expect(errorDebugClient.dispose()).resolves.not.toThrow();
+      
+      // Verify that the error was logged
+      expect(mockLogger.error).toHaveBeenCalledWith('Error disposing inner HTTP client', expect.any(Error));
     });
   });
 });

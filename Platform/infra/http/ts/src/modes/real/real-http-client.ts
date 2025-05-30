@@ -93,4 +93,16 @@ export class RealHttpClient extends BaseHttpClient {
       return false;
     }
   }
+
+  /**
+   * Alias for executeAsync to match test expectations
+   */
+  async sendAsync(request: HttpRequest): Promise<HttpResponse> {
+    return this.executeAsync(request);
+  }
+
+  protected override async onDispose(): Promise<void> {
+    // Real HTTP client doesn't need special cleanup
+    await super.onDispose();
+  }
 }

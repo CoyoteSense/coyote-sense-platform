@@ -89,11 +89,10 @@ export interface HttpClient {
    * @returns Promise resolving to HTTP response
    */
   deleteAsync(url: string, headers?: Record<string, string>): Promise<HttpResponse>;
-
   /**
    * Dispose of resources
    */
-  dispose(): void;
+  dispose(): Promise<void>;
 }
 
 export interface CoyoteHttpClient extends HttpClient {

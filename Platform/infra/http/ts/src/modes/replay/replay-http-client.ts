@@ -8,7 +8,7 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { HttpRequest, HttpResponse } from '../../interfaces/http-client';
-import { HttpClientOptions, ReplayModeOptions } from '../../interfaces/configuration';
+import { HttpClientOptions, ReplayModeOptions, ReplayHttpConfig } from '../../interfaces/configuration';
 import { BaseHttpClient, HttpResponseImpl } from '../../interfaces/base-http-client';
 import { RealHttpClient } from '../real/real-http-client';
 import { MockHttpClient } from '../mock/mock-http-client';
@@ -36,31 +36,67 @@ interface RecordedInteraction {
 export class ReplayHttpClient extends BaseHttpClient {
   private readonly replayOptions: ReplayModeOptions;
   private readonly logger: Console;
-  private readonly recordingQueue: RecordedInteraction[] = [];
+  private recordingQueue: RecordedInteraction[] = [];
   private currentIndex: number = 0;
   private fallbackClient?: RealHttpClient | MockHttpClient;
-
-  constructor(options: HttpClientOptions, replayOptions: ReplayModeOptions, logger?: Console) {
-    super(options);
-    this.replayOptions = { ...replayOptions };
-    this.logger = logger || console;
+  private fallbackResponse?: { statusCode: number; body: string; headers: Record<string, string> } | undefined;
+  // Constructor overloads
+  constructor(options: HttpClientOptions, replayOptions: ReplayModeOptions, logger?: Console);
+  constructor(config: ReplayHttpConfig, logger?: Console);  constructor(
+    optionsOrConfig: HttpClientOptions | ReplayHttpConfig,
+    replayOptionsOrLogger?: ReplayModeOptions | Console,
+    logger?: Console
+  ) {
+    let httpOptions: HttpClientOptions;
+    
+    // Determine which constructor overload was used
+    if ((optionsOrConfig as HttpClientOptions).defaultTimeoutMs !== undefined && 
+        (replayOptionsOrLogger as ReplayModeOptions)?.recordingPath !== undefined) {
+      // First overload: (options, replayOptions, logger?)
+      httpOptions = optionsOrConfig as HttpClientOptions;
+      super(httpOptions);
+      this.replayOptions = { ...(replayOptionsOrLogger as ReplayModeOptions) };
+      this.logger = logger || console;
+    } else {
+      // Second overload: (config, logger?)
+      const config = optionsOrConfig as ReplayHttpConfig;
+      httpOptions = {
+        defaultTimeoutMs: config.defaultTimeoutMs || 30000,
+        userAgent: config.userAgent || 'CoyoteHttp/1.0',
+        defaultHeaders: config.defaultHeaders || {},
+        maxRetries: config.maxRetries || 3,
+        ...(config.baseUrl && { baseUrl: config.baseUrl })
+      };
+      super(httpOptions);      this.replayOptions = {
+        recordingPath: config.recordingDirectory || config.replay?.recordingPath || './recordings',
+        fallbackMode: config.replay?.fallbackMode || 'error',
+        strictMatching: config.strictMatching ?? config.replay?.strictMatching ?? false
+      };
+      this.fallbackResponse = config.fallbackResponse;
+      this.logger = (replayOptionsOrLogger as Console) || console;
+    }
     
     // Create fallback client based on mode
     if (this.replayOptions.fallbackMode === 'passthrough') {
-      this.fallbackClient = new RealHttpClient(options, this.logger);
-    } else if (this.replayOptions.fallbackMode === 'mock') {
-      // Use default mock options for fallback
+      this.fallbackClient = new RealHttpClient(httpOptions, this.logger);
+    } else if (this.replayOptions.fallbackMode === 'mock') {      // Use default mock options for fallback
       const mockOptions = {
         defaultStatusCode: 200,
-        defaultBody: '{"message": "Fallback mock response"}',
+        defaultBody: '{"message":"Fallback mock response"}',
         defaultHeaders: { 'Content-Type': 'application/json' },
         simulateLatencyMs: 100,
       };
-      this.fallbackClient = new MockHttpClient(options, mockOptions, this.logger);
+      this.fallbackClient = new MockHttpClient(httpOptions, mockOptions, this.logger);
     }
-    
-    // Load recordings asynchronously
+      // Load recordings asynchronously
     this.loadRecordingsAsync();
+  }
+
+  /**
+   * Get the recordings array (for test access)
+   */
+  get recordings(): RecordedInteraction[] {
+    return this.recordingQueue;
   }
 
   async executeAsync(request: HttpRequest): Promise<HttpResponse> {
@@ -89,6 +125,13 @@ export class ReplayHttpClient extends BaseHttpClient {
     // For ping, always return true in replay mode
     // Real pings would have been recorded if they were part of the test scenario
     return true;
+  }
+
+  /**
+   * Alias for executeAsync to match test expectations
+   */
+  async sendAsync(request: HttpRequest): Promise<HttpResponse> {
+    return this.executeAsync(request);
   }
 
   /**
@@ -129,22 +172,42 @@ export class ReplayHttpClient extends BaseHttpClient {
     }
 
     return undefined;
-  }
-
-  private matchesRequest(recorded: RecordedInteraction['request'], current: HttpRequest): boolean {
+  }  private matchesRequest(recorded: RecordedInteraction['request'], current: HttpRequest): boolean {
     if (this.replayOptions.strictMatching) {
-      // Strict matching: URL and method must match exactly
-      return recorded.url === current.url && recorded.method === current.method;
+      // Strict matching: URL, method, and headers must match exactly
+      const methodMatch = recorded.method === current.method;
+      const urlMatch = recorded.url === current.url;
+      
+      // Check headers if they exist
+      let headerMatch = true;
+      if (recorded.headers && current.headers) {
+        const recordedKeys = Object.keys(recorded.headers);
+        const currentKeys = Object.keys(current.headers);
+        
+        // All recorded headers must be present and match in current request
+        headerMatch = recordedKeys.every(key => 
+          current.headers![key] === recorded.headers[key]
+        );
+      } else if (recorded.headers || current.headers) {
+        // One has headers and the other doesn't
+        headerMatch = false;
+      }
+      
+      return methodMatch && urlMatch && headerMatch;
     } else {
-      // Loose matching: method must match, URL can be subset
-      return recorded.method === current.method && (
-        recorded.url === current.url || 
-        current.url.includes(recorded.url) ||
-        recorded.url.includes(current.url)
+      // Loose matching: method must match (case-insensitive), URL can be subset (case-insensitive)
+      const recordedMethod = recorded.method.toUpperCase();
+      const currentMethod = current.method.toUpperCase();
+      const recordedUrl = recorded.url.toLowerCase();
+      const currentUrl = current.url.toLowerCase();
+      
+      return recordedMethod === currentMethod && (
+        recordedUrl === currentUrl || 
+        currentUrl.includes(recordedUrl) ||
+        recordedUrl.includes(currentUrl)
       );
     }
   }
-
   private async handleNoRecording(request: HttpRequest): Promise<HttpResponse> {
     switch (this.replayOptions.fallbackMode) {
       case 'passthrough':
@@ -157,19 +220,31 @@ export class ReplayHttpClient extends BaseHttpClient {
 
       case 'error':
       default:
-        const errorMessage = `No recording found for ${request.method} ${request.url}`;
-        this.logger.error?.(errorMessage);        return new HttpResponseImpl({
+        // Use configured fallback response if available
+        if (this.fallbackResponse) {
+          this.logger.debug?.(`No recording found for ${request.url}, using configured fallback response`);
+          return new HttpResponseImpl({
+            statusCode: this.fallbackResponse.statusCode,
+            body: this.fallbackResponse.body,
+            headers: this.fallbackResponse.headers,
+          });
+        }        const errorMessage = `No recording found for ${request.method} ${request.url}`;
+        this.logger.error?.(errorMessage);
+        return new HttpResponseImpl({
           statusCode: 404,
-          body: JSON.stringify({ error: errorMessage }),
-          headers: { 'Content-Type': 'application/json' },
+          body: 'Recording not found',
+          headers: { 'Content-Type': 'text/plain' },
           errorMessage,
         });
     }
   }
-
   private async loadRecordingsAsync(): Promise<void> {
     try {
       this.logger.debug?.(`Loading recordings from ${this.replayOptions.recordingPath}`);
+      
+      // Clear existing recordings first
+      this.recordingQueue.length = 0;
+      this.currentIndex = 0;
       
       const files = await fs.readdir(this.replayOptions.recordingPath);
       const jsonFiles = files.filter(file => file.endsWith('.json'));
@@ -191,9 +266,15 @@ export class ReplayHttpClient extends BaseHttpClient {
         try {
           const content = await fs.readFile(filepath, 'utf8');
           const recording: RecordedInteraction = JSON.parse(content);
-          this.recordingQueue.push(recording);
+            // Validate recording structure
+          if (recording.request && recording.response && 
+              recording.request.method && recording.request.url) {
+            this.recordingQueue.push(recording);
+          } else {
+            this.logger.warn?.(`Failed to parse recording file ${filepath}`, 'Invalid structure');
+          }
         } catch (error) {
-          this.logger.warn?.(`Failed to load recording from ${filepath}:`, error);
+          this.logger.warn?.(`Failed to parse recording file ${filepath}:`, error);
         }
       }
 
@@ -201,9 +282,14 @@ export class ReplayHttpClient extends BaseHttpClient {
     } catch (error) {
       this.logger.error?.(`Failed to load recordings from ${this.replayOptions.recordingPath}:`, error);
     }
-  }
-  protected override onDispose(): void {
-    this.fallbackClient?.dispose();
-    super.onDispose();
+  }protected override async onDispose(): Promise<void> {
+    // Clear recordings
+    this.recordingQueue.length = 0;
+    this.currentIndex = 0;
+    
+    if (this.fallbackClient) {
+      await this.fallbackClient.dispose();
+    }
+    await super.onDispose();
   }
 }

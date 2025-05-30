@@ -7,8 +7,8 @@
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { HttpRequest, HttpResponse } from '../../interfaces/http-client';
-import { HttpClientOptions, RecordModeOptions } from '../../interfaces/configuration';
+import { HttpRequest, HttpResponse, HttpClient } from '../../interfaces/http-client';
+import { HttpClientOptions, RecordModeOptions, RecordHttpConfig, DEFAULT_HTTP_OPTIONS, DEFAULT_RECORD_OPTIONS } from '../../interfaces/configuration';
 import { BaseHttpClient } from '../../interfaces/base-http-client';
 import { RealHttpClient } from '../real/real-http-client';
 
@@ -16,16 +16,16 @@ interface RecordedInteraction {
   request: {
     url: string;
     method: string;
-    headers: Record<string, string>;
+    headers?: Record<string, string>;
     body?: string;
   };
   response: {
     statusCode: number;
-    headers: Record<string, string>;
+    headers?: Record<string, string>;
     body: string;
     errorMessage?: string;
   };
-  timestamp: string;
+  timestamp?: string;
   duration: number;
 }
 
@@ -33,25 +33,71 @@ interface RecordedInteraction {
  * Recording HTTP client implementation that captures requests/responses
  */
 export class RecordHttpClient extends BaseHttpClient {
-  private readonly realClient: RealHttpClient;
+  private readonly innerClient: HttpClient;
   private readonly recordOptions: RecordModeOptions;
+  private readonly filenameTemplate: string;
+  private readonly prettyPrint: boolean;
+  private readonly includeTimestamp: boolean;
   private readonly logger: Console;
 
-  constructor(options: HttpClientOptions, recordOptions: RecordModeOptions, logger?: Console) {
-    super(options);
-    this.recordOptions = { ...recordOptions };
-    this.logger = logger || console;
-    
-    // Use real client for actual requests
-    this.realClient = new RealHttpClient(options, this.logger);
+  // Constructor overloads
+  constructor(options: HttpClientOptions, recordOptions: RecordModeOptions, logger?: Console);
+  constructor(innerClient: HttpClient, recordConfig: RecordHttpConfig, logger?: Console);
+  constructor(
+    optionsOrInnerClient: HttpClientOptions | HttpClient,
+    recordOptionsOrConfig?: RecordModeOptions | RecordHttpConfig,
+    logger?: Console
+  ) {
+    // Determine which constructor overload was used
+    if ((optionsOrInnerClient as HttpClientOptions).defaultTimeoutMs !== undefined && 
+        (recordOptionsOrConfig as RecordModeOptions)?.recordingPath !== undefined) {
+      // First overload: (options, recordOptions, logger?)
+      super(optionsOrInnerClient as HttpClientOptions);
+      this.recordOptions = { ...(recordOptionsOrConfig as RecordModeOptions) };
+      this.filenameTemplate = 'recording_{timestamp}_{method}_{url}.json';
+      this.prettyPrint = true;
+      this.includeTimestamp = true;
+      this.logger = logger || console;
+      
+      // Use real client for actual requests
+      this.innerClient = new RealHttpClient(optionsOrInnerClient as HttpClientOptions, this.logger);
+    } else {
+      // Second overload: (innerClient, recordConfig, logger?)
+      const config = recordOptionsOrConfig as RecordHttpConfig;
+      const httpOptions = {
+        defaultTimeoutMs: config?.defaultTimeoutMs || DEFAULT_HTTP_OPTIONS.defaultTimeoutMs,
+        userAgent: config?.userAgent || DEFAULT_HTTP_OPTIONS.userAgent,
+        defaultHeaders: config?.defaultHeaders || DEFAULT_HTTP_OPTIONS.defaultHeaders,
+        maxRetries: config?.maxRetries || DEFAULT_HTTP_OPTIONS.maxRetries,
+        ...(config?.baseUrl && { baseUrl: config.baseUrl })
+      };
+      super(httpOptions);
+      this.recordOptions = {
+        recordingPath: config?.recordingDirectory || config?.record?.recordingPath || DEFAULT_RECORD_OPTIONS.recordingPath,
+        overwriteExisting: config?.overwriteExisting ?? config?.record?.overwriteExisting ?? DEFAULT_RECORD_OPTIONS.overwriteExisting,
+        includeHeaders: config?.includeHeaders ?? config?.record?.includeHeaders ?? DEFAULT_RECORD_OPTIONS.includeHeaders,
+      };
+      this.filenameTemplate = config?.filenameTemplate || 'recording_{timestamp}_{method}_{url}.json';
+      this.prettyPrint = config?.prettyPrint ?? true;
+      this.includeTimestamp = config?.includeTimestamp ?? true;
+      this.logger = logger || console;
+      
+      // Use the provided inner client for actual requests
+      this.innerClient = optionsOrInnerClient as HttpClient;
+    }
     
     // Ensure recording directory exists
     this.ensureRecordingDirectory();
   }
 
-  async executeAsync(request: HttpRequest): Promise<HttpResponse> {
+  /**
+   * Get the current mode of this client
+   */
+  getMode(): string {
+    return 'record';
+  }  async executeAsync(request: HttpRequest): Promise<HttpResponse> {
     const startTime = Date.now();
-    const response = await this.realClient.executeAsync(request);
+    const response = await this.innerClient.executeAsync(request);
     const duration = Date.now() - startTime;
 
     // Record the request/response pair
@@ -61,25 +107,31 @@ export class RecordHttpClient extends BaseHttpClient {
   }
 
   async pingAsync(url: string): Promise<boolean> {
-    // Forward ping to real client (don't record ping requests)
-    return this.realClient.pingAsync(url);
+    // Forward ping to inner client (don't record ping requests)
+    return this.innerClient.pingAsync(url);
   }
 
-  private async recordInteraction(request: HttpRequest, response: HttpResponse, duration: number): Promise<void> {
-    try {      const interaction: RecordedInteraction = {
+  /**
+   * Alias for executeAsync to match test expectations
+   */
+  async sendAsync(request: HttpRequest): Promise<HttpResponse> {
+    return this.executeAsync(request);
+  }  private async recordInteraction(request: HttpRequest, response: HttpResponse, duration: number): Promise<void> {
+    try {
+      const interaction: RecordedInteraction = {
         request: {
           url: request.url,
           method: request.method,
-          headers: this.recordOptions.includeHeaders ? (request.headers || {}) : {},
+          ...(this.recordOptions.includeHeaders && request.headers && { headers: request.headers }),
           ...(request.body && { body: request.body }),
         },
         response: {
           statusCode: response.statusCode,
-          headers: this.recordOptions.includeHeaders ? response.headers : {},
+          ...(this.recordOptions.includeHeaders && { headers: response.headers }),
           body: response.body,
           ...(response.errorMessage && { errorMessage: response.errorMessage }),
         },
-        timestamp: new Date().toISOString(),
+        ...(this.includeTimestamp && { timestamp: new Date().toISOString() }),
         duration,
       };
 
@@ -97,23 +149,41 @@ export class RecordHttpClient extends BaseHttpClient {
         }
       }
 
-      await fs.writeFile(filepath, JSON.stringify(interaction, null, 2), 'utf8');
+      const jsonContent = this.prettyPrint 
+        ? JSON.stringify(interaction, null, 2)
+        : JSON.stringify(interaction);
+
+      await fs.writeFile(filepath, jsonContent, 'utf8');
       
-      this.logger.debug?.(`Recorded interaction: ${request.method} ${request.url} -> ${filepath}`);
-    } catch (error) {
-      this.logger.error?.('Failed to record HTTP interaction:', error);
+      this.logger.debug?.(`Recorded interaction: ${request.method} ${request.url} -> ${filepath}`);    } catch (error) {
+      this.logger.error?.('Failed to record HTTP request:', error);
     }
   }
 
   private generateFilename(request: HttpRequest): string {
-    // Create a safe filename based on the request
-    const url = new URL(request.url);
-    const hostname = url.hostname.replace(/[^a-zA-Z0-9]/g, '_');
-    const pathname = url.pathname.replace(/[^a-zA-Z0-9]/g, '_');
-    const method = request.method.toLowerCase();
     const timestamp = Date.now();
+    const method = request.method.toUpperCase();
     
-    return `${method}_${hostname}${pathname}_${timestamp}.json`;
+    // Sanitize URL for filename
+    let url = request.url;
+    // Remove leading slash
+    if (url.startsWith('/')) {
+      url = url.substring(1);
+    }
+    // Replace special characters with underscores
+    url = url.replace(/[^a-zA-Z0-9]/g, '_');
+    // Remove consecutive underscores
+    url = url.replace(/_+/g, '_');
+    // Remove trailing underscore
+    if (url.endsWith('_')) {
+      url = url.substring(0, url.length - 1);
+    }
+    
+    // Apply filename template
+    return this.filenameTemplate
+      .replace('{timestamp}', timestamp.toString())
+      .replace('{method}', method)
+      .replace('{url}', url);
   }
 
   private async ensureRecordingDirectory(): Promise<void> {
@@ -122,9 +192,13 @@ export class RecordHttpClient extends BaseHttpClient {
     } catch (error) {
       this.logger.error?.(`Failed to create recording directory ${this.recordOptions.recordingPath}:`, error);
     }
-  }
-  protected override onDispose(): void {
-    this.realClient.dispose();
-    super.onDispose();
+  }  protected override async onDispose(): Promise<void> {
+    try {
+      await this.innerClient.dispose();
+    } catch (error) {
+      this.logger.error?.('Error disposing inner client:', error);
+      // Don't rethrow - allow dispose to complete gracefully
+    }
+    await super.onDispose();
   }
 }
