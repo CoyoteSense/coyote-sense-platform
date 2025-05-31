@@ -1,10 +1,10 @@
 {
   "$schema": "https://coyote.ai/schemas/unit-spec-v1.json",
   "unitId": "auth",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "category": "api",
-  "description": "TODO: auth description",
-  "language": "cpp",
+  "description": "OAuth2 Authentication Service for CoyoteSense platform - supports Client Credentials, JWT Bearer, mTLS, and Authorization Code flows",
+  "language": "csharp",
   "entry": "worker/",
   "imageName": "ghcr.io/coyote/auth",
   "modes": [
@@ -19,8 +19,37 @@
     "subscribe": [],
     "publish": []
   },
+  "endpoints": [
+    {
+      "path": "/token",
+      "method": "POST",
+      "description": "OAuth2 token endpoint - supports client_credentials, jwt-bearer, authorization_code, and refresh_token grants"
+    },
+    {
+      "path": "/authorize",
+      "method": "GET",
+      "description": "OAuth2 authorization endpoint for interactive flows"
+    },
+    {
+      "path": "/introspect",
+      "method": "POST", 
+      "description": "Token introspection endpoint for validation"
+    },
+    {
+      "path": "/revoke",
+      "method": "POST",
+      "description": "Token revocation endpoint"
+    }
+  ],
   "resources": {
-    "cpu": "100m",
-    "memory": "128Mi"
+    "cpu": "200m",
+    "memory": "256Mi"
+  },
+  "environment": {
+    "AUTH_ISSUER": "https://auth-service.coyotesense.local",
+    "AUTH_PRIVATE_KEY_PATH": "/opt/coyote/keys/auth-service.key",
+    "AUTH_PUBLIC_KEY_PATH": "/opt/coyote/keys/auth-service.pub",
+    "AUTH_TOKEN_TTL": "3600",
+    "AUTH_REFRESH_TOKEN_TTL": "86400"
   }
 }

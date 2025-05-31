@@ -1,50 +1,56 @@
-// OAuth2 Authentication Interfaces for JavaScript/TypeScript
-// This file imports the main interfaces from auth-interfaces.js
+/**
+ * Multi-Standard Authentication Interfaces and Types for JavaScript
+ * 
+ * This module contains all the interface definitions and types for multi-standard authentication
+ * in the CoyoteSense platform, supporting OAuth2 (RFC 6749), JWT Bearer (RFC 7523), 
+ * and mTLS (RFC 8705) authentication methods.
+ */
 
-export * from './auth-interfaces.js';
-
-// OAuth2 Authentication Modes
+// Authentication Modes
 
 /**
- * OAuth2 authentication modes supported by the platform
+ * Authentication modes supported by the platform
  * @readonly
  * @enum {string}
  */
 const AuthMode = {
-  /** Standard OAuth2 client credentials flow */
+  /** Standard OAuth2 client credentials flow (RFC 6749) */
   CLIENT_CREDENTIALS: 'client_credentials',
   
-  /** Client credentials with mutual TLS authentication */
+  /** Client credentials with mutual TLS authentication (RFC 8705) */
   CLIENT_CREDENTIALS_MTLS: 'client_credentials_mtls',
   
-  /** JWT Bearer assertion flow */
+  /** JWT Bearer assertion flow (RFC 7523) */
   JWT_BEARER: 'jwt_bearer',
   
-  /** Authorization code flow */
+  /** Authorization code flow (RFC 6749) */
   AUTHORIZATION_CODE: 'authorization_code',
   
-  /** Authorization code flow with PKCE */
+  /** Authorization code flow with PKCE (RFC 7636) */
   AUTHORIZATION_CODE_PKCE: 'authorization_code_pkce'
 };
 
 /**
- * OAuth2 client configuration
- * @typedef {Object} OAuth2ClientConfig
- * @property {string} authMode - Authentication mode to use
- * @property {string} serverUrl - OAuth2 server base URL
- * @property {string} clientId - Client ID for OAuth2 authentication
- * @property {string} [clientSecret] - Client secret for OAuth2 authentication (optional for public clients)
+ * Authentication client configuration
+ * @typedef {Object} AuthClientConfig
+ * @property {string} [authMode=AuthMode.CLIENT_CREDENTIALS] - Authentication mode to use
+ * @property {string} serverUrl - Authentication server base URL
+ * @property {string} clientId - Client ID for authentication
+ * @property {string} [clientSecret] - Client secret for authentication
  * @property {string[]} [defaultScopes] - Default scopes to request
  * 
+ * // mTLS settings
  * @property {string} [clientCertPath] - Client certificate path for mTLS authentication
  * @property {string} [clientKeyPath] - Client certificate key path for mTLS authentication
  * @property {string} [caCertPath] - CA certificate path for mTLS authentication
  * 
+ * // JWT Bearer settings
  * @property {string} [jwtSigningKeyPath] - JWT signing key path for JWT Bearer flow
  * @property {string} [jwtAlgorithm='RS256'] - JWT algorithm for JWT Bearer flow
  * @property {string} [jwtIssuer] - JWT issuer for JWT Bearer flow
  * @property {string} [jwtAudience] - JWT audience for JWT Bearer flow
  * 
+ * // Authorization Code settings
  * @property {string} [redirectUri] - Redirect URI for authorization code flows
  * @property {boolean} [usePkce=true] - Use PKCE for authorization code flow
  * 
@@ -53,14 +59,14 @@ const AuthMode = {
  * @property {number} [maxRetryAttempts=3] - Maximum retry attempts for token operations
  * @property {number} [retryDelayMs=1000] - Retry delay in milliseconds
  * 
- * @property {number} [timeoutMs=30000] - Default timeout for OAuth2 requests in milliseconds
+ * @property {number} [timeoutMs=30000] - Default timeout for authentication requests in milliseconds
  * @property {boolean} [verifySsl=true] - Verify SSL certificates
- * @property {Object.<string, string>} [customHeaders] - Custom headers to include in OAuth2 requests
+ * @property {Object.<string, string>} [customHeaders] - Custom headers to include in authentication requests
  */
 
 /**
- * OAuth2 token information
- * @typedef {Object} OAuth2Token
+ * Authentication token information
+ * @typedef {Object} AuthToken
  * @property {string} accessToken - Access token value
  * @property {string} tokenType - Token type (typically 'Bearer')
  * @property {number} expiresAt - Token expiration time as Unix timestamp
@@ -70,18 +76,18 @@ const AuthMode = {
  */
 
 /**
- * OAuth2 authentication result
- * @typedef {Object} OAuth2AuthResult
+ * Authentication result
+ * @typedef {Object} AuthResult
  * @property {boolean} success - Whether the authentication was successful
- * @property {OAuth2Token} [token] - Access token (if successful)
+ * @property {AuthToken} [token] - Access token (if successful)
  * @property {string} [errorCode] - Error code (if failed)
  * @property {string} [errorDescription] - Error description (if failed)
  * @property {string} [errorDetails] - Additional error details (if failed)
  */
 
 /**
- * OAuth2 server information
- * @typedef {Object} OAuth2ServerInfo
+ * Authentication server information
+ * @typedef {Object} AuthServerInfo
  * @property {string} authorizationEndpoint - Authorization endpoint URL
  * @property {string} tokenEndpoint - Token endpoint URL
  * @property {string} [introspectionEndpoint] - Token introspection endpoint URL
@@ -91,12 +97,12 @@ const AuthMode = {
  */
 
 /**
- * OAuth2 client configuration helper functions
+ * Authentication client configuration helper functions
  */
-class OAuth2ConfigHelper {
+class AuthConfigHelper {
   /**
    * Check if using client credentials mode
-   * @param {OAuth2ClientConfig} config - Configuration to check
+   * @param {AuthClientConfig} config - Configuration to check
    * @returns {boolean}
    */
   static isClientCredentialsMode(config) {
@@ -105,7 +111,7 @@ class OAuth2ConfigHelper {
 
   /**
    * Check if using mTLS mode
-   * @param {OAuth2ClientConfig} config - Configuration to check
+   * @param {AuthClientConfig} config - Configuration to check
    * @returns {boolean}
    */
   static isMtlsMode(config) {
@@ -114,7 +120,7 @@ class OAuth2ConfigHelper {
 
   /**
    * Check if using JWT Bearer mode
-   * @param {OAuth2ClientConfig} config - Configuration to check
+   * @param {AuthClientConfig} config - Configuration to check
    * @returns {boolean}
    */
   static isJwtBearerMode(config) {
@@ -123,7 +129,7 @@ class OAuth2ConfigHelper {
 
   /**
    * Check if using any authorization code mode
-   * @param {OAuth2ClientConfig} config - Configuration to check
+   * @param {AuthClientConfig} config - Configuration to check
    * @returns {boolean}
    */
   static isAuthorizationCodeMode(config) {
@@ -133,7 +139,7 @@ class OAuth2ConfigHelper {
 
   /**
    * Check if certificates are required for this mode
-   * @param {OAuth2ClientConfig} config - Configuration to check
+   * @param {AuthClientConfig} config - Configuration to check
    * @returns {boolean}
    */
   static requiresCertificates(config) {
@@ -142,7 +148,7 @@ class OAuth2ConfigHelper {
 
   /**
    * Check if client secret is required for this mode
-   * @param {OAuth2ClientConfig} config - Configuration to check
+   * @param {AuthClientConfig} config - Configuration to check
    * @returns {boolean}
    */
   static requiresClientSecret(config) {
@@ -151,7 +157,7 @@ class OAuth2ConfigHelper {
 
   /**
    * Check if JWT key is required for this mode
-   * @param {OAuth2ClientConfig} config - Configuration to check
+   * @param {AuthClientConfig} config - Configuration to check
    * @returns {boolean}
    */
   static requiresJwtKey(config) {
@@ -160,7 +166,7 @@ class OAuth2ConfigHelper {
 
   /**
    * Check if redirect URI is required for this mode
-   * @param {OAuth2ClientConfig} config - Configuration to check
+   * @param {AuthClientConfig} config - Configuration to check
    * @returns {boolean}
    */
   static requiresRedirectUri(config) {
@@ -169,7 +175,7 @@ class OAuth2ConfigHelper {
 
   /**
    * Validate configuration for the selected authentication mode
-   * @param {OAuth2ClientConfig} config - Configuration to validate
+   * @param {AuthClientConfig} config - Configuration to validate
    * @returns {boolean}
    */
   static isValid(config) {
@@ -198,13 +204,13 @@ class OAuth2ConfigHelper {
 }
 
 /**
- * OAuth2 token storage interface
+ * Authentication token storage interface
  */
-class IOAuth2TokenStorage {
+class IAuthTokenStorage {
   /**
    * Store a token for a client
    * @param {string} clientId - Client ID
-   * @param {OAuth2Token} token - Token to store
+   * @param {AuthToken} token - Token to store
    * @returns {Promise<void>}
    */
   async storeTokenAsync(clientId, token) {
@@ -214,7 +220,7 @@ class IOAuth2TokenStorage {
   /**
    * Retrieve a token for a client
    * @param {string} clientId - Client ID
-   * @returns {OAuth2Token|null}
+   * @returns {AuthToken|null}
    */
   getToken(clientId) {
     throw new Error('Method must be implemented');
@@ -237,9 +243,9 @@ class IOAuth2TokenStorage {
 }
 
 /**
- * OAuth2 logger interface
+ * Authentication logger interface
  */
-class IOAuth2Logger {
+class IAuthLogger {
   /**
    * Log information message
    * @param {string} message - Message to log
@@ -266,41 +272,42 @@ class IOAuth2Logger {
 }
 
 /**
- * OAuth2 authentication client interface
+ * Multi-standard authentication client interface supporting OAuth2 (RFC 6749),
+ * JWT Bearer (RFC 7523), and mTLS (RFC 8705) authentication methods.
  */
-class IOAuth2AuthClient {
+class IAuthClient {
   /**
-   * Authenticate using Client Credentials flow
+   * Authenticate using Client Credentials flow (OAuth2 RFC 6749)
    * @param {string[]} [scopes] - Scopes to request
-   * @returns {Promise<OAuth2AuthResult>}
+   * @returns {Promise<AuthResult>}
    */
   async authenticateClientCredentialsAsync(scopes = null) {
     throw new Error('Method must be implemented');
   }
 
   /**
-   * Authenticate using JWT Bearer flow
+   * Authenticate using JWT Bearer flow (RFC 7523)
    * @param {string} [subject] - JWT subject
    * @param {string[]} [scopes] - Scopes to request
-   * @returns {Promise<OAuth2AuthResult>}
+   * @returns {Promise<AuthResult>}
    */
   async authenticateJwtBearerAsync(subject = null, scopes = null) {
     throw new Error('Method must be implemented');
   }
 
   /**
-   * Authenticate using Authorization Code flow
+   * Authenticate using Authorization Code flow (OAuth2 RFC 6749)
    * @param {string} authorizationCode - Authorization code
    * @param {string} redirectUri - Redirect URI
    * @param {string} [codeVerifier] - PKCE code verifier
-   * @returns {Promise<OAuth2AuthResult>}
+   * @returns {Promise<AuthResult>}
    */
   async authenticateAuthorizationCodeAsync(authorizationCode, redirectUri, codeVerifier = null) {
     throw new Error('Method must be implemented');
   }
 
   /**
-   * Start Authorization Code + PKCE flow
+   * Start Authorization Code + PKCE flow (RFC 7636)
    * @param {string} redirectUri - Redirect URI
    * @param {string[]} [scopes] - Scopes to request
    * @param {string} [state] - State parameter
@@ -313,7 +320,7 @@ class IOAuth2AuthClient {
   /**
    * Refresh access token using refresh token
    * @param {string} refreshToken - Refresh token
-   * @returns {Promise<OAuth2AuthResult>}
+   * @returns {Promise<AuthResult>}
    */
   async refreshTokenAsync(refreshToken) {
     throw new Error('Method must be implemented');
@@ -321,7 +328,7 @@ class IOAuth2AuthClient {
 
   /**
    * Get current valid token (automatically refreshes if needed)
-   * @returns {Promise<OAuth2Token|null>}
+   * @returns {Promise<AuthToken|null>}
    */
   async getValidTokenAsync() {
     throw new Error('Method must be implemented');
@@ -347,7 +354,7 @@ class IOAuth2AuthClient {
   }
 
   /**
-   * Test connection to OAuth2 server
+   * Test connection to authentication server
    * @returns {Promise<boolean>}
    */
   async testConnectionAsync() {
@@ -355,8 +362,8 @@ class IOAuth2AuthClient {
   }
 
   /**
-   * Get OAuth2 server information
-   * @returns {Promise<OAuth2ServerInfo|null>}
+   * Get authentication server information
+   * @returns {Promise<AuthServerInfo|null>}
    */
   async getServerInfoAsync() {
     throw new Error('Method must be implemented');
@@ -371,7 +378,7 @@ class IOAuth2AuthClient {
 
   /**
    * Get current token (if any)
-   * @returns {OAuth2Token|null}
+   * @returns {AuthToken|null}
    */
   get currentToken() {
     throw new Error('Property must be implemented');
@@ -428,7 +435,7 @@ class IOAuth2AuthClient {
 /**
  * In-memory token storage implementation
  */
-class InMemoryTokenStorage extends IOAuth2TokenStorage {
+class InMemoryTokenStorage extends IAuthTokenStorage {
   constructor() {
     super();
     this._tokens = new Map();
@@ -454,8 +461,8 @@ class InMemoryTokenStorage extends IOAuth2TokenStorage {
 /**
  * Console logger implementation
  */
-class ConsoleOAuth2Logger extends IOAuth2Logger {
-  constructor(prefix = 'OAuth2') {
+class ConsoleAuthLogger extends IAuthLogger {
+  constructor(prefix = 'Auth') {
     super();
     this.prefix = prefix;
   }
@@ -476,7 +483,7 @@ class ConsoleOAuth2Logger extends IOAuth2Logger {
 /**
  * Null logger implementation (no logging)
  */
-class NullOAuth2Logger extends IOAuth2Logger {
+class NullAuthLogger extends IAuthLogger {
   logInfo(message) {
     // No-op
   }
@@ -490,15 +497,51 @@ class NullOAuth2Logger extends IOAuth2Logger {
   }
 }
 
+// Legacy OAuth2 interfaces for backward compatibility (deprecated)
+// These will be removed in a future version - use Auth* interfaces instead
+
+/** @deprecated Use AuthMode instead */
+const OAuth2AuthMode = AuthMode;
+
+/** @deprecated Use AuthConfigHelper instead */
+const OAuth2ConfigHelper = AuthConfigHelper;
+
+/** @deprecated Use IAuthTokenStorage instead */
+const IOAuth2TokenStorage = IAuthTokenStorage;
+
+/** @deprecated Use IAuthLogger instead */
+const IOAuth2Logger = IAuthLogger;
+
+/** @deprecated Use IAuthClient instead */
+const IOAuth2AuthClient = IAuthClient;
+
+/** @deprecated Use InMemoryTokenStorage instead */
+const InMemoryOAuth2TokenStorage = InMemoryTokenStorage;
+
+/** @deprecated Use ConsoleAuthLogger instead */
+const ConsoleOAuth2Logger = ConsoleAuthLogger;
+
+/** @deprecated Use NullAuthLogger instead */
+const NullOAuth2Logger = NullAuthLogger;
+
 // Export for Node.js and browser environments
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     AuthMode,
+    AuthConfigHelper,
+    IAuthTokenStorage,
+    IAuthLogger,
+    IAuthClient,
+    InMemoryTokenStorage,
+    ConsoleAuthLogger,
+    NullAuthLogger,
+    // Legacy exports for backward compatibility
+    OAuth2AuthMode,
     OAuth2ConfigHelper,
     IOAuth2TokenStorage,
     IOAuth2Logger,
     IOAuth2AuthClient,
-    InMemoryTokenStorage,
+    InMemoryOAuth2TokenStorage,
     ConsoleOAuth2Logger,
     NullOAuth2Logger
   };
@@ -506,14 +549,25 @@ if (typeof module !== 'undefined' && module.exports) {
 
 // Export for ES6 modules
 if (typeof window !== 'undefined') {
-  window.OAuth2 = {
+  window.Auth = {
     AuthMode,
-    OAuth2ConfigHelper,
-    IOAuth2TokenStorage,
-    IOAuth2Logger,
-    IOAuth2AuthClient,
+    AuthConfigHelper,
+    IAuthTokenStorage,
+    IAuthLogger,
+    IAuthClient,
     InMemoryTokenStorage,
-    ConsoleOAuth2Logger,
-    NullOAuth2Logger
+    ConsoleAuthLogger,
+    NullAuthLogger,
+    // Legacy exports for backward compatibility
+    OAuth2: {
+      AuthMode: OAuth2AuthMode,
+      ConfigHelper: OAuth2ConfigHelper,
+      TokenStorage: IOAuth2TokenStorage,
+      Logger: IOAuth2Logger,
+      AuthClient: IOAuth2AuthClient,
+      InMemoryTokenStorage: InMemoryOAuth2TokenStorage,
+      ConsoleLogger: ConsoleOAuth2Logger,
+      NullLogger: NullOAuth2Logger
+    }
   };
 }

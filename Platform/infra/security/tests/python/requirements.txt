@@ -1,0 +1,43 @@
+# OAuth2 Authentication Client - Python Test Dependencies
+# Testing framework and utilities for the Python OAuth2 authentication client
+
+# Core testing framework
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+pytest-cov>=4.1.0
+pytest-mock>=3.11.0
+pytest-xdist>=3.3.0  # For parallel test execution
+pytest-json-report>=1.5.0  # For performance test reporting
+
+# HTTP mocking and testing
+responses>=0.23.0
+aioresponses>=0.7.4
+httpx>=0.24.0  # For async HTTP testing
+
+# Test utilities
+freezegun>=1.2.0  # For time-related testing
+factory-boy>=3.3.0  # For test data generation
+faker>=19.0.0  # For generating fake data
+
+# Code quality and coverage
+coverage>=7.3.0
+pytest-html>=3.2.0  # HTML test reports
+pytest-benchmark>=4.0.0  # Performance benchmarking
+
+# Linting and formatting (for CI/CD)
+flake8>=6.0.0
+black>=23.0.0
+isort>=5.12.0
+mypy>=1.5.0
+
+# Security testing
+bandit>=1.7.0  # Security linting
+safety>=2.3.0  # Dependency vulnerability checking
+
+# JWT testing utilities
+pyjwt>=2.8.0
+cryptography>=41.0.0
+
+# Additional test utilities
+tox>=4.0.0  # Testing across multiple Python versions
+parameterized>=0.9.0  # Parameterized tests
