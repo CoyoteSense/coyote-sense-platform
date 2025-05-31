@@ -360,7 +360,7 @@ public class AuthClient : IAuthClient
     {
         try
         {
-            _logger.LogInfo("Testing connection to OAuth2 server");
+            _logger.LogInfo("Testing connection to auth server");
             var result = await _httpClient.PingAsync(_config.ServerUrl, cancellationToken);
             _logger.LogInfo($"Connection test {(result ? "successful" : "failed")}");
             return result;
@@ -376,7 +376,7 @@ public class AuthClient : IAuthClient
     {
         try
         {
-            _logger.LogInfo("Getting OAuth2 server information");
+            _logger.LogInfo("Getting auth server information");
 
             var response = await _httpClient.GetAsync($"{_config.ServerUrl}/.well-known/oauth-authorization-server", cancellationToken: cancellationToken);
             
@@ -460,7 +460,7 @@ public class AuthClient : IAuthClient
         var headers = new Dictionary<string, string>
         {
             ["Accept"] = "application/json",
-            ["User-Agent"] = "CoyoteSense-OAuth2-Client/1.0"
+            ["User-Agent"] = "CoyoteSense-Auth-Client/1.0"
         };
 
         _httpClient.SetDefaultHeaders(headers);
