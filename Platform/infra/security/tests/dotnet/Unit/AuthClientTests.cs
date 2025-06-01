@@ -10,31 +10,29 @@ using Moq;
 using Moq.Protected;
 using Xunit;
 using FluentAssertions;
-using Coyote.Infra.Security.OAuth2;
+using Coyote.Infra.Security.Auth;
 
 namespace Coyote.Infra.Security.OAuth2.Tests.Unit;
 
 /// <summary>
-/// Unit tests for OAuth2AuthClient
+/// Unit tests for AuthClient
 /// </summary>
-public class OAuth2AuthClientTests : IDisposable
+public class AuthClientTests : IDisposable
 {
-    private readonly Mock<IOAuth2TokenStorage> _mockTokenStorage;
-    private readonly Mock<IOAuth2Logger> _mockLogger;
+    private readonly Mock<IAuthTokenStorage> _mockTokenStorage;
+    private readonly Mock<IAuthLogger> _mockLogger;
     private readonly Mock<HttpMessageHandler> _mockHttpMessageHandler;
     private readonly HttpClient _httpClient;
-    private readonly OAuth2ClientConfig _config;
-    private readonly OAuth2AuthClient _client;
-
-    public OAuth2AuthClientTests()
+    private readonly AuthClientConfig _config;
+    private readonly AuthClient _client;    public AuthClientTests()
     {
-        _mockTokenStorage = new Mock<IOAuth2TokenStorage>();
-        _mockLogger = new Mock<IOAuth2Logger>();
+        _mockTokenStorage = new Mock<IAuthTokenStorage>();
+        _mockLogger = new Mock<IAuthLogger>();
         _mockHttpMessageHandler = new Mock<HttpMessageHandler>();
 
         _httpClient = new HttpClient(_mockHttpMessageHandler.Object);
 
-        _config = new OAuth2ClientConfig
+        _config = new AuthClientConfig
         {
             ServerUrl = "https://test-auth.example.com",
             ClientId = "test-client-id",
@@ -44,7 +42,7 @@ public class OAuth2AuthClientTests : IDisposable
             EnableAutoRefresh = false // Disable for most tests
         };
 
-        _client = new OAuth2AuthClient(_config, _httpClient, _tokenStorage: _mockTokenStorage.Object, _logger: _mockLogger.Object);
+        _client = new AuthClient(_config, _httpClient, _tokenStorage: _mockTokenStorage.Object, _logger: _mockLogger.Object);
     }
 
     public void Dispose()
@@ -86,9 +84,7 @@ public class OAuth2AuthClientTests : IDisposable
 
     #endregion
 
-    #region Client Credentials Flow Tests
-
-    [Fact]
+    #region Client Credentials Flow Tests    [Fact]
     public async Task ClientCredentialsAsync_WithValidCredentials_ShouldReturnSuccess()
     {
         // Arrange
@@ -102,7 +98,7 @@ public class OAuth2AuthClientTests : IDisposable
 
         SetupHttpResponse(HttpStatusCode.OK, JsonSerializer.Serialize(tokenResponse));
 
-        _mockTokenStorage.Setup(x => x.StoreTokenAsync(It.IsAny<string>(), It.IsAny<OAuth2Token>(), It.IsAny<CancellationToken>()))
+        _mockTokenStorage.Setup(x => x.StoreTokenAsync(It.IsAny<string>(), It.IsAny<AuthToken>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
 
         // Act
@@ -171,11 +167,9 @@ public class OAuth2AuthClientTests : IDisposable
             token_type = "Bearer",
             expires_in = 3600,
             scope = "read write"
-        };
+        };        SetupHttpResponse(HttpStatusCode.OK, JsonSerializer.Serialize(tokenResponse));
 
-        SetupHttpResponse(HttpStatusCode.OK, JsonSerializer.Serialize(tokenResponse));
-
-        _mockTokenStorage.Setup(x => x.StoreTokenAsync(It.IsAny<string>(), It.IsAny<OAuth2Token>(), It.IsAny<CancellationToken>()))
+        _mockTokenStorage.Setup(x => x.StoreTokenAsync(It.IsAny<string>(), It.IsAny<AuthToken>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
 
         // Act
@@ -217,7 +211,7 @@ public class OAuth2AuthClientTests : IDisposable
 
         SetupHttpResponse(HttpStatusCode.OK, JsonSerializer.Serialize(tokenResponse));
 
-        _mockTokenStorage.Setup(x => x.StoreTokenAsync(It.IsAny<string>(), It.IsAny<OAuth2Token>(), It.IsAny<CancellationToken>()))
+        _mockTokenStorage.Setup(x => x.StoreTokenAsync(It.IsAny<string>(), It.IsAny<AuthToken>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
 
         // Act
@@ -270,7 +264,7 @@ public class OAuth2AuthClientTests : IDisposable
 
         SetupHttpResponse(HttpStatusCode.OK, JsonSerializer.Serialize(tokenResponse));
 
-        _mockTokenStorage.Setup(x => x.StoreTokenAsync(It.IsAny<string>(), It.IsAny<OAuth2Token>(), It.IsAny<CancellationToken>()))
+        _mockTokenStorage.Setup(x => x.StoreTokenAsync(It.IsAny<string>(), It.IsAny<AuthToken>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
 
         // Act
@@ -547,7 +541,7 @@ public class OAuth2AuthClientTests : IDisposable
 
         SetupHttpResponse(HttpStatusCode.OK, JsonSerializer.Serialize(refreshedTokenResponse));
 
-        _mockTokenStorage.Setup(x => x.StoreTokenAsync(It.IsAny<string>(), It.IsAny<OAuth2Token>(), It.IsAny<CancellationToken>()))
+        _mockTokenStorage.Setup(x => x.StoreTokenAsync(It.IsAny<string>(), It.IsAny<AuthToken>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
 
         // Act
@@ -581,7 +575,7 @@ public class OAuth2AuthClientTests : IDisposable
 
         SetupHttpResponse(HttpStatusCode.OK, JsonSerializer.Serialize(tokenResponse));
 
-        _mockTokenStorage.Setup(x => x.StoreTokenAsync(It.IsAny<string>(), It.IsAny<OAuth2Token>(), It.IsAny<CancellationToken>()))
+        _mockTokenStorage.Setup(x => x.StoreTokenAsync(It.IsAny<string>(), It.IsAny<AuthToken>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
 
         // Act
@@ -631,14 +625,14 @@ public class OAuth2AuthClientTests : IDisposable
             .ThrowsAsync(exception);
     }
 
-    private static OAuth2Token CreateTestToken(
+    private static AuthToken CreateTestToken(
         string accessToken = "test-access-token",
         string tokenType = "Bearer",
         int expiresIn = 3600,
         string? refreshToken = null,
         string scope = "read write")
     {
-        return new OAuth2Token
+        return new AuthToken
         {
             AccessToken = accessToken,
             TokenType = tokenType,

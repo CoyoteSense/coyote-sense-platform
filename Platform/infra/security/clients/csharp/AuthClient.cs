@@ -2,14 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
-using System.Net.Http;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Web;
 using Microsoft.IdentityModel.Tokens;
 using Coyote.Infra.Http;
 
@@ -198,7 +196,7 @@ public class AuthClient : IAuthClient
         }
     }
 
-    public async Task<(string authorizationUrl, string codeVerifier, string state)> StartAuthorizationCodeFlowAsync(string redirectUri, List<string>? scopes = null, string? state = null)
+    public (string authorizationUrl, string codeVerifier, string state) StartAuthorizationCodeFlow(string redirectUri, List<string>? scopes = null, string? state = null)
     {
         _logger.LogInfo("Starting Authorization Code + PKCE flow");
 
@@ -225,7 +223,7 @@ public class AuthClient : IAuthClient
             parameters["scope"] = string.Join(" ", _config.DefaultScopes);
         }
 
-        var queryString = string.Join("&", parameters.Select(kv => $"{HttpUtility.UrlEncode(kv.Key)}={HttpUtility.UrlEncode(kv.Value)}"));
+        var queryString = string.Join("&", parameters.Select(kv => $"{UrlEncode(kv.Key)}={UrlEncode(kv.Value)}"));
         var authorizationUrl = $"{_config.ServerUrl}/authorize?{queryString}";
 
         return (authorizationUrl, codeVerifier, actualState);
@@ -292,9 +290,7 @@ public class AuthClient : IAuthClient
         }
 
         return _currentToken.IsExpired ? null : _currentToken;
-    }
-
-    public async Task<bool> RevokeTokenAsync(string token, string? tokenTypeHint = null, CancellationToken cancellationToken = default)
+    }    public async Task<bool> RevokeTokenAsync(string token, string? tokenTypeHint = null, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -310,8 +306,13 @@ public class AuthClient : IAuthClient
                 parameters["token_type_hint"] = tokenTypeHint;
             }
 
-            var formContent = new FormUrlEncodedContent(parameters);
-            var response = await _httpClient.PostAsync($"{_config.ServerUrl}/revoke", formContent.ReadAsStringAsync().Result, cancellationToken: cancellationToken);
+            var formContent = CreateFormUrlEncodedContent(parameters);
+            var headers = new Dictionary<string, string>
+            {
+                ["Content-Type"] = "application/x-www-form-urlencoded"
+            };
+
+            var response = await _httpClient.PostAsync($"{_config.ServerUrl}/revoke", formContent, headers, cancellationToken);
 
             var success = response.IsSuccess;
             _logger.LogInfo($"Token revocation {(success ? "successful" : "failed")}");
@@ -322,9 +323,7 @@ public class AuthClient : IAuthClient
             _logger.LogError($"Token revocation error: {ex.Message}");
             return false;
         }
-    }
-
-    public async Task<bool> IntrospectTokenAsync(string token, CancellationToken cancellationToken = default)
+    }    public async Task<bool> IntrospectTokenAsync(string token, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -335,8 +334,13 @@ public class AuthClient : IAuthClient
                 ["token"] = token
             };
 
-            var formContent = new FormUrlEncodedContent(parameters);
-            var response = await _httpClient.PostAsync($"{_config.ServerUrl}/introspect", formContent.ReadAsStringAsync().Result, cancellationToken: cancellationToken);
+            var formContent = CreateFormUrlEncodedContent(parameters);
+            var headers = new Dictionary<string, string>
+            {
+                ["Content-Type"] = "application/x-www-form-urlencoded"
+            };
+
+            var response = await _httpClient.PostAsync($"{_config.ServerUrl}/introspect", formContent, headers, cancellationToken);
 
             if (!response.IsSuccess)
             {
@@ -469,19 +473,16 @@ public class AuthClient : IAuthClient
         {
             _httpClient.SetClientCertificate(_config.ClientCertPath, _config.ClientKeyPath);
         }
-    }
-
-    private async Task<AuthResult> MakeTokenRequestAsync(Dictionary<string, string> parameters, CancellationToken cancellationToken)
+    }    private async Task<AuthResult> MakeTokenRequestAsync(Dictionary<string, string> parameters, CancellationToken cancellationToken)
     {
-        var formContent = new FormUrlEncodedContent(parameters);
-        var contentString = await formContent.ReadAsStringAsync();
+        var formContent = CreateFormUrlEncodedContent(parameters);
         
         var headers = new Dictionary<string, string>
         {
             ["Content-Type"] = "application/x-www-form-urlencoded"
         };
 
-        var response = await _httpClient.PostAsync($"{_config.ServerUrl}/token", contentString, headers, cancellationToken);
+        var response = await _httpClient.PostAsync($"{_config.ServerUrl}/token", formContent, headers, cancellationToken);
 
         if (!response.IsSuccess)
         {
@@ -614,6 +615,36 @@ public class AuthClient : IAuthClient
         {
             _logger.LogError($"Failed to store token: {ex.Message}");
         }
+    }
+
+    private static string CreateFormUrlEncodedContent(Dictionary<string, string> parameters)
+    {
+        var encoded = parameters
+            .Where(kvp => !string.IsNullOrEmpty(kvp.Value))
+            .Select(kvp => $"{UrlEncode(kvp.Key)}={UrlEncode(kvp.Value)}")
+            .ToArray();
+        
+        return string.Join("&", encoded);
+    }
+
+    private static string UrlEncode(string value)
+    {
+        if (string.IsNullOrEmpty(value))
+            return string.Empty;
+
+        var encoded = new StringBuilder();
+        foreach (char c in value)
+        {
+            if (char.IsLetterOrDigit(c) || c == '-' || c == '_' || c == '.' || c == '~')
+            {
+                encoded.Append(c);
+            }
+            else
+            {
+                encoded.Append($"%{((int)c):X2}");
+            }
+        }
+        return encoded.ToString();
     }
 
     private void OnRefreshTimer(object? state)

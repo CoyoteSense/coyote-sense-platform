@@ -83,7 +83,7 @@ public class RealHttpClient : BaseHttpClient
     {
         try
         {            var request = new RestRequest(url, Method.Head);
-            request.Timeout = 5000; // Short timeout for ping (5 seconds in milliseconds)
+            request.Timeout = TimeSpan.FromMilliseconds(5000); // Short timeout for ping (5 seconds)
             
             var response = await _restClient.ExecuteAsync(request, cancellationToken);
             return response.IsSuccessful;
@@ -100,7 +100,7 @@ public class RealHttpClient : BaseHttpClient
         var restRequest = new RestRequest(request.Url, method);        // Set timeout if specified
         if (request.TimeoutMs.HasValue)
         {
-            restRequest.Timeout = request.TimeoutMs.Value;
+            restRequest.Timeout = TimeSpan.FromMilliseconds(request.TimeoutMs.Value);
         }
 
         // Add headers

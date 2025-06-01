@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using Coyote.Infra.Http;
+using Coyote.Infra.Http.Factory;
 using Coyote.Infra.Security.Auth;
+using HttpFactory = Coyote.Infra.Http.Factory;
 
 namespace Coyote.Infra.Security.Auth;
 
@@ -16,6 +18,15 @@ namespace Coyote.Infra.Security.Auth;
 /// </summary>
 public static class AuthClientFactory
 {
+    private static HttpFactory.IHttpClientFactory? _httpClientFactory;
+
+    /// <summary>
+    /// Set the HTTP client factory (typically called during DI setup)
+    /// </summary>
+    public static void SetHttpClientFactory(HttpFactory.IHttpClientFactory httpClientFactory)
+    {
+        _httpClientFactory = httpClientFactory;
+    }
     /// <summary>
     /// Create authentication client for Client Credentials flow
     /// </summary>
@@ -27,8 +38,7 @@ public static class AuthClientFactory
         IAuthTokenStorage? tokenStorage = null,
         IAuthLogger? logger = null,
         ICoyoteHttpClient? httpClient = null)
-    {
-        var config = new AuthClientConfig
+    {        var config = new AuthClientConfig
         {
             AuthMode = AuthMode.ClientCredentials,
             ServerUrl = serverUrl,
@@ -37,7 +47,7 @@ public static class AuthClientFactory
             DefaultScopes = defaultScopes ?? new List<string>()
         };
 
-        var actualHttpClient = httpClient ?? CreateDefaultHttpClient();
+        var actualHttpClient = httpClient ?? GetDefaultHttpClient();
         return new AuthClient(config, actualHttpClient, tokenStorage, logger);
     }
 
@@ -53,8 +63,7 @@ public static class AuthClientFactory
         IAuthTokenStorage? tokenStorage = null,
         IAuthLogger? logger = null,
         ICoyoteHttpClient? httpClient = null)
-    {
-        var config = new AuthClientConfig
+    {        var config = new AuthClientConfig
         {
             AuthMode = AuthMode.ClientCredentialsMtls,
             ServerUrl = serverUrl,
@@ -64,7 +73,7 @@ public static class AuthClientFactory
             DefaultScopes = defaultScopes ?? new List<string>()
         };
 
-        var actualHttpClient = httpClient ?? CreateDefaultHttpClient();
+        var actualHttpClient = httpClient ?? GetDefaultHttpClient();
         return new AuthClient(config, actualHttpClient, tokenStorage, logger);
     }
 
@@ -81,8 +90,7 @@ public static class AuthClientFactory
         IAuthTokenStorage? tokenStorage = null,
         IAuthLogger? logger = null,
         ICoyoteHttpClient? httpClient = null)
-    {
-        var config = new AuthClientConfig
+    {        var config = new AuthClientConfig
         {
             AuthMode = AuthMode.JwtBearer,
             ServerUrl = serverUrl,
@@ -93,7 +101,7 @@ public static class AuthClientFactory
             DefaultScopes = defaultScopes ?? new List<string>()
         };
 
-        var actualHttpClient = httpClient ?? CreateDefaultHttpClient();
+        var actualHttpClient = httpClient ?? GetDefaultHttpClient();
         return new AuthClient(config, actualHttpClient, tokenStorage, logger);
     }
 
@@ -108,8 +116,7 @@ public static class AuthClientFactory
         IAuthTokenStorage? tokenStorage = null,
         IAuthLogger? logger = null,
         ICoyoteHttpClient? httpClient = null)
-    {
-        var config = new AuthClientConfig
+    {        var config = new AuthClientConfig
         {
             AuthMode = AuthMode.AuthorizationCode,
             ServerUrl = serverUrl,
@@ -118,11 +125,9 @@ public static class AuthClientFactory
             DefaultScopes = defaultScopes ?? new List<string>()
         };
 
-        var actualHttpClient = httpClient ?? CreateDefaultHttpClient();
+        var actualHttpClient = httpClient ?? GetDefaultHttpClient();
         return new AuthClient(config, actualHttpClient, tokenStorage, logger);
-    }
-
-    /// <summary>
+    }    /// <summary>
     /// Create authentication client with custom configuration
     /// </summary>
     public static IAuthClient CreateCustomClient(
@@ -131,7 +136,7 @@ public static class AuthClientFactory
         IAuthLogger? logger = null,
         ICoyoteHttpClient? httpClient = null)
     {
-        var actualHttpClient = httpClient ?? CreateDefaultHttpClient();
+        var actualHttpClient = httpClient ?? GetDefaultHttpClient();
         return new AuthClient(config, actualHttpClient, tokenStorage, logger);
     }
 
@@ -141,9 +146,17 @@ public static class AuthClientFactory
     public static AuthClientBuilder CreateBuilder(string serverUrl, string clientId)
     {
         return new AuthClientBuilder(serverUrl, clientId);
-    }    internal static ICoyoteHttpClient CreateDefaultHttpClient()
+    }
+
+    internal static ICoyoteHttpClient GetDefaultHttpClient()
     {
-        // Create a simple HTTP client with default options
+        // Use the injected HTTP client factory if available
+        if (_httpClientFactory != null)
+        {
+            return _httpClientFactory.CreateHttpClient();
+        }
+
+        // Fallback to creating a simple HTTP client with default options
         var options = new HttpClientOptions
         {
             DefaultTimeoutMs = 30000,
@@ -152,7 +165,6 @@ public static class AuthClientFactory
             FollowRedirects = true
         };
         
-        // Create a simplified HTTP client implementation
         return new SimpleHttpClient(options);
     }
 }
@@ -331,13 +343,12 @@ public class AuthClientBuilder
     {
         _httpClient = httpClient;
         return this;
-    }
-
-    /// <summary>
+    }    /// <summary>
     /// Build the authentication client
     /// </summary>
     public IAuthClient Build()
-    {        var httpClient = _httpClient ?? AuthClientFactory.CreateDefaultHttpClient();
+    {
+        var httpClient = _httpClient ?? AuthClientFactory.GetDefaultHttpClient();
         return new AuthClient(_config, httpClient, _tokenStorage, _logger);
     }
 }

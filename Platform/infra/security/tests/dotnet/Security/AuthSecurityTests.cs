@@ -9,26 +9,25 @@ using Microsoft.IdentityModel.Tokens;
 using Xunit;
 using Xunit.Abstractions;
 using CoyoteSense.OAuth2.Client.Tests.Mocks;
+using Coyote.Infra.Security.Auth;
 
 namespace CoyoteSense.OAuth2.Client.Tests.Security;
 
 /// <summary>
-/// Security tests for OAuth2AuthClient to ensure secure handling of credentials and tokens
+/// Security tests for AuthClient to ensure secure handling of credentials and tokens
 /// </summary>
-public class OAuth2SecurityTests : IDisposable
+public class AuthSecurityTests : IDisposable
 {
     private readonly ITestOutputHelper _output;
     private readonly MockOAuth2Server _mockServer;
     private readonly ServiceProvider _serviceProvider;
-    private readonly IOAuth2AuthClient _client;
-    private bool _disposed;
-
-    public OAuth2SecurityTests(ITestOutputHelper output)
+    private readonly IAuthClient _client;
+    private bool _disposed;    public AuthSecurityTests(ITestOutputHelper output)
     {
         _output = output;
         _mockServer = new MockOAuth2Server();
         
-        var config = new OAuth2ClientConfiguration
+        var config = new AuthClientConfig
         {
             ServerUrl = _mockServer.BaseUrl,
             ClientId = "test-client",
@@ -41,11 +40,11 @@ public class OAuth2SecurityTests : IDisposable
         services.AddLogging(builder => builder.AddConsole().SetMinimumLevel(LogLevel.Warning));
         services.AddHttpClient();
         services.AddSingleton(config);
-        services.AddTransient<IOAuth2TokenStorage, InMemoryOAuth2TokenStorage>();
-        services.AddTransient<IOAuth2AuthClient, OAuth2AuthClient>();
+        services.AddTransient<IAuthTokenStorage, InMemoryTokenStorage>();
+        services.AddTransient<IAuthClient, AuthClient>();
         
         _serviceProvider = services.BuildServiceProvider();
-        _client = _serviceProvider.GetRequiredService<IOAuth2AuthClient>();
+        _client = _serviceProvider.GetRequiredService<IAuthClient>();
     }
 
     [Fact]
@@ -58,9 +57,7 @@ public class OAuth2SecurityTests : IDisposable
         {
             builder.AddProvider(new TestLoggerProvider(logMessages));
             builder.SetMinimumLevel(LogLevel.Trace);
-        });
-
-        var secureConfig = new OAuth2ClientConfiguration
+        });        var secureConfig = new AuthClientConfig
         {
             ServerUrl = _mockServer.BaseUrl,
             ClientId = "test-client",
@@ -73,11 +70,11 @@ public class OAuth2SecurityTests : IDisposable
         services.AddLogging();
         services.AddHttpClient();
         services.AddSingleton(secureConfig);
-        services.AddTransient<IOAuth2TokenStorage, InMemoryOAuth2TokenStorage>();
-        services.AddTransient<IOAuth2AuthClient, OAuth2AuthClient>();
+        services.AddTransient<IAuthTokenStorage, InMemoryTokenStorage>();
+        services.AddTransient<IAuthClient, AuthClient>();
 
         using var serviceProvider = services.BuildServiceProvider();
-        var secureClient = serviceProvider.GetRequiredService<IOAuth2AuthClient>();
+        var secureClient = serviceProvider.GetRequiredService<IAuthClient>();
 
         // Act
         await secureClient.AuthenticateClientCredentialsAsync();
@@ -100,19 +97,18 @@ public class OAuth2SecurityTests : IDisposable
         
         var services = new ServiceCollection();
         services.AddLogging(builder => builder.AddConsole().SetMinimumLevel(LogLevel.Warning));
-        services.AddHttpClient();
-        services.AddSingleton(new OAuth2ClientConfiguration
+        services.AddHttpClient();        services.AddSingleton(new AuthClientConfig
         {
             ServerUrl = _mockServer.BaseUrl,
             ClientId = "test-client",
             ClientSecret = "test-secret",
             Scope = "api.read"
         });
-        services.AddSingleton<IOAuth2TokenStorage>(secureTokenStorage);
-        services.AddTransient<IOAuth2AuthClient, OAuth2AuthClient>();
+        services.AddSingleton<IAuthTokenStorage>(secureTokenStorage);
+        services.AddTransient<IAuthClient, AuthClient>();
 
         using var serviceProvider = services.BuildServiceProvider();
-        var secureClient = serviceProvider.GetRequiredService<IOAuth2AuthClient>();
+        var secureClient = serviceProvider.GetRequiredService<IAuthClient>();
 
         // Act
         var result = await secureClient.AuthenticateClientCredentialsAsync();
@@ -137,9 +133,8 @@ public class OAuth2SecurityTests : IDisposable
     {
         // This test would require setting up HTTPS with invalid certificates
         // For now, we'll test that the client properly validates server certificates
-        
-        // Arrange - Create client with certificate validation enabled
-        var httpsConfig = new OAuth2ClientConfiguration
+          // Arrange - Create client with certificate validation enabled
+        var httpsConfig = new AuthClientConfig
         {
             ServerUrl = "https://self-signed.badssl.com", // Known bad certificate
             ClientId = "test-client",
@@ -152,11 +147,11 @@ public class OAuth2SecurityTests : IDisposable
         services.AddLogging(builder => builder.AddConsole());
         services.AddHttpClient();
         services.AddSingleton(httpsConfig);
-        services.AddTransient<IOAuth2TokenStorage, InMemoryOAuth2TokenStorage>();
-        services.AddTransient<IOAuth2AuthClient, OAuth2AuthClient>();
+        services.AddTransient<IAuthTokenStorage, InMemoryTokenStorage>();
+        services.AddTransient<IAuthClient, AuthClient>();
 
         using var serviceProvider = services.BuildServiceProvider();
-        var httpsClient = serviceProvider.GetRequiredService<IOAuth2AuthClient>();
+        var httpsClient = serviceProvider.GetRequiredService<IAuthClient>();
 
         // Act & Assert
         var exception = await Assert.ThrowsAsync<HttpRequestException>(
@@ -281,22 +276,21 @@ public class OAuth2SecurityTests : IDisposable
     {
         // Arrange
         var disposableStorage = new DisposableTokenStorage();
-        
-        var services = new ServiceCollection();
+          var services = new ServiceCollection();
         services.AddLogging(builder => builder.AddConsole());
         services.AddHttpClient();
-        services.AddSingleton(new OAuth2ClientConfiguration
+        services.AddSingleton(new AuthClientConfig
         {
             ServerUrl = _mockServer.BaseUrl,
             ClientId = "test-client",
             ClientSecret = "test-secret",
             Scope = "api.read"
         });
-        services.AddSingleton<IOAuth2TokenStorage>(disposableStorage);
-        services.AddTransient<IOAuth2AuthClient, OAuth2AuthClient>();
+        services.AddSingleton<IAuthTokenStorage>(disposableStorage);
+        services.AddTransient<IAuthClient, AuthClient>();
 
         using var serviceProvider = services.BuildServiceProvider();
-        var testClient = serviceProvider.GetRequiredService<IOAuth2AuthClient>();
+        var testClient = serviceProvider.GetRequiredService<IAuthClient>();
 
         // Act - Store some tokens
         await testClient.AuthenticateClientCredentialsAsync();
@@ -314,13 +308,13 @@ public class OAuth2SecurityTests : IDisposable
     public async Task RateLimiting_ShouldPreventBruteForceAttacks()
     {
         // Arrange - Create client with invalid credentials
-        var invalidConfig = new OAuth2ClientConfiguration
+        var invalidConfig = new AuthClientConfig
         {
             ServerUrl = _mockServer.BaseUrl,
             ClientId = "invalid-client",
             ClientSecret = "invalid-secret",
             Scope = "api.read",
-            RetryPolicy = new OAuth2RetryPolicy
+            RetryPolicy = new AuthRetryPolicy
             {
                 MaxRetries = 0 // Disable retries for this test
             }
@@ -330,11 +324,11 @@ public class OAuth2SecurityTests : IDisposable
         services.AddLogging(builder => builder.AddConsole());
         services.AddHttpClient();
         services.AddSingleton(invalidConfig);
-        services.AddTransient<IOAuth2TokenStorage, InMemoryOAuth2TokenStorage>();
-        services.AddTransient<IOAuth2AuthClient, OAuth2AuthClient>();
+        services.AddTransient<IAuthTokenStorage, InMemoryTokenStorage>();
+        services.AddTransient<IAuthClient, AuthClient>();
 
         using var serviceProvider = services.BuildServiceProvider();
-        var invalidClient = serviceProvider.GetRequiredService<IOAuth2AuthClient>();
+        var invalidClient = serviceProvider.GetRequiredService<IAuthClient>();
 
         // Act - Make multiple failed authentication attempts
         var tasks = new List<Task<OAuth2TokenResponse>>();
@@ -444,7 +438,7 @@ public class OAuth2SecurityTests : IDisposable
             _logMessages = logMessages;
         }
 
-        public IDisposable BeginScope<TState>(TState state) => null!;
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
         public bool IsEnabled(LogLevel logLevel) => true;
 
         public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
@@ -453,7 +447,7 @@ public class OAuth2SecurityTests : IDisposable
         }
     }
 
-    private class SecureInMemoryTokenStorage : IOAuth2TokenStorage
+    private class SecureInMemoryTokenStorage : IAuthTokenStorage
     {
         private readonly Dictionary<string, string> _encryptedTokens = new();
         private readonly byte[] _encryptionKey;
@@ -463,37 +457,33 @@ public class OAuth2SecurityTests : IDisposable
             using var rng = RandomNumberGenerator.Create();
             _encryptionKey = new byte[32];
             rng.GetBytes(_encryptionKey);
-        }
-
-        public Task<OAuth2StoredToken?> GetTokenAsync(string key, CancellationToken cancellationToken = default)
+        }        public AuthToken? GetToken(string clientId)
         {
-            if (_encryptedTokens.TryGetValue(key, out var encryptedToken))
+            if (_encryptedTokens.TryGetValue(clientId, out var encryptedToken))
             {
                 var decryptedJson = Decrypt(encryptedToken);
-                var token = JsonSerializer.Deserialize<OAuth2StoredToken>(decryptedJson);
-                return Task.FromResult(token);
+                var token = JsonSerializer.Deserialize<AuthToken>(decryptedJson);
+                return token;
             }
-            return Task.FromResult<OAuth2StoredToken?>(null);
+            return null;
         }
 
-        public Task StoreTokenAsync(string key, OAuth2StoredToken token, CancellationToken cancellationToken = default)
+        public Task StoreTokenAsync(string clientId, AuthToken token)
         {
             var json = JsonSerializer.Serialize(token);
             var encryptedToken = Encrypt(json);
-            _encryptedTokens[key] = encryptedToken;
+            _encryptedTokens[clientId] = encryptedToken;
             return Task.CompletedTask;
         }
 
-        public Task RemoveTokenAsync(string key, CancellationToken cancellationToken = default)
+        public void ClearToken(string clientId)
         {
-            _encryptedTokens.Remove(key);
-            return Task.CompletedTask;
+            _encryptedTokens.Remove(clientId);
         }
 
-        public Task ClearAllTokensAsync(CancellationToken cancellationToken = default)
+        public void ClearAllTokens()
         {
             _encryptedTokens.Clear();
-            return Task.CompletedTask;
         }
 
         public Dictionary<string, string> GetRawStoredTokens() => new(_encryptedTokens);
@@ -536,31 +526,29 @@ public class OAuth2SecurityTests : IDisposable
         }
     }
 
-    private class DisposableTokenStorage : IOAuth2TokenStorage, IDisposable
-    {
-        private Dictionary<string, OAuth2StoredToken>? _tokens = new();
+    private class DisposableTokenStorage : IAuthTokenStorage, IDisposable
+    {        private Dictionary<string, AuthToken>? _tokens = new();
 
-        public Task<OAuth2StoredToken?> GetTokenAsync(string key, CancellationToken cancellationToken = default)
+        public AuthToken? GetToken(string clientId)
         {
-            return Task.FromResult(_tokens?.GetValueOrDefault(key));
+            return _tokens?.GetValueOrDefault(clientId);
         }
 
-        public Task StoreTokenAsync(string key, OAuth2StoredToken token, CancellationToken cancellationToken = default)
+        public Task StoreTokenAsync(string clientId, AuthToken token)
         {
-            _tokens?[key] = token;
+            if (_tokens != null)
+                _tokens[clientId] = token;
             return Task.CompletedTask;
         }
 
-        public Task RemoveTokenAsync(string key, CancellationToken cancellationToken = default)
+        public void ClearToken(string clientId)
         {
-            _tokens?.Remove(key);
-            return Task.CompletedTask;
+            _tokens?.Remove(clientId);
         }
 
-        public Task ClearAllTokensAsync(CancellationToken cancellationToken = default)
+        public void ClearAllTokens()
         {
             _tokens?.Clear();
-            return Task.CompletedTask;
         }
 
         public bool HasStoredTokens() => _tokens?.Count > 0;

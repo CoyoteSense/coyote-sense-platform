@@ -3,37 +3,35 @@ using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using NBomber.CSharp;
-using NBomber.Http.CSharp;
 using Xunit;
 using Xunit.Abstractions;
 using CoyoteSense.OAuth2.Client.Tests.Mocks;
+using Coyote.Infra.Security.Auth;
 
 namespace CoyoteSense.OAuth2.Client.Tests.Performance;
 
 /// <summary>
-/// Performance tests for OAuth2AuthClient using NBomber
+/// Performance tests for AuthClient using NBomber
 /// </summary>
-public class OAuth2PerformanceTests : IDisposable
+public class AuthPerformanceTests : IDisposable
 {
     private readonly ITestOutputHelper _output;
     private readonly MockOAuth2Server _mockServer;
     private readonly ServiceProvider _serviceProvider;
-    private readonly IOAuth2AuthClient _client;
-    private bool _disposed;
-
-    public OAuth2PerformanceTests(ITestOutputHelper output)
+    private readonly IAuthClient _client;
+    private bool _disposed;    public AuthPerformanceTests(ITestOutputHelper output)
     {
         _output = output;
         _mockServer = new MockOAuth2Server();
         
-        var config = new OAuth2ClientConfiguration
+        var config = new AuthClientConfig
         {
             ServerUrl = _mockServer.BaseUrl,
             ClientId = "test-client",
             ClientSecret = "test-secret",
             Scope = "api.read api.write",
             EnableAutoRefresh = true,
-            RetryPolicy = new OAuth2RetryPolicy
+            RetryPolicy = new AuthRetryPolicy
             {
                 MaxRetries = 3,
                 BaseDelay = TimeSpan.FromMilliseconds(100),
@@ -43,24 +41,22 @@ public class OAuth2PerformanceTests : IDisposable
 
         var services = new ServiceCollection();
         services.AddLogging(builder => builder.AddConsole().SetMinimumLevel(LogLevel.Warning));
-        services.AddHttpClient();
-        services.AddSingleton(config);
-        services.AddTransient<IOAuth2TokenStorage, InMemoryOAuth2TokenStorage>();
-        services.AddTransient<IOAuth2AuthClient, OAuth2AuthClient>();
+        services.AddHttpClient();        services.AddSingleton(config);
+        services.AddTransient<IAuthTokenStorage, InMemoryTokenStorage>();
+        services.AddTransient<IAuthClient, AuthClient>();
         
         _serviceProvider = services.BuildServiceProvider();
-        _client = _serviceProvider.GetRequiredService<IOAuth2AuthClient>();
+        _client = _serviceProvider.GetRequiredService<IAuthClient>();
     }
 
     [Fact]
     [Trait("Category", "Performance")]
     public async Task ClientCredentialsFlow_ShouldHandleHighConcurrency()
-    {
-        // Arrange
+    {        // Arrange
         const int concurrentUsers = 50;
         const int requestsPerUser = 10;
-        var results = new List<OAuth2TokenResponse>();
-        var tasks = new List<Task<OAuth2TokenResponse>>();
+        var results = new List<AuthToken>();
+        var tasks = new List<Task<AuthToken>>();
 
         var stopwatch = Stopwatch.StartNew();
 
@@ -111,10 +107,8 @@ public class OAuth2PerformanceTests : IDisposable
             var result = await _client.AuthenticateClientCredentialsAsync();
             result.IsSuccess.Should().BeTrue();
             tokens.Add(result.AccessToken!);
-        }
-
-        const int concurrentRequests = 100;
-        var tasks = new List<Task<OAuth2TokenIntrospectionResponse>>();
+        }        const int concurrentRequests = 100;
+        var tasks = new List<Task<AuthTokenIntrospection>>();
         var stopwatch = Stopwatch.StartNew();
 
         // Act - Perform concurrent introspection requests
@@ -261,17 +255,15 @@ public class OAuth2PerformanceTests : IDisposable
             Scope = "api.read",
             EnableAutoRefresh = true,
             TokenRefreshThreshold = TimeSpan.FromSeconds(1)
-        };
-
-        var services = new ServiceCollection();
+        };        var services = new ServiceCollection();
         services.AddLogging(builder => builder.AddConsole().SetMinimumLevel(LogLevel.Warning));
         services.AddHttpClient();
         services.AddSingleton(shortExpiryConfig);
-        services.AddTransient<IOAuth2TokenStorage, InMemoryOAuth2TokenStorage>();
-        services.AddTransient<IOAuth2AuthClient, OAuth2AuthClient>();
+        services.AddTransient<IAuthTokenStorage, InMemoryTokenStorage>();
+        services.AddTransient<IAuthClient, AuthClient>();
 
         using var serviceProvider = services.BuildServiceProvider();
-        var autoRefreshClient = serviceProvider.GetRequiredService<IOAuth2AuthClient>();
+        var autoRefreshClient = serviceProvider.GetRequiredService<IAuthClient>();
 
         var stopwatch = Stopwatch.StartNew();
         const int requests = 50;
@@ -302,33 +294,30 @@ public class OAuth2PerformanceTests : IDisposable
     [Fact]
     [Trait("Category", "Performance")]
     public async Task ConcurrentClientsWithSharedTokenStorage_ShouldScale()
-    {
-        // Arrange - Create multiple clients sharing the same token storage
-        var sharedTokenStorage = new InMemoryOAuth2TokenStorage();
-        var clients = new List<IOAuth2AuthClient>();
+    {        // Arrange - Create multiple clients sharing the same token storage
+        var sharedTokenStorage = new InMemoryTokenStorage();var clients = new List<IAuthClient>();
 
         for (int i = 0; i < 10; i++)
         {
             var services = new ServiceCollection();
             services.AddLogging(builder => builder.AddConsole().SetMinimumLevel(LogLevel.Warning));
             services.AddHttpClient();
-            services.AddSingleton(new OAuth2ClientConfiguration
+            services.AddSingleton(new AuthClientConfig
             {
                 ServerUrl = _mockServer.BaseUrl,
-                ClientId = "test-client",
-                ClientSecret = "test-secret",
+                ClientId = "test-client",            ClientSecret = "test-secret",
                 Scope = "api.read",
                 EnableAutoRefresh = true
             });
-            services.AddSingleton<IOAuth2TokenStorage>(sharedTokenStorage);
-            services.AddTransient<IOAuth2AuthClient, OAuth2AuthClient>();
+            services.AddSingleton<IAuthTokenStorage>(sharedTokenStorage);
+            services.AddTransient<IAuthClient, AuthClient>();
 
             var serviceProvider = services.BuildServiceProvider();
-            clients.Add(serviceProvider.GetRequiredService<IOAuth2AuthClient>());
+            clients.Add(serviceProvider.GetRequiredService<IAuthClient>());
         }
 
         var stopwatch = Stopwatch.StartNew();
-        var tasks = new List<Task<OAuth2TokenResponse>>();
+        var tasks = new List<Task<AuthToken>>();
 
         // Act - Each client makes multiple requests concurrently
         foreach (var client in clients)

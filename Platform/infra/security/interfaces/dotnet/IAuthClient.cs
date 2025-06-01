@@ -29,12 +29,10 @@ public interface IAuthClient : IDisposable
     /// <summary>
     /// Authenticate using Authorization Code flow (OAuth2 RFC 6749)
     /// </summary>
-    Task<AuthResult> AuthenticateAuthorizationCodeAsync(string authorizationCode, string redirectUri, string? codeVerifier = null, CancellationToken cancellationToken = default);
-
-    /// <summary>
+    Task<AuthResult> AuthenticateAuthorizationCodeAsync(string authorizationCode, string redirectUri, string? codeVerifier = null, CancellationToken cancellationToken = default);    /// <summary>
     /// Start Authorization Code + PKCE flow (OAuth2 RFC 7636)
     /// </summary>
-    Task<(string authorizationUrl, string codeVerifier, string state)> StartAuthorizationCodeFlowAsync(string redirectUri, List<string>? scopes = null, string? state = null);    /// <summary>
+    (string authorizationUrl, string codeVerifier, string state) StartAuthorizationCodeFlow(string redirectUri, List<string>? scopes = null, string? state = null);/// <summary>
     /// Refresh access token using refresh token
     /// </summary>
     Task<AuthResult> RefreshTokenAsync(string refreshToken, CancellationToken cancellationToken = default);

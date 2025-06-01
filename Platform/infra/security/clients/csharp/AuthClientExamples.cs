@@ -135,10 +135,8 @@ public class AuthClientExamples
             logger: new ConsoleAuthLogger("AuthCode")
         );
 
-        var redirectUri = "http://localhost:8080/callback";
-
-        // Start authorization flow
-        var (authUrl, codeVerifier, state) = await client.StartAuthorizationCodeFlowAsync(
+        var redirectUri = "http://localhost:8080/callback";        // Start authorization flow
+        var (authUrl, codeVerifier, state) = client.StartAuthorizationCodeFlow(
             redirectUri: redirectUri,
             scopes: new List<string> { "read", "write", "profile" }
         );

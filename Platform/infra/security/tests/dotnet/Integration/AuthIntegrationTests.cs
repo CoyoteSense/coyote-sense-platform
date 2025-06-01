@@ -6,34 +6,33 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Xunit;
 using Xunit.Abstractions;
+using Coyote.Infra.Security.Auth;
 
 namespace CoyoteSense.OAuth2.Client.Tests.Integration;
 
 /// <summary>
-/// Integration tests for OAuth2AuthClient against real OAuth2 server
+/// Integration tests for AuthClient against real OAuth2 server
 /// </summary>
-public class OAuth2IntegrationTests : IDisposable
+public class AuthIntegrationTests : IDisposable
 {
     private readonly ITestOutputHelper _output;
     private readonly ServiceProvider _serviceProvider;
-    private readonly IOAuth2AuthClient _client;
-    private readonly OAuth2ClientConfiguration _config;
+    private readonly IAuthClient _client;
+    private readonly AuthClientConfig _config;
     private readonly HttpClient _httpClient;
-    private bool _disposed;
-
-    public OAuth2IntegrationTests(ITestOutputHelper output)
+    private bool _disposed;    public AuthIntegrationTests(ITestOutputHelper output)
     {
         _output = output;
         
         // Load configuration from environment variables
-        _config = new OAuth2ClientConfiguration
+        _config = new AuthClientConfig
         {
             ServerUrl = Environment.GetEnvironmentVariable("OAUTH2_SERVER_URL") ?? "https://localhost:5001",
             ClientId = Environment.GetEnvironmentVariable("OAUTH2_CLIENT_ID") ?? "integration-test-client",
             ClientSecret = Environment.GetEnvironmentVariable("OAUTH2_CLIENT_SECRET") ?? "integration-test-secret",
             Scope = Environment.GetEnvironmentVariable("OAUTH2_SCOPE") ?? "api.read api.write",
             EnableAutoRefresh = true,
-            RetryPolicy = new OAuth2RetryPolicy
+            RetryPolicy = new AuthRetryPolicy
             {
                 MaxRetries = 3,
                 BaseDelay = TimeSpan.FromSeconds(1),
@@ -43,15 +42,14 @@ public class OAuth2IntegrationTests : IDisposable
         };
 
         // Setup DI container
-        var services = new ServiceCollection();
-        services.AddLogging(builder => builder.AddConsole().SetMinimumLevel(LogLevel.Debug));
+        var services = new ServiceCollection();        services.AddLogging(builder => builder.AddConsole().SetMinimumLevel(LogLevel.Debug));
         services.AddHttpClient();
         services.AddSingleton(_config);
-        services.AddTransient<IOAuth2TokenStorage, InMemoryOAuth2TokenStorage>();
-        services.AddTransient<IOAuth2AuthClient, OAuth2AuthClient>();
+        services.AddTransient<IAuthTokenStorage, InMemoryTokenStorage>();
+        services.AddTransient<IAuthClient, AuthClient>();
         
         _serviceProvider = services.BuildServiceProvider();
-        _client = _serviceProvider.GetRequiredService<IOAuth2AuthClient>();
+        _client = _serviceProvider.GetRequiredService<IAuthClient>();
         _httpClient = _serviceProvider.GetRequiredService<HttpClient>();
     }
 
