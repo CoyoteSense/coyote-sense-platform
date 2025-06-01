@@ -305,7 +305,7 @@ public class AuthClientExamples
         Console.WriteLine("API call completed successfully");
     }
 
-    private static async Task TestTokenRefresh(IAuthAuthClient client, string refreshToken)
+    private static async Task TestTokenRefresh(IAuthClient client, string refreshToken)
     {
         Console.WriteLine("\nTesting token refresh...");
         
@@ -322,7 +322,7 @@ public class AuthClientExamples
         }
     }
 
-    private static async Task TestAutomaticRefresh(IAuthAuthClient client)
+    private static async Task TestAutomaticRefresh(IAuthClient client)
     {
         Console.WriteLine("\nTesting automatic token refresh...");
         

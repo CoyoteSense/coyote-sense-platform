@@ -455,7 +455,7 @@ public class AuthClient : IAuthClient
     private void ConfigureHttpClient()
     {
         _httpClient.SetDefaultTimeout(_config.TimeoutMs);
-        _httpClient.SetVerifyPeer(_config.VerifyPeer);
+        _httpClient.SetVerifyPeer(_config.VerifySsl);
 
         var headers = new Dictionary<string, string>
         {

@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using Coyote.Infra.Http;
-using Coyote.Infra.Http.Factory;
 using Coyote.Infra.Security.Auth;
 
 namespace Coyote.Infra.Security.Auth;
@@ -142,12 +141,83 @@ public static class AuthClientFactory
     public static AuthClientBuilder CreateBuilder(string serverUrl, string clientId)
     {
         return new AuthClientBuilder(serverUrl, clientId);
-    }
-
-    private static ICoyoteHttpClient CreateDefaultHttpClient()
+    }    internal static ICoyoteHttpClient CreateDefaultHttpClient()
     {
-        var factory = new HttpClientFactory();
-        return factory.CreateHttpClient();
+        // Create a simple HTTP client with default options
+        var options = new HttpClientOptions
+        {
+            DefaultTimeoutMs = 30000,
+            UserAgent = "CoyoteAuth/1.0",
+            VerifyPeer = true,
+            FollowRedirects = true
+        };
+        
+        // Create a simplified HTTP client implementation
+        return new SimpleHttpClient(options);
+    }
+}
+
+/// <summary>
+/// Simple HTTP client implementation for AuthClientFactory
+/// </summary>
+internal class SimpleHttpClient : BaseHttpClient
+{
+    public SimpleHttpClient(HttpClientOptions options) : base(options) { }    public override async Task<IHttpResponse> ExecuteAsync(IHttpRequest request, CancellationToken cancellationToken = default)
+    {
+        // Simple implementation using HttpClient
+        using var httpClient = new HttpClient();
+        httpClient.Timeout = TimeSpan.FromMilliseconds(request.TimeoutMs ?? 30000);
+        
+        var httpRequestMessage = new HttpRequestMessage(
+            GetHttpMethod(request.Method), 
+            request.Url);
+            
+        if (!string.IsNullOrEmpty(request.Body))
+        {
+            httpRequestMessage.Content = new StringContent(request.Body);
+        }
+        
+        foreach (var header in request.Headers)
+        {
+            httpRequestMessage.Headers.TryAddWithoutValidation(header.Key, header.Value);
+        }
+        
+        var response = await httpClient.SendAsync(httpRequestMessage, cancellationToken);
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        
+        return new HttpResponse
+        {
+            StatusCode = (int)response.StatusCode,
+            Body = body,
+            Headers = response.Headers.ToDictionary(h => h.Key, h => string.Join(",", h.Value))
+        };
+    }
+    
+    public override async Task<bool> PingAsync(string url, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var response = await GetAsync(url, cancellationToken: cancellationToken);
+            return response.IsSuccess;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+      private static System.Net.Http.HttpMethod GetHttpMethod(Coyote.Infra.Http.HttpMethod method)
+    {
+        return method switch
+        {
+            Coyote.Infra.Http.HttpMethod.Get => System.Net.Http.HttpMethod.Get,
+            Coyote.Infra.Http.HttpMethod.Post => System.Net.Http.HttpMethod.Post,
+            Coyote.Infra.Http.HttpMethod.Put => System.Net.Http.HttpMethod.Put,
+            Coyote.Infra.Http.HttpMethod.Delete => System.Net.Http.HttpMethod.Delete,
+            Coyote.Infra.Http.HttpMethod.Patch => System.Net.Http.HttpMethod.Patch,
+            Coyote.Infra.Http.HttpMethod.Head => System.Net.Http.HttpMethod.Head,
+            Coyote.Infra.Http.HttpMethod.Options => System.Net.Http.HttpMethod.Options,
+            _ => System.Net.Http.HttpMethod.Get
+        };
     }
 }
 
@@ -228,12 +298,11 @@ public class AuthClientBuilder
         return this;
     }
 
-    /// <summary>
-    /// Configure SSL verification
+    /// <summary>    /// Configure SSL verification
     /// </summary>
     public AuthClientBuilder WithSslVerification(bool verify)
     {
-        _config.VerifyPeer = verify;
+        _config.VerifySsl = verify;
         return this;
     }
 
@@ -268,70 +337,7 @@ public class AuthClientBuilder
     /// Build the authentication client
     /// </summary>
     public IAuthClient Build()
-    {
-        var httpClient = _httpClient ?? AuthClientFactory.CreateDefaultHttpClient();
+    {        var httpClient = _httpClient ?? AuthClientFactory.CreateDefaultHttpClient();
         return new AuthClient(_config, httpClient, _tokenStorage, _logger);
     }
-}
-
-// Legacy aliases for backward compatibility
-public static class AuthClientFactory
-{
-    public static IAuthClient CreateClientCredentialsClient(
-        string serverUrl,
-        string clientId,
-        string clientSecret,
-        List<string>? defaultScopes = null,
-        IAuthTokenStorage? tokenStorage = null,
-        IAuthLogger? logger = null,
-        ICoyoteHttpClient? httpClient = null) =>
-        AuthClientFactory.CreateClientCredentialsClient(serverUrl, clientId, clientSecret, defaultScopes, tokenStorage, logger, httpClient);
-
-    public static IAuthClient CreateMtlsClient(
-        string serverUrl,
-        string clientId,
-        string clientCertPath,
-        string clientKeyPath,
-        List<string>? defaultScopes = null,
-        IAuthTokenStorage? tokenStorage = null,
-        IAuthLogger? logger = null,
-        ICoyoteHttpClient? httpClient = null) =>
-        AuthClientFactory.CreateMtlsClient(serverUrl, clientId, clientCertPath, clientKeyPath, defaultScopes, tokenStorage, logger, httpClient);
-
-    public static IAuthClient CreateJwtBearerClient(
-        string serverUrl,
-        string clientId,
-        string jwtSigningKeyPath,
-        string jwtIssuer,
-        string jwtAudience,
-        List<string>? defaultScopes = null,
-        IAuthTokenStorage? tokenStorage = null,
-        IAuthLogger? logger = null,
-        ICoyoteHttpClient? httpClient = null) =>
-        AuthClientFactory.CreateJwtBearerClient(serverUrl, clientId, jwtSigningKeyPath, jwtIssuer, jwtAudience, defaultScopes, tokenStorage, logger, httpClient);
-
-    public static IAuthClient CreateAuthorizationCodeClient(
-        string serverUrl,
-        string clientId,
-        string? clientSecret = null,
-        List<string>? defaultScopes = null,
-        IAuthTokenStorage? tokenStorage = null,
-        IAuthLogger? logger = null,
-        ICoyoteHttpClient? httpClient = null) =>
-        AuthClientFactory.CreateAuthorizationCodeClient(serverUrl, clientId, clientSecret, defaultScopes, tokenStorage, logger, httpClient);
-
-    public static IAuthClient CreateCustomClient(
-        AuthClientConfig config,
-        IAuthTokenStorage? tokenStorage = null,
-        IAuthLogger? logger = null,
-        ICoyoteHttpClient? httpClient = null) =>
-        AuthClientFactory.CreateCustomClient(config, tokenStorage, logger, httpClient);
-
-    public static AuthClientBuilder CreateBuilder(string serverUrl, string clientId) =>
-        AuthClientFactory.CreateBuilder(serverUrl, clientId);
-}
-
-public class OAuth2ClientBuilder : AuthClientBuilder
-{
-    internal OAuth2ClientBuilder(string serverUrl, string clientId) : base(serverUrl, clientId) { }
 }
