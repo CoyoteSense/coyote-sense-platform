@@ -12,6 +12,7 @@ using CoyoteSense.OAuth2.Client.Tests.Mocks;
 using Coyote.Infra.Security.Auth;
 using Coyote.Infra.Http.Factory;
 using Coyote.Infra.Http;
+using Coyote.Infra.Security.Tests.TestHelpers;
 
 namespace CoyoteSense.OAuth2.Client.Tests.Security;
 

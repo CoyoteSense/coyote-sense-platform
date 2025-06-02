@@ -1,49 +1,62 @@
+using System;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
 using Coyote.Infra.Http;
-using Coyote.Infra.Http.Factory;
+using IHttpClientFactory = Coyote.Infra.Http.Factory.IHttpClientFactory;
 
-namespace Coyote.Infra.Security.Tests.TestHelpers;
-
-/// <summary>
-/// Test HTTP client factory for OAuth2 testing
-/// </summary>
-public class TestHttpClientFactory : Coyote.Infra.Http.Factory.IHttpClientFactory
+namespace Coyote.Infra.Security.Tests.TestHelpers
 {
-    private readonly ICoyoteHttpClient _httpClient;
-    private readonly ILogger<TestHttpClientFactory> _logger;
+    /// <summary>
+    /// Test implementation of HTTP client factory that returns the provided HTTP client
+    /// Simplifies testing with dependency injection
+    /// </summary>
+    public class TestHttpClientFactory : IHttpClientFactory
+    {
+        private readonly ICoyoteHttpClient _httpClient;
+        private readonly ILogger<TestHttpClientFactory>? _logger;
+        private readonly RuntimeMode _defaultMode;
 
-    public TestHttpClientFactory(ICoyoteHttpClient httpClient, ILogger<TestHttpClientFactory>? logger = null)
-    {
-        _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
-        _logger = logger ?? NullLogger<TestHttpClientFactory>.Instance;
-    }
+        /// <summary>
+        /// Create a new TestHttpClientFactory with a pre-configured HTTP client
+        /// </summary>
+        /// <param name="httpClient">The HTTP client to return from factory methods</param>
+        /// <param name="defaultMode">The default runtime mode</param>
+        /// <param name="logger">Optional logger</param>
+        public TestHttpClientFactory(
+            ICoyoteHttpClient httpClient, 
+            RuntimeMode defaultMode = RuntimeMode.Testing,
+            ILogger<TestHttpClientFactory>? logger = null)
+        {
+            _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
+            _defaultMode = defaultMode;
+            _logger = logger;
+            
+            _logger?.LogDebug("Created TestHttpClientFactory with mode: {Mode}", defaultMode);
+        }
 
-    public ICoyoteHttpClient CreateHttpClient()
-    {
-        _logger.LogDebug("Creating test HTTP client");
-        return _httpClient;
-    }
+        /// <summary>
+        /// Create an HTTP client using the default runtime mode
+        /// </summary>
+        public ICoyoteHttpClient CreateHttpClient()
+        {
+            _logger?.LogDebug("Creating HTTP client with default mode: {Mode}", _defaultMode);
+            return _httpClient;
+        }
 
-    public ICoyoteHttpClient CreateHttpClientForMode(RuntimeMode mode)
-    {
-        _logger.LogDebug("Creating test HTTP client for mode: {Mode}", mode);
-        return _httpClient;
-    }
+        /// <summary>
+        /// Create an HTTP client for a specific runtime mode
+        /// </summary>
+        public ICoyoteHttpClient CreateHttpClientForMode(RuntimeMode mode)
+        {
+            _logger?.LogDebug("Creating HTTP client for mode: {Mode}", mode);
+            return _httpClient;
+        }
 
-    public ICoyoteHttpClient CreateHttpClient(string clientName)
-    {
-        _logger.LogDebug("Creating test HTTP client with name: {ClientName}", clientName);
-        return _httpClient;
-    }    public ICoyoteHttpClient CreateHttpClient(HttpClientOptions options)
-    {
-        _logger.LogDebug("Creating test HTTP client with options");
-        return _httpClient;
-    }
-
-    public RuntimeMode GetCurrentMode()
-    {
-        return RuntimeMode.Testing;
+        /// <summary>
+        /// Get the current runtime mode
+        /// </summary>
+        public RuntimeMode GetCurrentMode()
+        {
+            return _defaultMode;
+        }
     }
 }
