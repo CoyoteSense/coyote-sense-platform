@@ -15,7 +15,7 @@ Hybrid event-driven, actor-based automation platform with AI at its core. Design
 - [Modules & Units Classification](Docs/modules_units_classification.md)
 - [Glossary & Syntax](Docs/glossary_and_syntax_primitives.md)
 - [Proto File Structure](Docs/model_proto_structure.md)
-- [Runtime Modes](Platform/coyoteflow_modes.md)
+- [Runtime Modes](Docs/coyoteflow_modes.md)
 
 ## Usage
 
