@@ -160,5 +160,5 @@ Units are organized by functional domain under `Platform/units/`:
 - **`ninja/`** - NinjaTrader integration
 - **`rithmic/`** - Rithmic trading platform integration
 
-> **See Also**: For complete folder structure documentation, refer to [`PLATFORM_FOLDER_STRUCTURE.md`](./PLATFORM_FOLDER_STRUCTURE.md)
+> **See Also**: For complete folder structure documentation, refer to [`platform_folder_structure.md`](./platform_folder_structure.md)
 
