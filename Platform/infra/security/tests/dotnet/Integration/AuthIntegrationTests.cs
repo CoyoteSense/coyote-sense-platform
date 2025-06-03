@@ -42,9 +42,8 @@ public class AuthIntegrationTests : IDisposable
         // Register our custom OAuth2 mock HTTP client
         services.AddSingleton<ICoyoteHttpClient, MockOAuth2HttpClient>();
         services.AddSingleton<Coyote.Infra.Http.Factory.IHttpClientFactory>(provider => 
-        {
-            var httpClient = provider.GetRequiredService<ICoyoteHttpClient>();
-            return new TestHttpClientFactory(httpClient);
+        {            var httpClient = provider.GetRequiredService<ICoyoteHttpClient>();
+            return new TestHttpClientFactory(httpClient, RuntimeMode.Testing);
         });
         
         services.AddSingleton(_config);
