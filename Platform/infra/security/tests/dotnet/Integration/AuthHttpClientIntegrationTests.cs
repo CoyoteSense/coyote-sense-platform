@@ -52,9 +52,8 @@ public class AuthHttpClientIntegrationTests : IDisposable
         
         // Create HTTP client
         _httpClient = _serviceProvider.GetRequiredService<ICoyoteHttpClient>();
-        
-        // Setup auth client factory
-        var httpClientFactory = _serviceProvider.GetRequiredService<IHttpClientFactory>();
+          // Setup auth client factory
+        var httpClientFactory = _serviceProvider.GetRequiredService<Coyote.Infra.Http.Factory.IHttpClientFactory>();
         AuthClientFactory.SetHttpClientFactory(httpClientFactory);
         
         // Create auth client configuration using mock endpoints

@@ -118,12 +118,11 @@ public class AuthClient : IAuthClient
                 throw new InvalidOperationException("JWT signing key path is required for JWT Bearer flow");
             }
 
-            var jwtAssertion = CreateJwtAssertion(subject);
-
-            var parameters = new Dictionary<string, string>
+            var jwtAssertion = CreateJwtAssertion(subject);            var parameters = new Dictionary<string, string>
             {
                 ["grant_type"] = "urn:ietf:params:oauth:grant-type:jwt-bearer",
-                ["assertion"] = jwtAssertion
+                ["assertion"] = jwtAssertion,
+                ["client_id"] = _config.ClientId
             };
 
             if (scopes?.Any() == true)
@@ -503,11 +502,21 @@ public class AuthClient : IAuthClient
             catch
             {
                 return AuthResult.Error("http_error", $"HTTP {response.StatusCode}", response.Body);
-            }
-        }
+            }        }
 
         try
         {
+            Console.WriteLine($"[AuthClient] Response body received: '{response.Body}'");
+            Console.WriteLine($"[AuthClient] Response body length: {response.Body?.Length ?? 0}");
+            Console.WriteLine($"[AuthClient] Response status: {response.StatusCode}");
+            Console.WriteLine($"[AuthClient] Response is success: {response.IsSuccess}");
+            
+            if (string.IsNullOrWhiteSpace(response.Body))
+            {
+                Console.WriteLine($"[AuthClient] ERROR: Response body is null or empty!");
+                return AuthResult.Error("empty_response", "Server returned empty response", "No response body received");
+            }
+            
             using var doc = JsonDocument.Parse(response.Body);
             var root = doc.RootElement;
 

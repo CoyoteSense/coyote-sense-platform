@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Threading.Tasks;
 using Xunit;
 using Xunit.Abstractions;
@@ -11,6 +12,7 @@ using Coyote.Infra.Security.Auth;
 using Coyote.Infra.Http;
 using Coyote.Infra.Http.Factory;
 using Coyote.Infra.Security.Tests.TestHelpers;
+using IHttpClientFactory = Coyote.Infra.Http.Factory.IHttpClientFactory;
 
 namespace CoyoteSense.OAuth2.Client.Tests.Integration;
 
@@ -25,28 +27,32 @@ public class MockOAuth2ServerIntegrationTests : IDisposable
     private readonly MockOAuth2Server _mockServer;
     private readonly IAuthClient _authClient;
     private readonly ICoyoteHttpClient _httpClient;
-    private bool _disposed;
-
-    public MockOAuth2ServerIntegrationTests(ITestOutputHelper output)
+    private bool _disposed;    public MockOAuth2ServerIntegrationTests(ITestOutputHelper output)
     {
         _output = output;
         
         // Setup real MockOAuth2Server with WireMock
         _mockServer = new MockOAuth2Server();
-          // Setup DI container with real HTTP client infrastructure
-        var services = new ServiceCollection();
-        services.AddLogging(builder => builder.AddConsole().SetMinimumLevel(LogLevel.Debug));
         
-        // Register HTTP client infrastructure - use standard Coyote HTTP client factory
-        services.AddCoyoteHttpClient(configureMode: options => options.Mode = RuntimeMode.Testing);
+        // Setup DI container with specialized OAuth2 HTTP client
+        var services = new ServiceCollection();
+        services.AddLogging(builder => builder.AddConsole().SetMinimumLevel(LogLevel.Warning)); // Reduce logging noise
+        
+        // Create our specialized MockOAuth2HttpClient instead of using standard DI
+        var mockOAuth2HttpClient = new MockOAuth2HttpClient();
+        mockOAuth2HttpClient.SetDefaultTimeout(5000); // 5 second timeout for faster tests
+          // Use TestHttpClientFactory to ensure we get our specialized client
+        var testFactory = new TestHttpClientFactory(mockOAuth2HttpClient, RuntimeMode.Testing);
+        services.AddSingleton<IHttpClientFactory>(_ => testFactory);
         
         // Register auth infrastructure
         services.AddTransient<IAuthTokenStorage, InMemoryTokenStorage>();
         services.AddTransient<IAuthLogger, TestAuthLogger>();
         
         _serviceProvider = services.BuildServiceProvider();
-          // Create HTTP client
-        _httpClient = _serviceProvider.GetRequiredService<ICoyoteHttpClient>();
+        
+        // Use our specialized HTTP client directly
+        _httpClient = mockOAuth2HttpClient;
         
         // Create auth client configuration using the real mock server
         var config = new AuthClientConfig
@@ -55,7 +61,8 @@ public class MockOAuth2ServerIntegrationTests : IDisposable
             ServerUrl = _mockServer.BaseUrl,
             ClientId = "test-client",
             ClientSecret = "test-secret",
-            DefaultScopes = new List<string> { "api.read", "api.write" }
+            DefaultScopes = new List<string> { "api.read", "api.write" },
+            TimeoutMs = 5000 // 5 second timeout for OAuth operations
         };
         
         _authClient = new AuthClient(config, _httpClient, 
@@ -97,20 +104,17 @@ public class MockOAuth2ServerIntegrationTests : IDisposable
         // Assert
         introspectionResult.Should().BeTrue();
         _output.WriteLine($"Token introspection successful for token: {authResult.Token.AccessToken[..10]}...");
-    }
-
-    [Fact]
-    [Trait("Category", "Integration")]
-    public async Task JwtBearerFlow_WithRealMockServer_ShouldAuthenticateSuccessfully()
+    }    [Fact]
+    [Trait("Category", "Integration")]    public async Task JwtBearerFlow_WithRealMockServer_ShouldAuthenticateSuccessfully()
     {
         // Arrange
-        var jwtKeyPath = await CreateTestJwtKeyAsync();
+        var jwtKeyPath = await _mockServer.ExportRSAPrivateKeyAsync();
         var jwtClient = AuthClientFactory.CreateJwtBearerClient(
             serverUrl: _mockServer.BaseUrl,
             clientId: "test-client",
             jwtSigningKeyPath: jwtKeyPath,
             jwtIssuer: "test-client",
-            jwtAudience: _mockServer.BaseUrl + "/oauth2/token",
+            jwtAudience: _mockServer.BaseUrl + "/token",
             defaultScopes: new List<string> { "api.read" });
 
         // Act
@@ -118,21 +122,30 @@ public class MockOAuth2ServerIntegrationTests : IDisposable
 
         // Assert
         result.Should().NotBeNull();
+        
+        // Debug: Output error details if authentication failed
+        if (!result.IsSuccess)
+        {
+            _output.WriteLine($"JWT Bearer authentication failed!");
+            _output.WriteLine($"Error Code: {result.ErrorCode}");
+            _output.WriteLine($"Error Description: {result.ErrorDescription}");
+            _output.WriteLine($"Error Details: {result.ErrorDetails}");
+        }
+        
         result.IsSuccess.Should().BeTrue();
         result.Token.Should().NotBeNull();
         result.Token!.AccessToken.Should().NotBeNullOrEmpty();
         
         jwtClient.Dispose();
         _output.WriteLine($"JWT Bearer authentication successful");
-    }
-
-    [Fact]
+    }[Fact]
     [Trait("Category", "Integration")]
     public async Task DiscoveryEndpoint_ShouldReturnValidConfiguration()
     {
         // Act
         var discoveryUrl = $"{_mockServer.BaseUrl}/.well-known/openid_configuration";
-        var request = new HttpRequest        {
+        var request = new HttpRequest
+        {
             Method = Coyote.Infra.Http.HttpMethod.Get,
             Url = discoveryUrl
         };

@@ -115,11 +115,14 @@ public class MockOAuth2Server : IDisposable
                             e = Convert.ToBase64String(_rsa.ExportParameters(false).Exponent!)
                         }
                     }
-                })));
-
-        // Token Endpoint
+                })));        // Token Endpoint (OAuth2 standard path)
         _server
             .Given(Request.Create().WithPath("/oauth2/token").UsingPost())
+            .RespondWith(Response.Create().WithCallback(request => HandleTokenRequest(request)));
+
+        // Token Endpoint (AuthClient expected path)
+        _server
+            .Given(Request.Create().WithPath("/token").UsingPost())
             .RespondWith(Response.Create().WithCallback(request => HandleTokenRequest(request)));
 
         // Token Introspection Endpoint
@@ -137,10 +140,9 @@ public class MockOAuth2Server : IDisposable
             .Given(Request.Create().WithPath("/health").UsingGet())
             .RespondWith(Response.Create()
                 .WithStatusCode(HttpStatusCode.OK)
-                .WithHeader("Content-Type", "application/json")
-                .WithBody(JsonSerializer.Serialize(new { status = "healthy", timestamp = DateTimeOffset.UtcNow })));
+                .WithHeader("Content-Type", "application/json")                .WithBody(JsonSerializer.Serialize(new { status = "healthy", timestamp = DateTimeOffset.UtcNow })));
     }
-
+    
     private WireMock.ResponseMessage HandleTokenRequest(WireMock.IRequestMessage request)
     {
         try
@@ -151,14 +153,18 @@ public class MockOAuth2Server : IDisposable
             var grantType = formData.GetValueOrDefault("grant_type", string.Empty);
             var clientId = ExtractClientId(request, formData);
             var clientSecret = ExtractClientSecret(request, formData);
+            
+            Console.WriteLine($"[MockOAuth2Server] Token request received:");
+            Console.WriteLine($"  Grant Type: {grantType}");
+            Console.WriteLine($"  Client ID: {clientId}");
+            Console.WriteLine($"  Form Data Keys: {string.Join(", ", formData.Keys)}");
 
             // Validate client credentials
             if (!ValidateClient(clientId, clientSecret, grantType))
             {
+                Console.WriteLine($"[MockOAuth2Server] Client validation failed for {clientId}");
                 return CreateErrorResponse(HttpStatusCode.Unauthorized, "invalid_client", "Invalid client credentials");
-            }
-
-            return grantType switch
+            }            var responseMessage = grantType switch
             {
                 "client_credentials" => HandleClientCredentialsGrant(clientId, formData),
                 "urn:ietf:params:oauth:grant-type:jwt-bearer" => HandleJwtBearerGrant(clientId, formData),
@@ -166,12 +172,15 @@ public class MockOAuth2Server : IDisposable
                 "refresh_token" => HandleRefreshTokenGrant(clientId, formData),
                 _ => CreateErrorResponse(HttpStatusCode.BadRequest, "unsupported_grant_type", "Unsupported grant type")
             };
-        }
+            
+            return responseMessage;        }
         catch (Exception ex)
         {
             return CreateErrorResponse(HttpStatusCode.InternalServerError, "server_error", ex.Message);
         }
-    }    private WireMock.ResponseMessage HandleClientCredentialsGrant(string clientId, Dictionary<string, string> formData)
+    }
+
+    private WireMock.ResponseMessage HandleClientCredentialsGrant(string clientId, Dictionary<string, string> formData)
     {
         var scope = formData.GetValueOrDefault("scope", "api.read");
         var token = GenerateAccessToken(clientId, scope);
@@ -205,20 +214,33 @@ public class MockOAuth2Server : IDisposable
                 BodyAsString = JsonSerializer.Serialize(response) 
             }
         };
-    }
-
-    private WireMock.ResponseMessage HandleJwtBearerGrant(string clientId, Dictionary<string, string> formData)
+    }    private WireMock.ResponseMessage HandleJwtBearerGrant(string clientId, Dictionary<string, string> formData)
     {
         var assertion = formData.GetValueOrDefault("assertion", string.Empty);
+        
+        // Debug: Log the JWT assertion details
+        Console.WriteLine($"[MockOAuth2Server] JWT Bearer Grant Request:");
+        Console.WriteLine($"  Client ID: {clientId}");
+        Console.WriteLine($"  Assertion present: {!string.IsNullOrEmpty(assertion)}");
+        Console.WriteLine($"  Assertion length: {assertion.Length}");
+        if (!string.IsNullOrEmpty(assertion))
+        {
+            Console.WriteLine($"  Assertion (first 50 chars): {assertion.Substring(0, Math.Min(50, assertion.Length))}...");
+        }
         
         // Validate JWT assertion
         if (!ValidateJwtAssertion(assertion))
         {
+            Console.WriteLine($"[MockOAuth2Server] JWT validation failed");
             return CreateErrorResponse(HttpStatusCode.BadRequest, "invalid_grant", "Invalid JWT assertion");
         }
+          Console.WriteLine($"[MockOAuth2Server] JWT validation succeeded");
 
         var scope = formData.GetValueOrDefault("scope", "api.read");
         var token = GenerateAccessToken(clientId, scope);
+        
+        Console.WriteLine($"[MockOAuth2Server] Generating access token for client '{clientId}' with scope '{scope}'");
+        Console.WriteLine($"[MockOAuth2Server] Generated token: {token.Substring(0, Math.Min(20, token.Length))}...");
         
         var tokenInfo = new MockTokenInfo
         {
@@ -229,15 +251,17 @@ public class MockOAuth2Server : IDisposable
             ClientId = clientId,
             IssuedAt = DateTimeOffset.UtcNow,
             IsActive = true
-        };
-
-        _activeTokens[token] = tokenInfo;        var response = new
+        };        _activeTokens[token] = tokenInfo;        var response = new
         {
             access_token = token,
             token_type = "Bearer",
             expires_in = 3600,
             scope
-        };        return new WireMock.ResponseMessage 
+        };
+
+        var jsonResponse = JsonSerializer.Serialize(response);
+        Console.WriteLine($"[MockOAuth2Server] JWT Bearer response JSON: {jsonResponse}");
+        Console.WriteLine($"[MockOAuth2Server] JSON length: {jsonResponse.Length}");        return new WireMock.ResponseMessage 
         { 
             StatusCode = (int)HttpStatusCode.OK,
             Headers = new Dictionary<string, WireMockList<string>> 
@@ -246,7 +270,8 @@ public class MockOAuth2Server : IDisposable
             },
             BodyData = new WireMock.Util.BodyData 
             { 
-                BodyAsString = JsonSerializer.Serialize(response) 
+                BodyAsString = jsonResponse,
+                DetectedBodyType = WireMock.Types.BodyType.String
             }
         };
     }
@@ -282,10 +307,12 @@ public class MockOAuth2Server : IDisposable
             token_type = "Bearer",
             expires_in = 3600,
             refresh_token = refreshToken,
-            scope
-        };
+            scope        };
 
-        return new WireMock.ResponseMessage 
+        var jsonResponse = JsonSerializer.Serialize(response);
+        Console.WriteLine($"[MockOAuth2Server] JWT Bearer response JSON: {jsonResponse}");
+        
+        var responseMessage = new WireMock.ResponseMessage 
         { 
             StatusCode = (int)HttpStatusCode.OK,
             Headers = new Dictionary<string, WireMockList<string>> 
@@ -294,9 +321,15 @@ public class MockOAuth2Server : IDisposable
             },
             BodyData = new WireMock.Util.BodyData 
             { 
-                BodyAsString = JsonSerializer.Serialize(response) 
+                BodyAsString = jsonResponse 
             }
         };
+        
+        Console.WriteLine($"[MockOAuth2Server] Returning response with status: {responseMessage.StatusCode}");
+        Console.WriteLine($"[MockOAuth2Server] Response headers: {string.Join(", ", responseMessage.Headers.Keys)}");
+        Console.WriteLine($"[MockOAuth2Server] Response body length: {jsonResponse.Length}");
+        
+        return responseMessage;
     }
 
     private WireMock.ResponseMessage HandleRefreshTokenGrant(string clientId, Dictionary<string, string> formData)
@@ -478,37 +511,71 @@ public class MockOAuth2Server : IDisposable
         var bytes = new byte[32];
         rng.GetBytes(bytes);
         return Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
-    }
-
-    private bool ValidateClient(string clientId, string clientSecret, string grantType)
+    }    private bool ValidateClient(string clientId, string clientSecret, string grantType)
     {
+        Console.WriteLine($"[MockOAuth2Server] ValidateClient called:");
+        Console.WriteLine($"  Client ID: '{clientId}'");
+        Console.WriteLine($"  Client Secret: '{clientSecret}'");
+        Console.WriteLine($"  Grant Type: '{grantType}'");
+        
         if (!_registeredClients.TryGetValue(clientId, out var client))
+        {
+            Console.WriteLine($"[MockOAuth2Server] Client '{clientId}' not found in registered clients");
+            Console.WriteLine($"[MockOAuth2Server] Available clients: {string.Join(", ", _registeredClients.Keys)}");
             return false;
+        }
 
-        if (client.ClientSecret != clientSecret)
+        Console.WriteLine($"[MockOAuth2Server] Found client: ID='{client.ClientId}', Secret='{client.ClientSecret}'");
+        
+        // JWT Bearer flow does not require client secret - the JWT assertion provides authentication
+        if (grantType == "urn:ietf:params:oauth:grant-type:jwt-bearer")
+        {
+            Console.WriteLine($"[MockOAuth2Server] JWT Bearer flow - skipping client secret validation");
+        }
+        else if (client.ClientSecret != clientSecret)
+        {
+            Console.WriteLine($"[MockOAuth2Server] Client secret mismatch! Expected: '{client.ClientSecret}', Got: '{clientSecret}'");
             return false;
+        }
 
         if (grantType != "introspection" && grantType != "revocation" && !client.GrantTypes.Contains(grantType))
+        {
+            Console.WriteLine($"[MockOAuth2Server] Grant type '{grantType}' not allowed for client. Allowed: {string.Join(", ", client.GrantTypes)}");
             return false;
+        }
 
+        Console.WriteLine($"[MockOAuth2Server] Client validation successful for '{clientId}'");
         return true;
-    }
-
-    private bool ValidateJwtAssertion(string assertion)
+    }private bool ValidateJwtAssertion(string assertion)
     {
         try
         {
+            Console.WriteLine($"[MockOAuth2Server] Validating JWT assertion...");
+            
             var tokenHandler = new JwtSecurityTokenHandler();
             if (!tokenHandler.CanReadToken(assertion))
+            {
+                Console.WriteLine($"[MockOAuth2Server] JWT validation failed: Cannot read token");
                 return false;
+            }
 
-            var jwt = tokenHandler.ReadJwtToken(assertion);
-            
-            // Basic validation - in real implementation, this would be more comprehensive
-            return jwt.ValidTo > DateTime.UtcNow;
+            var validationParameters = new TokenValidationParameters
+            {
+                ValidateIssuerSigningKey = true,
+                IssuerSigningKey = _signingKey,
+                ValidateIssuer = false, // Skip issuer validation for test
+                ValidateAudience = false, // Skip audience validation for test
+                ValidateLifetime = true,
+                ClockSkew = TimeSpan.FromMinutes(5)
+            };
+
+            var principal = tokenHandler.ValidateToken(assertion, validationParameters, out var validatedToken);
+            Console.WriteLine($"[MockOAuth2Server] JWT validation succeeded");
+            return true;
         }
-        catch
+        catch (Exception ex)
         {
+            Console.WriteLine($"[MockOAuth2Server] JWT validation failed with exception: {ex.Message}");
             return false;
         }
     }
@@ -534,28 +601,36 @@ public class MockOAuth2Server : IDisposable
         }
 
         return string.Empty;
-    }
-
-    private string ExtractClientSecret(WireMock.IRequestMessage request, Dictionary<string, string> formData)
+    }    private string ExtractClientSecret(WireMock.IRequestMessage request, Dictionary<string, string> formData)
     {
+        Console.WriteLine($"[MockOAuth2Server] ExtractClientSecret called:");
+        
         // Try form data first
         if (formData.TryGetValue("client_secret", out var clientSecret))
+        {
+            Console.WriteLine($"[MockOAuth2Server] Found client_secret in form data: '{clientSecret}'");
             return clientSecret;
+        }
 
         // Try Basic authentication
         if (request.Headers?.TryGetValue("Authorization", out var authHeader) == true)
         {
             var authValue = authHeader.FirstOrDefault();
+            Console.WriteLine($"[MockOAuth2Server] Authorization header: '{authValue}'");
             if (authValue?.StartsWith("Basic ") == true)
             {
                 var encoded = authValue.Substring(6);
                 var decoded = Encoding.UTF8.GetString(Convert.FromBase64String(encoded));
                 var parts = decoded.Split(':');
                 if (parts.Length == 2)
+                {
+                    Console.WriteLine($"[MockOAuth2Server] Extracted client_secret from Basic auth: '{parts[1]}'");
                     return parts[1];
+                }
             }
         }
 
+        Console.WriteLine($"[MockOAuth2Server] No client_secret found - returning empty string");
         return string.Empty;
     }
 
@@ -596,8 +671,18 @@ public class MockOAuth2Server : IDisposable
             BodyData = new WireMock.Util.BodyData 
             { 
                 BodyAsString = JsonSerializer.Serialize(errorResponse) 
-            }
-        };
+            }        };
+    }
+
+    /// <summary>
+    /// Exports the server's RSA private key as PEM for JWT signing
+    /// </summary>
+    public async Task<string> ExportRSAPrivateKeyAsync()
+    {
+        var keyPath = Path.Combine(Path.GetTempPath(), $"mock-server-jwt-key-{Guid.NewGuid()}.pem");
+        var privateKey = _rsa.ExportRSAPrivateKeyPem();
+        await File.WriteAllTextAsync(keyPath, privateKey);
+        return keyPath;
     }
 
     public void Dispose()

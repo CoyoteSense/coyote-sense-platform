@@ -100,8 +100,25 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
                     _logger?.LogDebug("Using predefined response for token URL: {Url}", request.Url);
                     return Task.FromResult(_predefinedResponses[request.Url]);
                 }
-                
-                return HandleTokenRequest(request);
+                  return HandleTokenRequest(request);
+            }
+
+            // Try pattern matching for discovery endpoints
+            if (request.Url.Contains("/.well-known/openid_configuration") || 
+                request.Url.Contains("/.well-known/openid-configuration") ||
+                request.Url.Contains("/.well-known/oauth-authorization-server"))
+            {
+                Console.WriteLine($"[MockHttpClient] OAuth2 discovery endpoint detected: {request.Url}");
+                _logger?.LogDebug("OAuth2 discovery endpoint detected: {Url}", request.Url);
+                return HandleDiscoveryRequest(request);
+            }
+
+            // Try pattern matching for JWKS endpoints
+            if (request.Url.Contains("/.well-known/jwks"))
+            {
+                Console.WriteLine($"[MockHttpClient] JWKS endpoint detected: {request.Url}");
+                _logger?.LogDebug("JWKS endpoint detected: {Url}", request.Url);
+                return HandleJwksRequest(request);
             }
 
             // Try pattern matching for introspection endpoints
@@ -474,8 +491,90 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
             // based on grant type in request body. The HandleTokenRequest method will handle
             // all token requests dynamically.
             
-            // We can still set up other non-token endpoints if needed
-            // For example: discovery endpoints, JWKS endpoints, etc.
+            // Set up discovery endpoint responses for common patterns
+            SetupDiscoveryEndpoints();
+            
+            // Set up JWKS endpoint responses
+            SetupJwksEndpoints();
+        }
+
+        private void SetupDiscoveryEndpoints()
+        {
+            // Common discovery endpoint patterns
+            var discoveryPaths = new[]
+            {
+                "/.well-known/openid_configuration",
+                "/.well-known/openid-configuration",
+                "/.well-known/oauth-authorization-server"
+            };
+
+            foreach (var path in discoveryPaths)
+            {
+                // Create discovery response for different base URLs
+                var baseUrls = new[] { "http://localhost", "https://localhost" };
+                foreach (var baseUrl in baseUrls)
+                {
+                    for (int port = 1000; port <= 65535; port += 1000) // Cover common port ranges
+                    {
+                        var discoveryUrl = $"{baseUrl}:{port}{path}";
+                        var tokenEndpoint = $"{baseUrl}:{port}/oauth2/token";
+                        var introspectionEndpoint = $"{baseUrl}:{port}/oauth2/introspect";
+                        var revocationEndpoint = $"{baseUrl}:{port}/oauth2/revoke";
+                        var jwksUri = $"{baseUrl}:{port}/.well-known/jwks";
+                        
+                        var discoveryResponse = new
+                        {
+                            issuer = $"{baseUrl}:{port}",
+                            token_endpoint = tokenEndpoint,
+                            introspection_endpoint = introspectionEndpoint,
+                            revocation_endpoint = revocationEndpoint,
+                            jwks_uri = jwksUri,
+                            grant_types_supported = new[] { "client_credentials", "authorization_code", "refresh_token", "urn:ietf:params:oauth:grant-type:jwt-bearer" },
+                            token_endpoint_auth_methods_supported = new[] { "client_secret_basic", "client_secret_post" },
+                            scopes_supported = new[] { "api.read", "api.write", "openid", "profile" },
+                            response_types_supported = new[] { "code" }
+                        };
+                        
+                        SetPredefinedJsonResponse(discoveryUrl, discoveryResponse);
+                    }
+                }
+            }
+        }
+
+        private void SetupJwksEndpoints()
+        {
+            // Mock JWKS response for testing
+            var jwksResponse = new
+            {
+                keys = new[]
+                {
+                    new
+                    {
+                        kty = "RSA",
+                        use = "sig",
+                        kid = "test-key-1",
+                        // These are mock values - in real implementation these would be actual RSA key parameters
+                        n = "mock-modulus-base64",
+                        e = "AQAB" // Standard RSA exponent
+                    }
+                }
+            };
+
+            // Common JWKS endpoint patterns
+            var jwksPaths = new[] { "/.well-known/jwks", "/.well-known/jwks.json" };
+            
+            foreach (var path in jwksPaths)
+            {
+                var baseUrls = new[] { "http://localhost", "https://localhost" };
+                foreach (var baseUrl in baseUrls)
+                {
+                    for (int port = 1000; port <= 65535; port += 1000)
+                    {
+                        var jwksUrl = $"{baseUrl}:{port}{path}";
+                        SetPredefinedJsonResponse(jwksUrl, jwksResponse);
+                    }
+                }
+            }
         }private IHttpResponse CreateResponse(int statusCode, string body, string contentType = "text/plain", IDictionary<string, string>? headers = null)
         {
             var responseHeaders = new Dictionary<string, string>
@@ -646,5 +745,77 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
         }
 
         #endregion
+
+        private Task<IHttpResponse> HandleDiscoveryRequest(IHttpRequest request)
+        {
+            _logger?.LogDebug("Handling discovery request for URL: {Url}", request.Url);
+
+            // Extract base URL from the request
+            var baseUrl = ExtractBaseUrlFromDiscoveryRequest(request.Url);
+            
+            var discoveryResponse = new
+            {
+                issuer = baseUrl,
+                token_endpoint = $"{baseUrl}/oauth2/token",
+                introspection_endpoint = $"{baseUrl}/oauth2/introspect",
+                revocation_endpoint = $"{baseUrl}/oauth2/revoke",
+                jwks_uri = $"{baseUrl}/.well-known/jwks",
+                grant_types_supported = new[] { "client_credentials", "authorization_code", "refresh_token", "urn:ietf:params:oauth:grant-type:jwt-bearer" },
+                token_endpoint_auth_methods_supported = new[] { "client_secret_basic", "client_secret_post" },
+                scopes_supported = new[] { "api.read", "api.write", "openid", "profile" },
+                response_types_supported = new[] { "code" }
+            };
+
+            var json = JsonSerializer.Serialize(discoveryResponse);
+            return Task.FromResult(CreateResponse(200, json, "application/json"));
+        }
+
+        private Task<IHttpResponse> HandleJwksRequest(IHttpRequest request)
+        {
+            _logger?.LogDebug("Handling JWKS request for URL: {Url}", request.Url);
+
+            // Mock JWKS response for testing
+            var jwksResponse = new
+            {
+                keys = new[]
+                {
+                    new
+                    {
+                        kty = "RSA",
+                        use = "sig",
+                        kid = "test-key-1",
+                        // These are mock values - in real implementation these would be actual RSA key parameters
+                        n = "mock-modulus-base64-encoded-value-for-testing-purposes",
+                        e = "AQAB" // Standard RSA exponent (65537 in base64)
+                    }
+                }
+            };
+
+            var json = JsonSerializer.Serialize(jwksResponse);
+            return Task.FromResult(CreateResponse(200, json, "application/json"));
+        }
+
+        private string ExtractBaseUrlFromDiscoveryRequest(string discoveryUrl)
+        {
+            // Extract base URL from discovery endpoint URL
+            // e.g., "http://localhost:12345/.well-known/openid_configuration" -> "http://localhost:12345"
+            var wellKnownIndex = discoveryUrl.IndexOf("/.well-known/", StringComparison.OrdinalIgnoreCase);
+            if (wellKnownIndex > 0)
+            {
+                return discoveryUrl.Substring(0, wellKnownIndex);
+            }
+            
+            // Fallback - try to parse as URI and reconstruct base
+            try
+            {
+                var uri = new Uri(discoveryUrl);
+                return $"{uri.Scheme}://{uri.Authority}";
+            }
+            catch
+            {
+                // If all else fails, assume localhost
+                return "http://localhost:8080";
+            }
+        }
     }
 }
