@@ -25,15 +25,20 @@ public class AuthClient : IAuthClient
     private readonly IAuthLogger _logger;
     private readonly Timer? _refreshTimer;
     private AuthToken? _currentToken;
-    private bool _disposed;
-
-    public AuthClient(
+    private bool _disposed;    public AuthClient(
         AuthClientConfig config,
         ICoyoteHttpClient httpClient,
         IAuthTokenStorage? tokenStorage = null,
         IAuthLogger? logger = null)
     {
         _config = config ?? throw new ArgumentNullException(nameof(config));
+        
+        // Validate configuration
+        if (!_config.IsValid())
+        {
+            throw new ArgumentException("Invalid authentication configuration. Please check required fields for the selected authentication mode.", nameof(config));
+        }
+        
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
         _tokenStorage = tokenStorage ?? new InMemoryTokenStorage();
         _logger = logger ?? new NullAuthLogger();

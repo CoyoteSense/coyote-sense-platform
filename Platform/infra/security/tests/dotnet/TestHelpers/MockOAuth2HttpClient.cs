@@ -20,6 +20,7 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
         private readonly Dictionary<string, IHttpResponse> _predefinedResponses = new();
         private readonly List<IHttpRequest> _recordedRequests = new();
         private readonly HashSet<string> _revokedTokens = new();
+        private readonly Dictionary<string, Exception> _exceptionMap = new();
         private bool _recordRequests = true;
         private bool _disposed;
 
@@ -53,7 +54,16 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
             Console.WriteLine($"[MockHttpClient] ExecuteAsync called: {request.Method} {request.Url}");
             _logger?.LogInformation("MockHttpClient ExecuteAsync: {Method} {Url}", request.Method, request.Url);
 
-            // Record the request if enabled            if (_recordRequests)
+            // Check if an exception should be thrown for this URL
+            if (_exceptionMap.TryGetValue(request.Url, out var exception))
+            {
+                Console.WriteLine($"[MockHttpClient] Throwing configured exception for URL: {request.Url}");
+                _logger?.LogDebug("Throwing configured exception for URL: {Url}", request.Url);
+                throw exception;
+            }
+
+            // Record the request if enabled
+            if (_recordRequests)
             {
                 _recordedRequests.Add(request);
                 _logger?.LogDebug("Recorded request: {Method} {Url}", request.Method, request.Url);
@@ -61,11 +71,19 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
 
             // Look for predefined response matching this URL exactly
             if (_predefinedResponses.TryGetValue(request.Url, out var exactResponse))
-            {                Console.WriteLine($"[MockHttpClient] Found exact match for URL: {request.Url}");
+            {
+                Console.WriteLine($"[MockHttpClient] Found exact match for URL: {request.Url}");
                 _logger?.LogDebug("Found exact match for URL: {Url}", request.Url);
                 return Task.FromResult(exactResponse);
             }
-            
+
+            // Debug: Print all predefined response URLs for troubleshooting
+            Console.WriteLine($"[MockHttpClient] Checking predefined responses. Total count: {_predefinedResponses.Count}");
+            foreach (var kvp in _predefinedResponses)
+            {
+                Console.WriteLine($"[MockHttpClient] Predefined URL: {kvp.Key}");
+            }
+
             // Try pattern matching for token endpoints
             if (request.Url.Contains("/oauth2/token") || 
                 request.Url.Contains("/oauth/token") ||
@@ -74,6 +92,15 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
             {
                 Console.WriteLine($"[MockHttpClient] OAuth2 token endpoint detected: {request.Url}");
                 _logger?.LogDebug("OAuth2 token endpoint detected: {Url}", request.Url);
+                
+                // Check if there's a predefined response for this exact token URL first
+                if (_predefinedResponses.ContainsKey(request.Url))
+                {
+                    Console.WriteLine($"[MockHttpClient] Using predefined response for token URL: {request.Url}");
+                    _logger?.LogDebug("Using predefined response for token URL: {Url}", request.Url);
+                    return Task.FromResult(_predefinedResponses[request.Url]);
+                }
+                
                 return HandleTokenRequest(request);
             }
 
@@ -91,7 +118,9 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
                 Console.WriteLine($"[MockHttpClient] OAuth2 revocation endpoint detected: {request.Url}");
                 _logger?.LogDebug("OAuth2 revocation endpoint detected: {Url}", request.Url);
                 return HandleRevocationRequest(request);
-            }            // Default response if no matches
+            }
+
+            // Default response if no matches
             Console.WriteLine($"[MockHttpClient] No predefined response for URL: {request.Url}");
             _logger?.LogWarning("No predefined response for URL: {Url}", request.Url);
             return Task.FromResult(CreateResponse(404, "Not Found", "text/plain"));
@@ -325,7 +354,25 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
                 error = error,
                 error_description = errorDescription
             };
-              SetPredefinedJsonResponse(url, response, statusCode);
+            
+            SetPredefinedJsonResponse(url, response, statusCode);
+        }
+
+        /// <summary>
+        /// Configure an exception to be thrown for a specific URL
+        /// </summary>
+        public void SetExceptionForUrl(string url, Exception exception)
+        {
+            _exceptionMap[url] = exception;
+            _logger?.LogDebug("Set exception for URL: {Url}, Exception: {Exception}", url, exception.GetType().Name);
+        }
+
+        /// <summary>
+        /// Clear all configured exceptions
+        /// </summary>
+        public void ClearExceptions()
+        {
+            _exceptionMap.Clear();
         }
 
         #endregion

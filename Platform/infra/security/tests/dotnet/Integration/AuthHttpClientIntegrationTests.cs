@@ -10,6 +10,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using CoyoteSense.OAuth2.Client.Tests.Mocks;
 using Coyote.Infra.Security.Auth;
+using Coyote.Infra.Security.Tests.TestHelpers;
 using Coyote.Infra.Http;
 using Coyote.Infra.Http.Factory;
 using Coyote.Infra.Http.Modes.Mock;
@@ -205,12 +206,12 @@ public class AuthHttpClientIntegrationTests : IDisposable
     {
         // Test with different HTTP client modes
         var modes = new[] { RuntimeMode.Testing, RuntimeMode.Production, RuntimeMode.Debug };
-        
-        foreach (var mode in modes)
+          foreach (var mode in modes)
         {
             _output.WriteLine($"Testing with HTTP client mode: {mode}");
             
-            var factory = new TestHttpClientFactory(mode);
+            var mockHttpClient = new MockOAuth2HttpClient();
+            var factory = new TestHttpClientFactory(mockHttpClient, mode);
             var httpClient = factory.CreateHttpClientForMode(mode);
               var config = new AuthClientConfig
             {
@@ -327,186 +328,5 @@ public class AuthHttpClientIntegrationTests : IDisposable
             _serviceProvider?.Dispose();
             _disposed = true;
         }
-    }
-}
-
-/// <summary>
-/// Test implementation of HTTP client factory for integration testing
-/// </summary>
-internal class TestHttpClientFactory : Coyote.Infra.Http.Factory.IHttpClientFactory
-{
-    private readonly RuntimeMode _defaultMode;
-
-    public TestHttpClientFactory(RuntimeMode defaultMode = RuntimeMode.Testing)
-    {
-        _defaultMode = defaultMode;
-    }
-
-    public ICoyoteHttpClient CreateHttpClient()
-    {
-        return CreateHttpClientForMode(_defaultMode);
-    }
-
-    public ICoyoteHttpClient CreateHttpClientForMode(RuntimeMode mode)
-    {
-        var options = new HttpClientOptions
-        {
-            DefaultTimeoutMs = 30000,
-            UserAgent = $"CoyoteAuth-Test/{mode}",
-            VerifyPeer = false, // For testing
-            FollowRedirects = true
-        };
-
-        return mode switch
-        {
-            RuntimeMode.Testing => new TestMockHttpClient(options),
-            RuntimeMode.Debug => new TestDebugHttpClient(options),
-            _ => new TestRealHttpClient(options)
-        };
-    }
-
-    public RuntimeMode GetCurrentMode() => _defaultMode;
-}
-
-/// <summary>
-/// Test implementations of HTTP clients for different modes
-/// </summary>
-internal class TestRealHttpClient : BaseHttpClient
-{
-    public TestRealHttpClient(HttpClientOptions options) : base(options) { }
-
-    public override async Task<IHttpResponse> ExecuteAsync(IHttpRequest request, CancellationToken cancellationToken = default)
-    {
-        using var httpClient = new System.Net.Http.HttpClient();
-        httpClient.Timeout = TimeSpan.FromMilliseconds(request.TimeoutMs ?? 30000);
-        
-        var httpRequestMessage = new System.Net.Http.HttpRequestMessage(
-            GetHttpMethod(request.Method), request.Url);
-            
-        if (!string.IsNullOrEmpty(request.Body))
-        {
-            httpRequestMessage.Content = new StringContent(request.Body, Encoding.UTF8, 
-                request.Headers.ContainsKey("Content-Type") ? request.Headers["Content-Type"] : "application/json");
-        }
-        
-        foreach (var header in request.Headers)
-        {
-            if (header.Key != "Content-Type")
-                httpRequestMessage.Headers.TryAddWithoutValidation(header.Key, header.Value);
-        }
-        
-        var response = await httpClient.SendAsync(httpRequestMessage, cancellationToken);
-        var body = await response.Content.ReadAsStringAsync(cancellationToken);
-          return new HttpResponse
-        {
-            StatusCode = (int)response.StatusCode,
-            Body = body,
-            Headers = response.Headers.ToDictionary(h => h.Key, h => string.Join(",", h.Value)),
-            ErrorMessage = response.IsSuccessStatusCode ? null : "HTTP request failed"
-        };
-    }
-
-    public override async Task<bool> PingAsync(string url, CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            var response = await GetAsync(url, cancellationToken: cancellationToken);
-            return response.IsSuccess;
-        }
-        catch
-        {
-            return false;
-        }
-    }
-
-    private static System.Net.Http.HttpMethod GetHttpMethod(Coyote.Infra.Http.HttpMethod method)
-    {
-        return method switch
-        {
-            Coyote.Infra.Http.HttpMethod.Get => System.Net.Http.HttpMethod.Get,
-            Coyote.Infra.Http.HttpMethod.Post => System.Net.Http.HttpMethod.Post,
-            Coyote.Infra.Http.HttpMethod.Put => System.Net.Http.HttpMethod.Put,
-            Coyote.Infra.Http.HttpMethod.Delete => System.Net.Http.HttpMethod.Delete,
-            Coyote.Infra.Http.HttpMethod.Patch => System.Net.Http.HttpMethod.Patch,
-            Coyote.Infra.Http.HttpMethod.Head => System.Net.Http.HttpMethod.Head,
-            Coyote.Infra.Http.HttpMethod.Options => System.Net.Http.HttpMethod.Options,
-            _ => System.Net.Http.HttpMethod.Get
-        };
-    }
-}
-
-internal class TestMockHttpClient : BaseHttpClient
-{
-    private readonly MockHttpClient _mockClient;
-    
-    public TestMockHttpClient(HttpClientOptions options) : base(options) 
-    { 
-        // Create mock options for OAuth2 testing
-        var mockOptions = Microsoft.Extensions.Options.Options.Create(new HttpClientModeOptions
-        {
-            Mode = RuntimeMode.Testing,
-            Mock = new MockResponseOptions
-            {
-                DefaultStatusCode = 200,
-                DefaultBody = "{\"access_token\":\"mock_token\",\"token_type\":\"Bearer\",\"expires_in\":3600}",
-                DefaultHeaders = new Dictionary<string, string> { ["Content-Type"] = "application/json" },
-                DelayMs = 10
-            }
-        });
-        
-        var httpOptions = Microsoft.Extensions.Options.Options.Create(options);
-        
-        // Create a simple logger for testing
-        var loggerFactory = Microsoft.Extensions.Logging.LoggerFactory.Create(builder => builder.AddConsole());
-        var logger = loggerFactory.CreateLogger<MockHttpClient>();
-        
-        _mockClient = new MockHttpClient(httpOptions, mockOptions, logger);
-        
-        // Configure common OAuth2 endpoints with appropriate mock responses
-        SetupOAuth2MockResponses();
-    }
-    
-    private void SetupOAuth2MockResponses()
-    {
-        // Mock token endpoint response
-        _mockClient.SetPredefinedJsonResponse("https://login.microsoftonline.com/test-tenant/oauth2/v2.0/token", 
-            new { access_token = "mock_access_token", token_type = "Bearer", expires_in = 3600 });
-            
-        // Mock discovery endpoint response
-        _mockClient.SetPredefinedJsonResponse("https://login.microsoftonline.com/test-tenant/v2.0/.well-known/openid_configuration",
-            new { 
-                issuer = "https://login.microsoftonline.com/test-tenant/v2.0",
-                token_endpoint = "https://login.microsoftonline.com/test-tenant/oauth2/v2.0/token",
-                jwks_uri = "https://login.microsoftonline.com/test-tenant/discovery/v2.0/keys"
-            });
-    }
-    
-    public override async Task<IHttpResponse> ExecuteAsync(IHttpRequest request, CancellationToken cancellationToken = default)
-    {
-        return await _mockClient.ExecuteAsync(request, cancellationToken);
-    }
-    
-    public override async Task<bool> PingAsync(string url, CancellationToken cancellationToken = default)
-    {
-        return await _mockClient.PingAsync(url, cancellationToken);
-    }
-}
-
-internal class TestDebugHttpClient : TestRealHttpClient
-{
-    public TestDebugHttpClient(HttpClientOptions options) : base(options) { }
-    
-    public override async Task<IHttpResponse> ExecuteAsync(IHttpRequest request, CancellationToken cancellationToken = default)
-    {
-        Console.WriteLine($"[DEBUG HTTP] {request.Method} {request.Url}");
-        if (!string.IsNullOrEmpty(request.Body))
-            Console.WriteLine($"[DEBUG HTTP] Body: {request.Body}");
-        
-        var response = await base.ExecuteAsync(request, cancellationToken);
-        
-        Console.WriteLine($"[DEBUG HTTP] Response: {response.StatusCode}");
-        Console.WriteLine($"[DEBUG HTTP] Body: {response.Body}");
-        
-        return response;
     }
 }
