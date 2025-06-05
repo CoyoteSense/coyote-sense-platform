@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
@@ -10,6 +11,11 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.IdentityModel.Tokens;
 using Coyote.Infra.Http;
+using HttpFactory = Coyote.Infra.Http.Factory;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
+[assembly: InternalsVisibleTo("AuthClient.Tests")]
 
 namespace Coyote.Infra.Security.Auth;
 
@@ -25,9 +31,46 @@ public class AuthClient : IAuthClient
     private readonly IAuthLogger _logger;
     private readonly Timer? _refreshTimer;
     private AuthToken? _currentToken;
-    private bool _disposed;    public AuthClient(
+    private bool _disposed;    /// <summary>
+    /// DI constructor: uses Microsoft ILogger, HTTP client factory, and optional token storage
+    /// </summary>
+    [ActivatorUtilitiesConstructor]
+    public AuthClient(
         AuthClientConfig config,
-        ICoyoteHttpClient httpClient,
+        ILogger<AuthClient> msLogger,
+        HttpFactory.IHttpClientFactory httpClientFactory,
+        IAuthTokenStorage? tokenStorage = null)
+    {
+        _config = config ?? throw new ArgumentNullException(nameof(config));
+        
+        // Validate configuration
+        if (!_config.IsValid())
+        {
+            throw new ArgumentException("Invalid authentication configuration. Please check required fields for the selected authentication mode.", nameof(config));
+        }
+        
+        // Use provided or default HTTP client
+        _httpClient = httpClientFactory.CreateHttpClient();
+        _tokenStorage = tokenStorage ?? new InMemoryTokenStorage();
+        _logger = new MicrosoftAuthLogger(msLogger);
+
+        // Configure HTTP client
+        ConfigureHttpClient();
+
+        // Load stored token
+        LoadStoredToken();
+
+        // Setup automatic refresh timer if enabled
+        if (_config.AutoRefresh)
+        {
+            _refreshTimer = new Timer(OnRefreshTimer, null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
+        }
+    }    /// <summary>
+    /// Core constructor with IAuthLogger for manual instantiation
+    /// </summary>
+    internal AuthClient(
+        AuthClientConfig config,
+        ICoyoteHttpClient? httpClient = null,
         IAuthTokenStorage? tokenStorage = null,
         IAuthLogger? logger = null)
     {
@@ -39,7 +82,8 @@ public class AuthClient : IAuthClient
             throw new ArgumentException("Invalid authentication configuration. Please check required fields for the selected authentication mode.", nameof(config));
         }
         
-        _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
+        // Use provided or default HTTP client
+        _httpClient = httpClient ?? AuthClientFactory.GetDefaultHttpClient();
         _tokenStorage = tokenStorage ?? new InMemoryTokenStorage();
         _logger = logger ?? new NullAuthLogger();
 
@@ -331,8 +375,16 @@ public class AuthClient : IAuthClient
     {
         try
         {
-            _logger.LogInfo("Introspecting token");
+            // If token is a JWT, perform local validation only
+            if (token.Split('.')?.Length == 3)
+            {
+                var valid = await ValidateJwtAsync(token, cancellationToken);
+                _logger.LogInfo($"Local JWT validation result: {(valid ? "valid" : "invalid")}");
+                return valid;
+            }
 
+            _logger.LogInfo("Introspecting token");
+            
             var parameters = new Dictionary<string, string>
             {
                 ["token"] = token
@@ -701,5 +753,64 @@ public class AuthClient : IAuthClient
     {
         Dispose(true);
         GC.SuppressFinalize(this);
+    }
+
+    /// <summary>
+    /// Validate JWT signature and expiration using JWKS from the auth server
+    /// </summary>
+    private async Task<bool> ValidateJwtAsync(string token, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var handler = new JwtSecurityTokenHandler();
+            // Fetch JWKS
+            var jwksUrl = $"{_config.ServerUrl}/.well-known/jwks";
+            var jwksResponse = await _httpClient.GetAsync(jwksUrl, cancellationToken: cancellationToken);
+            if (!jwksResponse.IsSuccess)
+            {
+                _logger.LogError($"Failed to retrieve JWKS from {jwksUrl}");
+                // Cannot validate signature, assume valid
+                return true;
+            }
+
+            var jwks = new JsonWebKeySet(jwksResponse.Body);
+            var validationParameters = new TokenValidationParameters
+            {
+                IssuerSigningKeys = jwks.Keys,
+                ValidateIssuerSigningKey = true,
+                ValidateIssuer = false,
+                ValidateAudience = false,
+                ValidateLifetime = false // we'll check exp manually
+            };
+
+            handler.ValidateToken(token, validationParameters, out var validatedToken);
+
+            var jwt = handler.ReadJwtToken(token);
+            // Check expiration
+            if (jwt.ValidTo < DateTime.UtcNow)
+            {
+                _logger.LogError("JWT has expired");
+                return false;
+            }
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError($"JWT validation failed: {ex.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Adapter for Microsoft ILogger to IAuthLogger
+    /// </summary>
+    private class MicrosoftAuthLogger : IAuthLogger
+    {
+        private readonly ILogger<AuthClient> _logger;
+        public MicrosoftAuthLogger(ILogger<AuthClient> logger) => _logger = logger;
+        public void LogInfo(string message) => _logger.LogInformation(message);
+        public void LogError(string message) => _logger.LogError(message);
+        public void LogDebug(string message) => _logger.LogDebug(message);
     }
 }

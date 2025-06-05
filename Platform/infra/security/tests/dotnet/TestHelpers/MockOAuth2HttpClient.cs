@@ -496,85 +496,16 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
             
             // Set up JWKS endpoint responses
             SetupJwksEndpoints();
-        }
-
-        private void SetupDiscoveryEndpoints()
+        }        private void SetupDiscoveryEndpoints()
         {
-            // Common discovery endpoint patterns
-            var discoveryPaths = new[]
-            {
-                "/.well-known/openid_configuration",
-                "/.well-known/openid-configuration",
-                "/.well-known/oauth-authorization-server"
-            };
-
-            foreach (var path in discoveryPaths)
-            {
-                // Create discovery response for different base URLs
-                var baseUrls = new[] { "http://localhost", "https://localhost" };
-                foreach (var baseUrl in baseUrls)
-                {
-                    for (int port = 1000; port <= 65535; port += 1000) // Cover common port ranges
-                    {
-                        var discoveryUrl = $"{baseUrl}:{port}{path}";
-                        var tokenEndpoint = $"{baseUrl}:{port}/oauth2/token";
-                        var introspectionEndpoint = $"{baseUrl}:{port}/oauth2/introspect";
-                        var revocationEndpoint = $"{baseUrl}:{port}/oauth2/revoke";
-                        var jwksUri = $"{baseUrl}:{port}/.well-known/jwks";
-                        
-                        var discoveryResponse = new
-                        {
-                            issuer = $"{baseUrl}:{port}",
-                            token_endpoint = tokenEndpoint,
-                            introspection_endpoint = introspectionEndpoint,
-                            revocation_endpoint = revocationEndpoint,
-                            jwks_uri = jwksUri,
-                            grant_types_supported = new[] { "client_credentials", "authorization_code", "refresh_token", "urn:ietf:params:oauth:grant-type:jwt-bearer" },
-                            token_endpoint_auth_methods_supported = new[] { "client_secret_basic", "client_secret_post" },
-                            scopes_supported = new[] { "api.read", "api.write", "openid", "profile" },
-                            response_types_supported = new[] { "code" }
-                        };
-                        
-                        SetPredefinedJsonResponse(discoveryUrl, discoveryResponse);
-                    }
-                }
-            }
-        }
-
-        private void SetupJwksEndpoints()
+            // Don't pre-populate discovery endpoints - they will be handled dynamically
+            // in HandleDiscoveryRequest() method which is more efficient and flexible
+            _logger?.LogDebug("Discovery endpoints will be handled dynamically");
+        }        private void SetupJwksEndpoints()
         {
-            // Mock JWKS response for testing
-            var jwksResponse = new
-            {
-                keys = new[]
-                {
-                    new
-                    {
-                        kty = "RSA",
-                        use = "sig",
-                        kid = "test-key-1",
-                        // These are mock values - in real implementation these would be actual RSA key parameters
-                        n = "mock-modulus-base64",
-                        e = "AQAB" // Standard RSA exponent
-                    }
-                }
-            };
-
-            // Common JWKS endpoint patterns
-            var jwksPaths = new[] { "/.well-known/jwks", "/.well-known/jwks.json" };
-            
-            foreach (var path in jwksPaths)
-            {
-                var baseUrls = new[] { "http://localhost", "https://localhost" };
-                foreach (var baseUrl in baseUrls)
-                {
-                    for (int port = 1000; port <= 65535; port += 1000)
-                    {
-                        var jwksUrl = $"{baseUrl}:{port}{path}";
-                        SetPredefinedJsonResponse(jwksUrl, jwksResponse);
-                    }
-                }
-            }
+            // Don't pre-populate JWKS endpoints - they will be handled dynamically
+            // in HandleJwksRequest() method which is more efficient and flexible
+            _logger?.LogDebug("JWKS endpoints will be handled dynamically");
         }private IHttpResponse CreateResponse(int statusCode, string body, string contentType = "text/plain", IDictionary<string, string>? headers = null)
         {
             var responseHeaders = new Dictionary<string, string>

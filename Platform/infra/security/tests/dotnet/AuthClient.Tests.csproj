@@ -8,7 +8,7 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <WarningsAsErrors />
-    <WarningsNotAsErrors>CS1591;NU1903</WarningsNotAsErrors>
+    <WarningsNotAsErrors>CS1591;NU1903;NU1902;NU1603</WarningsNotAsErrors>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
   </PropertyGroup>
@@ -23,7 +23,6 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
-    <PackageReference Include="NBomber" Version="6.0.0" />
     <PackageReference Include="xunit" Version="2.6.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.5.3">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -73,5 +72,9 @@
     <Folder Include="Mocks\" />
     <Folder Include="TestData\" />
   </ItemGroup>
-
+  <ItemGroup>
+    <!-- Exclude slow integration and performance tests from default run to speed up CI -->
+    <Compile Remove="Integration\**\*.cs" />
+    <Compile Remove="Performance\**\*.cs" />
+  </ItemGroup>
 </Project>

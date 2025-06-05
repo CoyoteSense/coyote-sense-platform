@@ -253,19 +253,21 @@ public class AuthClientBuilder
     }
 
     /// <summary>
-    /// Configure client secret for confidential clients
+    /// Configure client secret for confidential clients (Client Credentials flow)
     /// </summary>
     public AuthClientBuilder WithClientSecret(string clientSecret)
     {
+        _config.AuthMode = AuthMode.ClientCredentials;
         _config.ClientSecret = clientSecret;
         return this;
     }
 
     /// <summary>
-    /// Configure client certificate for mTLS authentication
+    /// Configure client certificate for mTLS authentication (Client Credentials mTLS flow)
     /// </summary>
     public AuthClientBuilder WithClientCertificate(string certPath, string keyPath)
     {
+        _config.AuthMode = AuthMode.ClientCredentialsMtls;
         _config.ClientCertPath = certPath;
         _config.ClientKeyPath = keyPath;
         return this;
@@ -276,9 +278,21 @@ public class AuthClientBuilder
     /// </summary>
     public AuthClientBuilder WithJwtSigning(string signingKeyPath, string issuer, string audience)
     {
+        _config.AuthMode = AuthMode.JwtBearer;
         _config.JwtSigningKeyPath = signingKeyPath;
         _config.JwtIssuer = issuer;
         _config.JwtAudience = audience;
+        return this;
+    }
+
+    /// <summary>
+    /// Configure Authorization Code flow (optionally with client secret)
+    /// </summary>
+    public AuthClientBuilder WithAuthorizationCodeFlow(string? clientSecret = null)
+    {
+        _config.AuthMode = AuthMode.AuthorizationCode;
+        if (!string.IsNullOrEmpty(clientSecret))
+            _config.ClientSecret = clientSecret;
         return this;
     }
 
@@ -344,6 +358,43 @@ public class AuthClientBuilder
         _httpClient = httpClient;
         return this;
     }    /// <summary>
+    /// Configure redirect URI for Authorization Code flow
+    /// </summary>
+    public AuthClientBuilder WithRedirectUri(string redirectUri)
+    {
+        _config.RedirectUri = redirectUri;
+        return this;
+    }
+
+    /// <summary>
+    /// Enable or disable PKCE for Authorization Code flow
+    /// </summary>
+    public AuthClientBuilder WithPkce(bool usePkce = true)
+    {
+        _config.UsePkce = usePkce;
+        _config.AuthMode = usePkce ? AuthMode.AuthorizationCodePkce : AuthMode.AuthorizationCode;
+        return this;
+    }
+
+    /// <summary>
+    /// Configure maximum retry attempts for token operations
+    /// </summary>
+    public AuthClientBuilder WithMaxRetryAttempts(int attempts)
+    {
+        _config.MaxRetryAttempts = attempts;
+        return this;
+    }
+
+    /// <summary>
+    /// Configure retry delay in milliseconds for token operations
+    /// </summary>
+    public AuthClientBuilder WithRetryDelay(int delayMs)
+    {
+        _config.RetryDelayMs = delayMs;
+        return this;
+    }
+
+    /// <summary>
     /// Build the authentication client
     /// </summary>
     public IAuthClient Build()

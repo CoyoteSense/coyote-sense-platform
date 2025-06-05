@@ -71,12 +71,18 @@ public class AuthSecurityTests : IDisposable
             ClientId = "test-client",
             ClientSecret = "super-secret-that-should-not-appear-in-logs",
             DefaultScopes = new List<string> { "api.read" }
-        };
-
-        var services = new ServiceCollection();
+        };        var services = new ServiceCollection();
         services.AddSingleton<ILoggerFactory>(loggerFactory);
         services.AddLogging();
-        services.AddHttpClient();
+        
+        // Register the Coyote HTTP client factory
+        services.AddSingleton<ICoyoteHttpClient, MockOAuth2HttpClient>();
+        services.AddSingleton<Coyote.Infra.Http.Factory.IHttpClientFactory>(provider => 
+        {
+            var httpClient = provider.GetRequiredService<ICoyoteHttpClient>();
+            return new TestHttpClientFactory(httpClient);
+        });
+        
         services.AddSingleton(secureConfig);
         services.AddTransient<IAuthTokenStorage, InMemoryTokenStorage>();
         services.AddTransient<IAuthClient, AuthClient>();
@@ -100,10 +106,18 @@ public class AuthSecurityTests : IDisposable
     public async Task AccessToken_ShouldBeStoredSecurely()
     {
         // Arrange
-        var secureTokenStorage = new SecureInMemoryTokenStorage();
-          var services = new ServiceCollection();
+        var secureTokenStorage = new SecureInMemoryTokenStorage();        var services = new ServiceCollection();
         services.AddLogging(builder => builder.AddConsole().SetMinimumLevel(LogLevel.Warning));
-        services.AddHttpClient();        services.AddSingleton(new AuthClientConfig
+        
+        // Register the Coyote HTTP client factory
+        services.AddSingleton<ICoyoteHttpClient, MockOAuth2HttpClient>();
+        services.AddSingleton<Coyote.Infra.Http.Factory.IHttpClientFactory>(provider => 
+        {
+            var httpClient = provider.GetRequiredService<ICoyoteHttpClient>();
+            return new TestHttpClientFactory(httpClient);
+        });
+        
+        services.AddSingleton(new AuthClientConfig
         {
             ServerUrl = _mockServer.BaseUrl,
             ClientId = "test-client",
@@ -146,11 +160,17 @@ public class AuthSecurityTests : IDisposable
             ClientSecret = "test-secret",
             DefaultScopes = new List<string> { "api.read" }
             // TODO: ValidateServerCertificate property not available in current API
-        };
-
-        var services = new ServiceCollection();
+        };        var services = new ServiceCollection();
         services.AddLogging(builder => builder.AddConsole());
-        services.AddHttpClient();
+        
+        // Register the Coyote HTTP client factory
+        services.AddSingleton<ICoyoteHttpClient, MockOAuth2HttpClient>();
+        services.AddSingleton<Coyote.Infra.Http.Factory.IHttpClientFactory>(provider => 
+        {
+            var httpClient = provider.GetRequiredService<ICoyoteHttpClient>();
+            return new TestHttpClientFactory(httpClient);
+        });
+        
         services.AddSingleton(httpsConfig);
         services.AddTransient<IAuthTokenStorage, InMemoryTokenStorage>();
         services.AddTransient<IAuthClient, AuthClient>();
@@ -252,10 +272,18 @@ public class AuthSecurityTests : IDisposable
     public async Task TokenStorage_ShouldClearTokensOnDispose()
     {
         // Arrange
-        var disposableStorage = new DisposableTokenStorage();
-          var services = new ServiceCollection();
+        var disposableStorage = new DisposableTokenStorage();        var services = new ServiceCollection();
         services.AddLogging(builder => builder.AddConsole());
-        services.AddHttpClient();        services.AddSingleton(new AuthClientConfig
+        
+        // Register the Coyote HTTP client factory
+        services.AddSingleton<ICoyoteHttpClient, MockOAuth2HttpClient>();
+        services.AddSingleton<Coyote.Infra.Http.Factory.IHttpClientFactory>(provider => 
+        {
+            var httpClient = provider.GetRequiredService<ICoyoteHttpClient>();
+            return new TestHttpClientFactory(httpClient);
+        });
+        
+        services.AddSingleton(new AuthClientConfig
         {
             ServerUrl = _mockServer.BaseUrl,
             ClientId = "test-client",
@@ -294,11 +322,17 @@ public class AuthSecurityTests : IDisposable
             // {
             //     MaxRetries = 0 // Disable retries for this test
             // }
-        };
-
-        var services = new ServiceCollection();
+        };        var services = new ServiceCollection();
         services.AddLogging(builder => builder.AddConsole());
-        services.AddHttpClient();
+        
+        // Register the Coyote HTTP client factory
+        services.AddSingleton<ICoyoteHttpClient, MockOAuth2HttpClient>();
+        services.AddSingleton<Coyote.Infra.Http.Factory.IHttpClientFactory>(provider => 
+        {
+            var httpClient = provider.GetRequiredService<ICoyoteHttpClient>();
+            return new TestHttpClientFactory(httpClient);
+        });
+        
         services.AddSingleton(invalidConfig);
         services.AddTransient<IAuthTokenStorage, InMemoryTokenStorage>();
         services.AddTransient<IAuthClient, AuthClient>();
