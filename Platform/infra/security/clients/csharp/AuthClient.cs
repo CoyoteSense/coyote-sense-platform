@@ -97,13 +97,24 @@ public class AuthClient : IAuthClient
         if (_config.AutoRefresh)
         {
             _refreshTimer = new Timer(OnRefreshTimer, null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
-        }
-    }
+        }    }
 
+    /// <summary>
+    /// Gets the current authentication token
+    /// </summary>
     public AuthToken? CurrentToken => _currentToken;
 
+    /// <summary>
+    /// Gets a value indicating whether the client is currently authenticated
+    /// </summary>
     public bool IsAuthenticated => _currentToken != null && !_currentToken.IsExpired;
 
+    /// <summary>
+    /// Authenticates using OAuth2 Client Credentials flow (RFC 6749)
+    /// </summary>
+    /// <param name="scopes">Optional scopes to request during authentication</param>
+    /// <param name="cancellationToken">Cancellation token for the operation</param>
+    /// <returns>Authentication result containing token or error information</returns>
     public async Task<AuthResult> AuthenticateClientCredentialsAsync(List<string>? scopes = null, CancellationToken cancellationToken = default)
     {
         try
@@ -148,9 +159,15 @@ public class AuthClient : IAuthClient
         {
             _logger.LogError($"Client Credentials authentication error: {ex.Message}");
             return AuthResult.Error("authentication_error", "Authentication failed", ex.Message);
-        }
-    }
+        }    }
 
+    /// <summary>
+    /// Authenticates using JWT Bearer token flow (RFC 7523)
+    /// </summary>
+    /// <param name="subject">Optional subject for the JWT assertion</param>
+    /// <param name="scopes">Optional scopes to request during authentication</param>
+    /// <param name="cancellationToken">Cancellation token for the operation</param>
+    /// <returns>Authentication result containing token or error information</returns>
     public async Task<AuthResult> AuthenticateJwtBearerAsync(string? subject = null, List<string>? scopes = null, CancellationToken cancellationToken = default)
     {
         try
@@ -196,9 +213,16 @@ public class AuthClient : IAuthClient
         {
             _logger.LogError($"JWT Bearer authentication error: {ex.Message}");
             return AuthResult.Error("authentication_error", "Authentication failed", ex.Message);
-        }
-    }
+        }    }
 
+    /// <summary>
+    /// Authenticates using OAuth2 Authorization Code flow (RFC 6749)
+    /// </summary>
+    /// <param name="authorizationCode">Authorization code received from the authorization server</param>
+    /// <param name="redirectUri">Redirect URI used during authorization</param>
+    /// <param name="codeVerifier">Optional PKCE code verifier for enhanced security</param>
+    /// <param name="cancellationToken">Cancellation token for the operation</param>
+    /// <returns>Authentication result containing token or error information</returns>
     public async Task<AuthResult> AuthenticateAuthorizationCodeAsync(string authorizationCode, string redirectUri, string? codeVerifier = null, CancellationToken cancellationToken = default)
     {
         try
@@ -241,9 +265,15 @@ public class AuthClient : IAuthClient
         {
             _logger.LogError($"Authorization Code authentication error: {ex.Message}");
             return AuthResult.Error("authentication_error", "Authentication failed", ex.Message);
-        }
-    }
+        }    }
 
+    /// <summary>
+    /// Starts OAuth2 Authorization Code flow with PKCE (RFC 7636)
+    /// </summary>
+    /// <param name="redirectUri">Redirect URI where the authorization code will be sent</param>
+    /// <param name="scopes">Optional scopes to request during authorization</param>
+    /// <param name="state">Optional state parameter for CSRF protection</param>
+    /// <returns>Tuple containing authorization URL, code verifier, and state</returns>
     public (string authorizationUrl, string codeVerifier, string state) StartAuthorizationCodeFlow(string redirectUri, List<string>? scopes = null, string? state = null)
     {
         _logger.LogInfo("Starting Authorization Code + PKCE flow");
@@ -274,9 +304,14 @@ public class AuthClient : IAuthClient
         var queryString = string.Join("&", parameters.Select(kv => $"{UrlEncode(kv.Key)}={UrlEncode(kv.Value)}"));
         var authorizationUrl = $"{_config.ServerUrl}/authorize?{queryString}";
 
-        return (authorizationUrl, codeVerifier, actualState);
-    }
+        return (authorizationUrl, codeVerifier, actualState);    }
 
+    /// <summary>
+    /// Refreshes an access token using a refresh token
+    /// </summary>
+    /// <param name="refreshToken">The refresh token to use for obtaining a new access token</param>
+    /// <param name="cancellationToken">Cancellation token for the operation</param>
+    /// <returns>Authentication result containing the new token or error information</returns>
     public async Task<AuthResult> RefreshTokenAsync(string refreshToken, CancellationToken cancellationToken = default)
     {
         try
@@ -313,9 +348,13 @@ public class AuthClient : IAuthClient
         {
             _logger.LogError($"Token refresh error: {ex.Message}");
             return AuthResult.Error("refresh_error", "Token refresh failed", ex.Message);
-        }
-    }
+        }    }
 
+    /// <summary>
+    /// Gets a valid token, automatically refreshing if needed and possible
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token for the operation</param>
+    /// <returns>Valid authentication token or null if not available</returns>
     public async Task<AuthToken?> GetValidTokenAsync(CancellationToken cancellationToken = default)
     {
         if (_currentToken == null)
@@ -335,10 +374,17 @@ public class AuthClient : IAuthClient
             {
                 return refreshResult.Token;
             }
-        }
+        }        return _currentToken.IsExpired ? null : _currentToken;
+    }
 
-        return _currentToken.IsExpired ? null : _currentToken;
-    }    public async Task<bool> RevokeTokenAsync(string token, string? tokenTypeHint = null, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Revokes an access or refresh token
+    /// </summary>
+    /// <param name="token">The token to revoke</param>
+    /// <param name="tokenTypeHint">Optional hint about the token type (access_token or refresh_token)</param>
+    /// <param name="cancellationToken">Cancellation token for the operation</param>
+    /// <returns>True if revocation was successful, false otherwise</returns>
+    public async Task<bool> RevokeTokenAsync(string token, string? tokenTypeHint = null, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -371,7 +417,15 @@ public class AuthClient : IAuthClient
             _logger.LogError($"Token revocation error: {ex.Message}");
             return false;
         }
-    }    public async Task<bool> IntrospectTokenAsync(string token, CancellationToken cancellationToken = default)
+    }
+
+    /// <summary>
+    /// Introspects a token to check its validity and properties
+    /// </summary>
+    /// <param name="token">The token to introspect</param>
+    /// <param name="cancellationToken">Cancellation token for the operation</param>
+    /// <returns>True if the token is active, false otherwise</returns>
+    public async Task<bool> IntrospectTokenAsync(string token, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -413,9 +467,13 @@ public class AuthClient : IAuthClient
         {
             _logger.LogError($"Token introspection error: {ex.Message}");
             return false;
-        }
-    }
+        }    }
 
+    /// <summary>
+    /// Tests the connection to the authentication server
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token for the operation</param>
+    /// <returns>True if connection is successful, false otherwise</returns>
     public async Task<bool> TestConnectionAsync(CancellationToken cancellationToken = default)
     {
         try
@@ -429,9 +487,13 @@ public class AuthClient : IAuthClient
         {
             _logger.LogError($"Connection test error: {ex.Message}");
             return false;
-        }
-    }
+        }    }
 
+    /// <summary>
+    /// Gets information about the authentication server capabilities
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token for the operation</param>
+    /// <returns>Server information or null if not available</returns>
     public async Task<AuthServerInfo?> GetServerInfoAsync(CancellationToken cancellationToken = default)
     {
         try
@@ -474,9 +536,11 @@ public class AuthClient : IAuthClient
         {
             _logger.LogError($"Get server info error: {ex.Message}");
             return null;
-        }
-    }
+        }    }
 
+    /// <summary>
+    /// Clears all stored tokens from memory and storage
+    /// </summary>
     public void ClearTokens()
     {
         _logger.LogInfo("Clearing stored tokens");
@@ -484,31 +548,53 @@ public class AuthClient : IAuthClient
         _tokenStorage.ClearToken(_config.ClientId);
     }
 
-    // Synchronous wrapper methods
+    // Synchronous wrapper methods for backwards compatibility
+    
+    /// <summary>
+    /// Synchronous wrapper for AuthenticateClientCredentialsAsync
+    /// </summary>
     public AuthResult AuthenticateClientCredentials(List<string>? scopes = null) =>
         AuthenticateClientCredentialsAsync(scopes).GetAwaiter().GetResult();
 
+    /// <summary>
+    /// Synchronous wrapper for AuthenticateJwtBearerAsync
+    /// </summary>
     public AuthResult AuthenticateJwtBearer(string? subject = null, List<string>? scopes = null) =>
         AuthenticateJwtBearerAsync(subject, scopes).GetAwaiter().GetResult();
 
+    /// <summary>
+    /// Synchronous wrapper for AuthenticateAuthorizationCodeAsync
+    /// </summary>
     public AuthResult AuthenticateAuthorizationCode(string authorizationCode, string redirectUri, string? codeVerifier = null) =>
-        AuthenticateAuthorizationCodeAsync(authorizationCode, redirectUri, codeVerifier).GetAwaiter().GetResult();
-
+        AuthenticateAuthorizationCodeAsync(authorizationCode, redirectUri, codeVerifier).GetAwaiter().GetResult();    /// <summary>
+    /// Synchronous wrapper for RefreshTokenAsync
+    /// </summary>
     public AuthResult RefreshToken(string refreshToken) =>
         RefreshTokenAsync(refreshToken).GetAwaiter().GetResult();
 
+    /// <summary>
+    /// Synchronous wrapper for GetValidTokenAsync
+    /// </summary>
     public AuthToken? GetValidToken() =>
-        GetValidTokenAsync().GetAwaiter().GetResult();
-
+        GetValidTokenAsync().GetAwaiter().GetResult();    /// <summary>
+    /// Synchronous wrapper for RevokeTokenAsync
+    /// </summary>
     public bool RevokeToken(string token, string? tokenTypeHint = null) =>
         RevokeTokenAsync(token, tokenTypeHint).GetAwaiter().GetResult();
 
+    /// <summary>
+    /// Synchronous wrapper for IntrospectTokenAsync
+    /// </summary>
     public bool IntrospectToken(string token) =>
-        IntrospectTokenAsync(token).GetAwaiter().GetResult();
-
+        IntrospectTokenAsync(token).GetAwaiter().GetResult();    /// <summary>
+    /// Synchronous wrapper for TestConnectionAsync
+    /// </summary>
     public bool TestConnection() =>
         TestConnectionAsync().GetAwaiter().GetResult();
 
+    /// <summary>
+    /// Synchronous wrapper for GetServerInfoAsync
+    /// </summary>
     public AuthServerInfo? GetServerInfo() =>
         GetServerInfoAsync().GetAwaiter().GetResult();
 
@@ -733,9 +819,12 @@ public class AuthClient : IAuthClient
                     _logger.LogError($"Background token refresh failed: {ex.Message}");
                 }
             });
-        }
-    }
+        }    }
 
+    /// <summary>
+    /// Releases the unmanaged resources used by the AuthClient and optionally releases the managed resources
+    /// </summary>
+    /// <param name="disposing">true to release both managed and unmanaged resources; false to release only unmanaged resources</param>
     protected virtual void Dispose(bool disposing)
     {
         if (!_disposed)
@@ -745,10 +834,12 @@ public class AuthClient : IAuthClient
                 _refreshTimer?.Dispose();
                 _httpClient?.Dispose();
             }
-            _disposed = true;
-        }
+            _disposed = true;        }
     }
 
+    /// <summary>
+    /// Releases all resources used by the AuthClient
+    /// </summary>
     public void Dispose()
     {
         Dispose(true);

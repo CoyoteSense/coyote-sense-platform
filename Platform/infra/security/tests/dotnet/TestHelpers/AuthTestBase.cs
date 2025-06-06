@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Coyote.Infra.Security.Auth;
 using Coyote.Infra.Http;
+using Coyote.Infra.Security.Tests.TestHelpers;
 
 namespace Coyote.Infra.Security.Tests.TestHelpers
 {

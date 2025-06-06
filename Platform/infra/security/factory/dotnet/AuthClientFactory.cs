@@ -322,9 +322,10 @@ public class AuthClientBuilder
     {
         _config.TimeoutMs = timeoutMs;
         return this;
-    }
-
-    /// <summary>    /// Configure SSL verification
+    }    
+    
+    /// <summary>
+    /// Configure SSL verification
     /// </summary>
     public AuthClientBuilder WithSslVerification(bool verify)
     {

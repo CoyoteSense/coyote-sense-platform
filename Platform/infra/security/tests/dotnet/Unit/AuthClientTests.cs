@@ -302,15 +302,15 @@ public class AuthClientTests : AuthTestBase
         var result = await _client.RefreshTokenAsync("invalid-refresh-token");
 
         // Assert
-        result.IsSuccess.Should().BeFalse();
-        result.ErrorCode.Should().Be("invalid_grant");
+        result.IsSuccess.Should().BeFalse();        result.ErrorCode.Should().Be("invalid_grant");
         result.ErrorDescription.Should().Be("Refresh token is invalid");
     }
 
     #endregion
 
     #region Token Introspection Tests
-      [Fact]
+
+    [Fact]
     public async Task IntrospectTokenAsync_WithActiveToken_ShouldReturnTrue()
     {
         // Arrange
@@ -322,21 +322,28 @@ public class AuthClientTests : AuthTestBase
             exp = DateTimeOffset.UtcNow.AddHours(1).ToUnixTimeSeconds()
         };
 
-        SetupHttpResponse(HttpStatusCode.OK, JsonSerializer.Serialize(introspectionResponse));
+        // Set up response for the introspection endpoint specifically
+        var introspectUrl = $"{_config.ServerUrl}/introspect";
+        Console.WriteLine($"[AuthClientTests] Setting up introspection response for URL: {introspectUrl}");
+        _mockHttpClient.SetPredefinedResponse(introspectUrl, 200, JsonSerializer.Serialize(introspectionResponse));
 
         // Act
         var result = await _client.IntrospectTokenAsync("test-access-token");
 
         // Assert
         result.Should().BeTrue();
-    }    [Fact]
+    }
+
+    [Fact]
     public async Task IntrospectTokenAsync_WithInactiveToken_ShouldReturnFalse()
     {
         // Arrange
         var introspectionResponse = new
         {
             active = false
-        };        // Set up response for the introspection endpoint specifically
+        };
+
+        // Set up response for the introspection endpoint specifically
         var introspectUrl = $"{_config.ServerUrl}/introspect";
         Console.WriteLine($"[AuthClientTests] Setting up introspection response for URL: {introspectUrl}");
         _mockHttpClient.SetPredefinedResponse(introspectUrl, 200, JsonSerializer.Serialize(introspectionResponse));
@@ -351,24 +358,29 @@ public class AuthClientTests : AuthTestBase
     #endregion
 
     #region Token Revocation Tests
-      [Fact]
+
+    [Fact]
     public async Task RevokeTokenAsync_WithValidToken_ShouldReturnSuccess()
     {
         // Arrange
-        SetupHttpResponse(HttpStatusCode.OK, "");
+        // Set up response for the revocation endpoint specifically
+        var revokeUrl = $"{_config.ServerUrl}/revoke";
+        Console.WriteLine($"[AuthClientTests] Setting up revocation response for URL: {revokeUrl}");
+        _mockHttpClient.SetPredefinedResponse(revokeUrl, 200, "");
 
         _mockTokenStorage.Setup(x => x.ClearToken(It.IsAny<string>()))
             .Verifiable();
 
         // Act
-        var result = await _client.RevokeTokenAsync("test-access-token");
-
-        // Assert
+        var result = await _client.RevokeTokenAsync("test-access-token");        // Assert
         result.Should().BeTrue();
-    }    [Fact]
+    }
+
+    [Fact]
     public async Task RevokeTokenAsync_WithServerError_ShouldReturnError()
     {
-        // Arrange        // Set up error response for the revocation endpoint specifically
+        // Arrange
+        // Set up error response for the revocation endpoint specifically
         var revokeUrl = $"{_config.ServerUrl}/revoke";
         Console.WriteLine($"[AuthClientTests] Setting up revocation error response for URL: {revokeUrl}");
         _mockHttpClient.SetPredefinedResponse(revokeUrl, 500, "Internal Server Error");

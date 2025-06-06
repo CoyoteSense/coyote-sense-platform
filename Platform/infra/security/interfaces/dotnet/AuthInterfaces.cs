@@ -255,25 +255,36 @@ public interface IAuthLogger
 /// In-memory token storage implementation
 /// </summary>
 public class InMemoryTokenStorage : IAuthTokenStorage
-{
-    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, AuthToken> _tokens = new();
+{    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, AuthToken> _tokens = new();
 
+    /// <summary>
+    /// Stores an authentication token for the specified client
+    /// </summary>
     public Task StoreTokenAsync(string clientId, AuthToken token)
     {
         _tokens[clientId] = token;
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// Retrieves the stored token for the specified client
+    /// </summary>
     public AuthToken? GetToken(string clientId)
     {
         return _tokens.TryGetValue(clientId, out var token) ? token : null;
     }
 
+    /// <summary>
+    /// Clears the stored token for the specified client
+    /// </summary>
     public void ClearToken(string clientId)
     {
         _tokens.TryRemove(clientId, out _);
     }
 
+    /// <summary>
+    /// Clears all stored tokens
+    /// </summary>
     public void ClearAllTokens()
     {
         _tokens.Clear();
@@ -284,24 +295,34 @@ public class InMemoryTokenStorage : IAuthTokenStorage
 /// Console logger implementation
 /// </summary>
 public class ConsoleAuthLogger : IAuthLogger
-{
-    private readonly string _prefix;
+{    private readonly string _prefix;
 
+    /// <summary>
+    /// Initializes a new instance of the ConsoleAuthLogger
+    /// </summary>
     public ConsoleAuthLogger(string? prefix = null)
     {
         _prefix = prefix ?? "Auth";
     }
 
+    /// <summary>
+    /// Logs an informational message to the console
+    /// </summary>
     public void LogInfo(string message)
     {
         Console.WriteLine($"[{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}] [{_prefix}] INFO: {message}");
     }
 
+    /// <summary>
+    /// Logs an error message to the console
+    /// </summary>
     public void LogError(string message)
-    {
-        Console.WriteLine($"[{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}] [{_prefix}] ERROR: {message}");
+    {        Console.WriteLine($"[{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}] [{_prefix}] ERROR: {message}");
     }
 
+    /// <summary>
+    /// Logs a debug message to the console
+    /// </summary>
     public void LogDebug(string message)
     {
         Console.WriteLine($"[{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}] [{_prefix}] DEBUG: {message}");
@@ -313,8 +334,19 @@ public class ConsoleAuthLogger : IAuthLogger
 /// </summary>
 public class NullAuthLogger : IAuthLogger
 {
+    /// <summary>
+    /// Logs an informational message (no-op)
+    /// </summary>
     public void LogInfo(string message) { }
+    
+    /// <summary>
+    /// Logs an error message (no-op)
+    /// </summary>
     public void LogError(string message) { }
+    
+    /// <summary>
+    /// Logs a debug message (no-op)
+    /// </summary>
     public void LogDebug(string message) { }
 }
 

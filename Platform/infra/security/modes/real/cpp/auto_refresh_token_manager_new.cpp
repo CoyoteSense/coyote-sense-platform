@@ -107,21 +107,23 @@ std::future<std::string> AutoRefreshTokenManager::GetValidTokenAsync(const std::
         auto now = std::chrono::system_clock::now();
         
         // Check if token is still valid (with 1 minute buffer)
-        if (now >= (entry.token.expires_at - std::chrono::minutes(1))) {
-            // Token expired or about to expire - force refresh
-            if (!entry.is_refreshing.exchange(true)) {
-                try {
-                    auto new_token = refreshTokenInternal(entry).get();
-                    return new_token.access_token;
-                } catch (const std::exception&) {
-                    entry.is_refreshing = false;
-                    throw;
-                }
-            } else {
-                // Another thread is refreshing, wait and retry
-                std::this_thread::sleep_for(std::chrono::milliseconds(100));
-                return GetValidTokenAsync(client_id).get();
+        if (now >= (entry.token.expires_at - std::chrono::minutes(1))) {        // Token expired or about to expire - force refresh
+        if (!entry.is_refreshing.exchange(true)) {
+            try {
+                auto new_token = refreshTokenInternal(entry).get();
+                return new_token.access_token;
+            } catch (const std::exception&) {
+                entry.is_refreshing = false;
+                throw;
             }
+        } else {
+            // Another thread is refreshing, wait for it to complete
+            while (entry.is_refreshing.load()) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            }
+            // Refresh completed, return the updated token
+            return entry.token.access_token;
+        }
         }
         
         return entry.token.access_token;
