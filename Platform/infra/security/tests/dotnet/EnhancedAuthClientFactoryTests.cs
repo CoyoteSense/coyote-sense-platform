@@ -283,24 +283,23 @@ public class EnhancedAuthClientFactoryTests
         Assert.Same(client1, client1Again); // Should return same instance
         Assert.Equal(2, pool.ActiveClientCount);
         _output.WriteLine("✅ Client pool managing multiple clients correctly");
-    }
-
-    [Fact]
-    public void LegacyFactoryMethods_ShouldStillWork()
+    }    [Fact]
+    public void ModernFactoryMethods_ShouldWork()
     {
         // Arrange & Act
-        #pragma warning disable CS0618 // Type or member is obsolete
-        using var client = AuthClientFactory.CreateClientCredentialsClient(
-            "https://auth.example.com",
-            "test-client",
-            "test-secret",
-            new List<string> { "legacy.scope" }
-        );
-        #pragma warning restore CS0618
+        var options = new ClientCredentialsOptions
+        {
+            ServerUrl = "https://auth.example.com",
+            ClientId = "test-client",
+            ClientSecret = "test-secret",
+            DefaultScopes = new List<string> { "modern.scope" }
+        };
+        
+        using var client = AuthClientFactory.CreateFromOptions(options);
 
         // Assert
         Assert.NotNull(client);
-        _output.WriteLine("✅ Legacy factory methods still working (backward compatibility)");
+        _output.WriteLine("✅ Modern factory methods working correctly");
     }
 }
 

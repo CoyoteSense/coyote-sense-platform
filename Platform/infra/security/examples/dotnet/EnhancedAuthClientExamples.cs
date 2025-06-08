@@ -67,28 +67,29 @@ public class EnhancedAuthClientExamples
     /// <summary>
     /// Example: Legacy Factory Method (LEGACY - Consider migrating)
     /// Shows the old approach for comparison
-    /// </summary>
-    public static async Task MtlsLegacyFactoryExample()
+    /// </summary>    public static async Task MtlsLegacyFactoryExample()
     {
-        Console.WriteLine("\n=== Legacy mTLS Factory Example ===");
+        Console.WriteLine("\n=== Modern mTLS Options Example ===");
 
-        // Legacy approach with many parameters
-        #pragma warning disable CS0618 // Type or member is obsolete
-        using var client = AuthClientFactory.CreateMtlsClient(
-            serverUrl: ServerUrl,
-            clientId: ClientId,
-            clientCertPath: "/opt/coyote/certs/client.crt",
-            clientKeyPath: "/opt/coyote/certs/client.key",
-            defaultScopes: new List<string> { "keyvault.read", "keyvault.write" },
-            logger: new ConsoleAuthLogger("mTLS-Legacy")
+        // Modern approach with options pattern
+        var options = new MtlsOptions
+        {
+            ServerUrl = ServerUrl,
+            ClientId = ClientId,
+            ClientCertPath = "/opt/coyote/certs/client.crt",
+            ClientKeyPath = "/opt/coyote/certs/client.key",
+            DefaultScopes = new List<string> { "keyvault.read", "keyvault.write" }
+        };
+        
+        using var client = AuthClientFactory.CreateFromOptions(
+            options,
+            logger: new ConsoleAuthLogger("mTLS-Modern")
         );
-        #pragma warning restore CS0618
 
         var result = await client.AuthenticateClientCredentialsAsync();
-        
-        if (result.IsSuccess)
+          if (result.IsSuccess)
         {
-            Console.WriteLine($"✅ Legacy mTLS authentication successful!");
+            Console.WriteLine($"✅ Modern mTLS authentication successful!");
         }
         else
         {

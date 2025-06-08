@@ -557,60 +557,9 @@ public class AuthClient : IAuthClient
     /// </summary>
     public void ClearTokens()
     {
-        _logger.LogInfo("Clearing stored tokens");
-        _currentToken = null;
+        _logger.LogInfo("Clearing stored tokens");        _currentToken = null;
         _tokenStorage.ClearToken(_config.ClientId);
     }
-
-    // Synchronous wrapper methods for backwards compatibility
-    
-    /// <summary>
-    /// Synchronous wrapper for AuthenticateClientCredentialsAsync
-    /// </summary>
-    public AuthResult AuthenticateClientCredentials(List<string>? scopes = null) =>
-        AuthenticateClientCredentialsAsync(scopes).GetAwaiter().GetResult();
-
-    /// <summary>
-    /// Synchronous wrapper for AuthenticateJwtBearerAsync
-    /// </summary>
-    public AuthResult AuthenticateJwtBearer(string? subject = null, List<string>? scopes = null) =>
-        AuthenticateJwtBearerAsync(subject, scopes).GetAwaiter().GetResult();
-
-    /// <summary>
-    /// Synchronous wrapper for AuthenticateAuthorizationCodeAsync
-    /// </summary>
-    public AuthResult AuthenticateAuthorizationCode(string authorizationCode, string redirectUri, string? codeVerifier = null) =>
-        AuthenticateAuthorizationCodeAsync(authorizationCode, redirectUri, codeVerifier).GetAwaiter().GetResult();    /// <summary>
-    /// Synchronous wrapper for RefreshTokenAsync
-    /// </summary>
-    public AuthResult RefreshToken(string refreshToken) =>
-        RefreshTokenAsync(refreshToken).GetAwaiter().GetResult();
-
-    /// <summary>
-    /// Synchronous wrapper for GetValidTokenAsync
-    /// </summary>
-    public AuthToken? GetValidToken() =>
-        GetValidTokenAsync().GetAwaiter().GetResult();    /// <summary>
-    /// Synchronous wrapper for RevokeTokenAsync
-    /// </summary>
-    public bool RevokeToken(string token, string? tokenTypeHint = null) =>
-        RevokeTokenAsync(token, tokenTypeHint).GetAwaiter().GetResult();
-
-    /// <summary>
-    /// Synchronous wrapper for IntrospectTokenAsync
-    /// </summary>
-    public bool IntrospectToken(string token) =>
-        IntrospectTokenAsync(token).GetAwaiter().GetResult();    /// <summary>
-    /// Synchronous wrapper for TestConnectionAsync
-    /// </summary>
-    public bool TestConnection() =>
-        TestConnectionAsync().GetAwaiter().GetResult();
-
-    /// <summary>
-    /// Synchronous wrapper for GetServerInfoAsync
-    /// </summary>
-    public AuthServerInfo? GetServerInfo() =>
-        GetServerInfoAsync().GetAwaiter().GetResult();
 
     private void ConfigureHttpClient()
     {

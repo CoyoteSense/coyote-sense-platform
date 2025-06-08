@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using System.Linq;
 using System.Threading;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.DependencyInjection;
@@ -145,120 +146,11 @@ public static class AuthClientFactory
         }
         
         var actualHttpClient = httpClient ?? GetDefaultHttpClient();
-        return new AuthClient(config, actualHttpClient, tokenStorage, logger);
-    }
+        return new AuthClient(config, actualHttpClient, tokenStorage, logger);    }
 
     #endregion
 
-    #region Traditional Factory Methods (Legacy Support)
-    
-    /// <summary>
-    /// Create authentication client for Client Credentials flow
-    /// [Legacy] Consider using CreateFromOptions for better maintainability
-    /// </summary>
-    [Obsolete("Consider using CreateFromOptions(ClientCredentialsOptions) for better maintainability and validation")]
-    public static IAuthClient CreateClientCredentialsClient(
-        string serverUrl,
-        string clientId,
-        string clientSecret,
-        List<string>? defaultScopes = null,
-        IAuthTokenStorage? tokenStorage = null,
-        IAuthLogger? logger = null,
-        ICoyoteHttpClient? httpClient = null)
-    {        var config = new AuthClientConfig
-        {
-            AuthMode = AuthMode.ClientCredentials,
-            ServerUrl = serverUrl,
-            ClientId = clientId,
-            ClientSecret = clientSecret,
-            DefaultScopes = defaultScopes ?? new List<string>()
-        };
-
-        var actualHttpClient = httpClient ?? GetDefaultHttpClient();
-        return new AuthClient(config, actualHttpClient, tokenStorage, logger);
-    }    
-    
-    /// <summary>
-    /// Create authentication client for Client Credentials flow with mTLS
-    /// [Legacy] Consider using CreateFromOptions for better maintainability
-    /// </summary>
-    [Obsolete("Consider using CreateFromOptions(MtlsOptions) for better maintainability and validation")]
-    public static IAuthClient CreateMtlsClient(
-        string serverUrl,
-        string clientId,
-        string clientCertPath,
-        string clientKeyPath,
-        List<string>? defaultScopes = null,
-        IAuthTokenStorage? tokenStorage = null,
-        IAuthLogger? logger = null,
-        ICoyoteHttpClient? httpClient = null)
-    {        var config = new AuthClientConfig
-        {
-            AuthMode = AuthMode.ClientCredentialsMtls,
-            ServerUrl = serverUrl,
-            ClientId = clientId,
-            ClientCertPath = clientCertPath,
-            ClientKeyPath = clientKeyPath,
-            DefaultScopes = defaultScopes ?? new List<string>()
-        };
-
-        var actualHttpClient = httpClient ?? GetDefaultHttpClient();
-        return new AuthClient(config, actualHttpClient, tokenStorage, logger);
-    }    /// <summary>
-    /// Create authentication client for JWT Bearer flow
-    /// [Legacy] Consider using CreateFromOptions for better maintainability
-    /// </summary>
-    [Obsolete("Consider using CreateFromOptions(JwtBearerOptions) for better maintainability and validation")]
-    public static IAuthClient CreateJwtBearerClient(
-        string serverUrl,
-        string clientId,
-        string jwtSigningKeyPath,
-        string jwtIssuer,
-        string jwtAudience,
-        List<string>? defaultScopes = null,
-        IAuthTokenStorage? tokenStorage = null,
-        IAuthLogger? logger = null,
-        ICoyoteHttpClient? httpClient = null)
-    {        var config = new AuthClientConfig
-        {
-            AuthMode = AuthMode.JwtBearer,
-            ServerUrl = serverUrl,
-            ClientId = clientId,
-            JwtSigningKeyPath = jwtSigningKeyPath,
-            JwtIssuer = jwtIssuer,
-            JwtAudience = jwtAudience,
-            DefaultScopes = defaultScopes ?? new List<string>()
-        };
-
-        var actualHttpClient = httpClient ?? GetDefaultHttpClient();
-        return new AuthClient(config, actualHttpClient, tokenStorage, logger);
-    }    
-    
-    /// <summary>
-    /// Create authentication client for Authorization Code flow
-    /// [Legacy] Consider using CreateFromOptions for better maintainability
-    /// </summary>
-    [Obsolete("Consider using CreateFromOptions(AuthorizationCodeOptions) for better maintainability and validation")]
-    public static IAuthClient CreateAuthorizationCodeClient(
-        string serverUrl,
-        string clientId,
-        string? clientSecret = null,
-        List<string>? defaultScopes = null,
-        IAuthTokenStorage? tokenStorage = null,
-        IAuthLogger? logger = null,
-        ICoyoteHttpClient? httpClient = null)
-    {        var config = new AuthClientConfig
-        {
-            AuthMode = AuthMode.AuthorizationCode,
-            ServerUrl = serverUrl,
-            ClientId = clientId,
-            ClientSecret = clientSecret,
-            DefaultScopes = defaultScopes ?? new List<string>()
-        };
-
-        var actualHttpClient = httpClient ?? GetDefaultHttpClient();
-        return new AuthClient(config, actualHttpClient, tokenStorage, logger);
-    }    
+    #region Modern Factory Methods
     
     /// <summary>
     /// Create authentication client with custom configuration

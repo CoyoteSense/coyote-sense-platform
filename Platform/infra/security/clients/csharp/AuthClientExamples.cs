@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Coyote.Infra.Security.Auth;
+using Coyote.Infra.Security.Auth.Options;
 
 namespace Coyote.Infra.Security.Auth.Examples;
 
@@ -17,18 +18,19 @@ public class AuthClientExamples
     /// Example: Client Credentials authentication
     /// </summary>
     public static async Task ClientCredentialsExample()
-    {        Console.WriteLine("=== Client Credentials Flow Example ===");
-
-        // Create client using factory
-        #pragma warning disable CS0618 // Type or member is obsolete
-        using var client = AuthClientFactory.CreateClientCredentialsClient(
-            serverUrl: ServerUrl,
-            clientId: ClientId,
-            clientSecret: "your-client-secret",
-            defaultScopes: new List<string> { "read", "write" },
+    {        Console.WriteLine("=== Client Credentials Flow Example ===");        // Create client using modern options pattern
+        var options = new ClientCredentialsOptions
+        {
+            ServerUrl = ServerUrl,
+            ClientId = ClientId,
+            ClientSecret = "your-client-secret",
+            DefaultScopes = new List<string> { "read", "write" }
+        };
+        
+        using var client = AuthClientFactory.CreateFromOptions(
+            options,
             logger: new ConsoleAuthLogger("ClientCredentials")
         );
-        #pragma warning restore CS0618
 
         // Test connection
         var connected = await client.TestConnectionAsync();
@@ -62,19 +64,20 @@ public class AuthClientExamples
     /// Example: mTLS authentication
     /// </summary>
     public static async Task MtlsExample()
-    {        Console.WriteLine("\n=== mTLS Flow Example ===");
-
-        // Create client using factory
-        #pragma warning disable CS0618 // Type or member is obsolete
-        using var client = AuthClientFactory.CreateMtlsClient(
-            serverUrl: ServerUrl,
-            clientId: ClientId,
-            clientCertPath: "/opt/coyote/certs/client.crt",
-            clientKeyPath: "/opt/coyote/certs/client.key",
-            defaultScopes: new List<string> { "read", "write" },
+    {        Console.WriteLine("\n=== mTLS Flow Example ===");        // Create client using modern options pattern
+        var options = new MtlsOptions
+        {
+            ServerUrl = ServerUrl,
+            ClientId = ClientId,
+            ClientCertPath = "/opt/coyote/certs/client.crt",
+            ClientKeyPath = "/opt/coyote/certs/client.key",
+            DefaultScopes = new List<string> { "read", "write" }
+        };
+        
+        using var client = AuthClientFactory.CreateFromOptions(
+            options,
             logger: new ConsoleAuthLogger("mTLS")
         );
-        #pragma warning restore CS0618
 
         // Authenticate using Client Credentials with mTLS
         var result = await client.AuthenticateClientCredentialsAsync();
@@ -94,20 +97,21 @@ public class AuthClientExamples
     /// Example: JWT Bearer authentication
     /// </summary>
     public static async Task JwtBearerExample()
-    {        Console.WriteLine("\n=== JWT Bearer Flow Example ===");
-
-        // Create client using factory
-        #pragma warning disable CS0618 // Type or member is obsolete
-        using var client = AuthClientFactory.CreateJwtBearerClient(
-            serverUrl: ServerUrl,
-            clientId: ClientId,
-            jwtSigningKeyPath: "/opt/coyote/keys/jwt-signing.key",
-            jwtIssuer: "coyote-unit-service",
-            jwtAudience: ServerUrl,
-            defaultScopes: new List<string> { "read", "write" },
+    {        Console.WriteLine("\n=== JWT Bearer Flow Example ===");        // Create client using modern options pattern
+        var options = new JwtBearerOptions
+        {
+            ServerUrl = ServerUrl,
+            ClientId = ClientId,
+            JwtSigningKeyPath = "/opt/coyote/keys/jwt-signing.key",
+            JwtIssuer = "coyote-unit-service",
+            JwtAudience = ServerUrl,
+            DefaultScopes = new List<string> { "read", "write" }
+        };
+        
+        using var client = AuthClientFactory.CreateFromOptions(
+            options,
             logger: new ConsoleAuthLogger("JwtBearer")
         );
-        #pragma warning restore CS0618
 
         // Authenticate using JWT Bearer
         var result = await client.AuthenticateJwtBearerAsync(subject: "service-account");
@@ -127,17 +131,18 @@ public class AuthClientExamples
     /// Example: Authorization Code + PKCE flow
     /// </summary>
     public static async Task AuthorizationCodeExample()
-    {        Console.WriteLine("\n=== Authorization Code + PKCE Flow Example ===");
-
-        // Create client using factory
-        #pragma warning disable CS0618 // Type or member is obsolete
-        using var client = AuthClientFactory.CreateAuthorizationCodeClient(
-            serverUrl: ServerUrl,
-            clientId: ClientId,
-            defaultScopes: new List<string> { "read", "write", "profile" },
+    {        Console.WriteLine("\n=== Authorization Code + PKCE Flow Example ===");        // Create client using modern options pattern
+        var options = new AuthorizationCodeOptions
+        {
+            ServerUrl = ServerUrl,
+            ClientId = ClientId,
+            DefaultScopes = new List<string> { "read", "write", "profile" }
+        };
+        
+        using var client = AuthClientFactory.CreateFromOptions(
+            options,
             logger: new ConsoleAuthLogger("AuthCode")
         );
-        #pragma warning restore CS0618
 
         var redirectUri = "http://localhost:8080/callback";        // Start authorization flow
         var (authUrl, codeVerifier, state) = client.StartAuthorizationCodeFlow(
@@ -226,16 +231,17 @@ public class AuthClientExamples
     /// Example: Token management operations
     /// </summary>
     public static async Task TokenManagementExample()
-    {        Console.WriteLine("\n=== Token Management Example ===");
-
-        #pragma warning disable CS0618 // Type or member is obsolete
-        using var client = AuthClientFactory.CreateClientCredentialsClient(
-            serverUrl: ServerUrl,
-            clientId: ClientId,
-            clientSecret: "your-client-secret",
+    {        Console.WriteLine("\n=== Token Management Example ===");        var options = new ClientCredentialsOptions
+        {
+            ServerUrl = ServerUrl,
+            ClientId = ClientId,
+            ClientSecret = "your-client-secret"
+        };
+        
+        using var client = AuthClientFactory.CreateFromOptions(
+            options,
             logger: new ConsoleAuthLogger("TokenMgmt")
         );
-        #pragma warning restore CS0618
 
         // Authenticate
         var result = await client.AuthenticateClientCredentialsAsync();
@@ -267,16 +273,17 @@ public class AuthClientExamples
     /// Example: Server discovery
     /// </summary>
     public static async Task ServerDiscoveryExample()
-    {        Console.WriteLine("\n=== Server Discovery Example ===");
-
-        #pragma warning disable CS0618 // Type or member is obsolete
-        using var client = AuthClientFactory.CreateClientCredentialsClient(
-            serverUrl: ServerUrl,
-            clientId: ClientId,
-            clientSecret: "your-client-secret",
+    {        Console.WriteLine("\n=== Server Discovery Example ===");        var options = new ClientCredentialsOptions
+        {
+            ServerUrl = ServerUrl,
+            ClientId = ClientId,
+            ClientSecret = "your-client-secret"
+        };
+        
+        using var client = AuthClientFactory.CreateFromOptions(
+            options,
             logger: new ConsoleAuthLogger("Discovery")
         );
-        #pragma warning restore CS0618
 
         // Get server information
         var serverInfo = await client.GetServerInfoAsync();
