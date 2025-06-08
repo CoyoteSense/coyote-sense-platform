@@ -144,14 +144,15 @@ public static class AuthClientFactory
         {
             config.ClientSecret = credentialProvider.GetClientSecret();
         }
-        
+
         var actualHttpClient = httpClient ?? GetDefaultHttpClient();
-        return new AuthClient(config, actualHttpClient, tokenStorage, logger);    }
+        return new AuthClient(config, actualHttpClient, tokenStorage, logger);
+    }
 
     #endregion
 
     #region Modern Factory Methods
-    
+
     /// <summary>
     /// Create authentication client with custom configuration
     /// </summary>
@@ -170,7 +171,8 @@ public static class AuthClientFactory
     /// </summary>
     public static AuthClientBuilder CreateBuilder(string serverUrl, string clientId)
     {
-        return new AuthClientBuilder(serverUrl, clientId);    }
+        return new AuthClientBuilder(serverUrl, clientId);
+    }
 
     #endregion
 
@@ -183,17 +185,18 @@ public static class AuthClientFactory
     {
         var context = new ValidationContext(options);
         var results = new List<ValidationResult>();
-        
+
         if (!Validator.TryValidateObject(options, context, results, true))
         {
             var errors = string.Join(", ", results.Select(r => r.ErrorMessage));
             throw new ArgumentException($"Invalid options: {errors}");
         }
     }    /// <summary>
-    /// Thread-safe HTTP client retrieval
-    /// </summary>
+         /// Thread-safe HTTP client retrieval
+         /// </summary>
     internal static ICoyoteHttpClient GetDefaultHttpClient()
-    {        lock (_lock)
+    {
+        lock (_lock)
         {
             // Use the injected HTTP client factory if available
             if (_httpClientFactory != null)
@@ -204,7 +207,7 @@ public static class AuthClientFactory
             // Create a minimal service provider for HTTP client factory
             var services = new Microsoft.Extensions.DependencyInjection.ServiceCollection();
             services.AddLogging();
-            
+
             // Register all HTTP client implementations
             services.AddTransient<Coyote.Infra.Http.Modes.Real.RealHttpClient>();
             services.AddTransient<Coyote.Infra.Http.Modes.Mock.MockHttpClient>();
@@ -212,15 +215,15 @@ public static class AuthClientFactory
             services.AddTransient<Coyote.Infra.Http.Modes.Replay.ReplayHttpClient>();
             services.AddTransient<Coyote.Infra.Http.Modes.Simulation.SimulationHttpClient>();
             services.AddTransient<Coyote.Infra.Http.Modes.Debug.DebugHttpClient>();
-            
+
             var serviceProvider = services.BuildServiceProvider();
 
             // Create a proper HTTP client using the platform's factory infrastructure
             var factory = new HttpFactory.HttpClientFactory(
                 serviceProvider: serviceProvider,
-                modeOptions: Microsoft.Extensions.Options.Options.Create(new HttpClientModeOptions 
-                { 
-                    Mode = RuntimeMode.Production 
+                modeOptions: Microsoft.Extensions.Options.Options.Create(new HttpClientModeOptions
+                {
+                    Mode = RuntimeMode.Production
                 }),
                 httpOptions: Microsoft.Extensions.Options.Options.Create(new HttpClientOptions
                 {
@@ -235,7 +238,7 @@ public static class AuthClientFactory
                 }),
                 logger: Microsoft.Extensions.Logging.Abstractions.NullLogger<HttpFactory.HttpClientFactory>.Instance
             );
-            
+
             return factory.CreateHttpClient();
         }
     }
@@ -332,8 +335,8 @@ public class AuthClientBuilder
     {
         _config.TimeoutMs = timeoutMs;
         return this;
-    }    
-    
+    }
+
     /// <summary>
     /// Configure SSL verification
     /// </summary>
@@ -369,8 +372,8 @@ public class AuthClientBuilder
         _httpClient = httpClient;
         return this;
     }    /// <summary>
-    /// Configure redirect URI for Authorization Code flow
-    /// </summary>
+         /// Configure redirect URI for Authorization Code flow
+         /// </summary>
     public AuthClientBuilder WithRedirectUri(string redirectUri)
     {
         _config.RedirectUri = redirectUri;

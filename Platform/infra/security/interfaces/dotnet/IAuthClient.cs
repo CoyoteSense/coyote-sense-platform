@@ -17,8 +17,8 @@ namespace Coyote.Infra.Security.Auth;
 /// </summary>
 public interface IAuthClient : IDisposable
 {    /// <summary>
-    /// Authenticate using Client Credentials flow (OAuth2 RFC 6749)
-    /// </summary>
+     /// Authenticate using Client Credentials flow (OAuth2 RFC 6749)
+     /// </summary>
     Task<AuthResult> AuthenticateClientCredentialsAsync(List<string>? scopes = null, CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -30,11 +30,11 @@ public interface IAuthClient : IDisposable
     /// Authenticate using Authorization Code flow (OAuth2 RFC 6749)
     /// </summary>
     Task<AuthResult> AuthenticateAuthorizationCodeAsync(string authorizationCode, string redirectUri, string? codeVerifier = null, CancellationToken cancellationToken = default);    /// <summary>
-    /// Start Authorization Code + PKCE flow (OAuth2 RFC 7636)
-    /// </summary>
+                                                                                                                                                                                      /// Start Authorization Code + PKCE flow (OAuth2 RFC 7636)
+                                                                                                                                                                                      /// </summary>
     (string authorizationUrl, string codeVerifier, string state) StartAuthorizationCodeFlow(string redirectUri, List<string>? scopes = null, string? state = null);/// <summary>
-    /// Refresh access token using refresh token
-    /// </summary>
+                                                                                                                                                                   /// Refresh access token using refresh token
+                                                                                                                                                                   /// </summary>
     Task<AuthResult> RefreshTokenAsync(string refreshToken, CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -46,8 +46,8 @@ public interface IAuthClient : IDisposable
     /// Revoke a token
     /// </summary>
     Task<bool> RevokeTokenAsync(string token, string? tokenTypeHint = null, CancellationToken cancellationToken = default);    /// <summary>
-    /// Introspect a token
-    /// </summary>
+                                                                                                                               /// Introspect a token
+                                                                                                                               /// </summary>
     Task<bool> IntrospectTokenAsync(string token, CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -64,10 +64,10 @@ public interface IAuthClient : IDisposable
     /// Clear stored tokens
     /// </summary>
     void ClearTokens();    /// <summary>
-    /// Current token (if any)
-    /// </summary>
+                           /// Current token (if any)
+                           /// </summary>
     AuthToken? CurrentToken { get; }    /// <summary>
-    /// Whether client has valid authentication
-    /// </summary>
+                                        /// Whether client has valid authentication
+                                        /// </summary>
     bool IsAuthenticated { get; }
 }

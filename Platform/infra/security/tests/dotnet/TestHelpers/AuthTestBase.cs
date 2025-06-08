@@ -48,7 +48,7 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
 
             // Setup dependency injection
             var services = new ServiceCollection();
-            
+
             // Add logging
             services.AddLogging(builder => builder.AddConsole().SetMinimumLevel(LogLevel.Debug));
 
@@ -67,13 +67,14 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
             ConfigureServices(services);
 
             ServiceProvider = services.BuildServiceProvider();
-        }        protected AuthClient CreateAuthClient(AuthClientConfig? customConfig = null)
+        }
+        protected AuthClient CreateAuthClient(AuthClientConfig? customConfig = null)
         {
             var config = customConfig ?? Config;
             var httpClient = ServiceProvider.GetRequiredService<ICoyoteHttpClient>();
             var tokenStorage = ServiceProvider.GetRequiredService<IAuthTokenStorage>();
             var logger = ServiceProvider.GetRequiredService<IAuthLogger>();
-            
+
             return new AuthClient(config, httpClient, tokenStorage, logger);
         }
 
@@ -82,7 +83,7 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
             var httpClient = ServiceProvider.GetRequiredService<ICoyoteHttpClient>();
             var tokenStorage = ServiceProvider.GetRequiredService<IAuthTokenStorage>();
             var logger = ServiceProvider.GetRequiredService<IAuthLogger>();
-            
+
             return new AuthClient(config!, httpClient, tokenStorage, logger);
         }
 

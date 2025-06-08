@@ -29,14 +29,14 @@ public class AuthClientTests : AuthTestBase
     private readonly Mock<IAuthLogger> _mockLogger;
     private readonly MockOAuth2HttpClient _mockHttpClient;
     private readonly AuthClientConfig _config;
-    private readonly AuthClient _client;    public AuthClientTests()
+    private readonly AuthClient _client; public AuthClientTests()
     {
         _mockTokenStorage = new Mock<IAuthTokenStorage>();
         _mockLogger = new Mock<IAuthLogger>();
-        
+
         // Get the mock HTTP client from the service provider
         _mockHttpClient = ServiceProvider.GetRequiredService<MockOAuth2HttpClient>();
-        
+
         _config = new AuthClientConfig
         {
             ServerUrl = "https://test-auth.example.com",
@@ -61,13 +61,15 @@ public class AuthClientTests : AuthTestBase
     }
 
     #region Configuration Tests
-      [Fact]    public void Constructor_WithValidConfig_ShouldInitializeCorrectly()
+    [Fact]
+    public void Constructor_WithValidConfig_ShouldInitializeCorrectly()
     {
         // Arrange & Act
         using var client = CreateAuthClient(_config);        // Assert
         client.Should().NotBeNull();
         // Note: AuthClient doesn't expose Config property publicly
-    }    [Fact]
+    }
+    [Fact]
     public void Constructor_WithNullConfig_ShouldThrowArgumentNullException()
     {
         // Arrange, Act & Assert
@@ -125,7 +127,7 @@ public class AuthClientTests : AuthTestBase
         {
             error = "invalid_client",
             error_description = "Authentication failed"
-        };        SetupHttpResponse(HttpStatusCode.Unauthorized, JsonSerializer.Serialize(errorResponse));
+        }; SetupHttpResponse(HttpStatusCode.Unauthorized, JsonSerializer.Serialize(errorResponse));
 
         // Act
         var result = await _client.AuthenticateClientCredentialsAsync(new List<string> { "read", "write" });
@@ -135,7 +137,8 @@ public class AuthClientTests : AuthTestBase
         result.ErrorCode.Should().Be("invalid_client");
         result.ErrorDescription.Should().Be("Authentication failed");
         result.Token.Should().BeNull();
-    }    [Fact]
+    }
+    [Fact]
     public async Task ClientCredentialsAsync_WithNetworkError_ShouldReturnError()
     {
         // Arrange
@@ -169,7 +172,7 @@ public class AuthClientTests : AuthTestBase
             JwtAudience = "https://test-auth.example.com/token",
             DefaultScopes = new List<string> { "api.read", "api.write" }
         };
-        
+
         // Create a new client with JWT config
         var jwtClient = CreateAuthClient(jwtConfig);
 
@@ -180,9 +183,9 @@ public class AuthClientTests : AuthTestBase
             expires_in = 3600,
             scope = "read write"
         };
-        
+
         SetupHttpResponse(HttpStatusCode.OK, JsonSerializer.Serialize(tokenResponse));
-        
+
         _mockTokenStorage.Setup(x => x.StoreTokenAsync(It.IsAny<string>(), It.IsAny<AuthToken>()))
             .Returns(Task.CompletedTask);
 
@@ -193,12 +196,13 @@ public class AuthClientTests : AuthTestBase
         result.IsSuccess.Should().BeTrue();
         result.Token.Should().NotBeNull();
         result.Token!.AccessToken.Should().Be("jwt-access-token");
-    }    [Fact]
+    }
+    [Fact]
     public async Task JwtBearerAsync_WithoutJwtConfig_ShouldReturnError()
     {
         // Arrange
         // Use default config which doesn't have JWT configuration
-        
+
         // Act
         var result = await _client.AuthenticateJwtBearerAsync("test-subject", new List<string> { "read", "write" });
 
@@ -225,7 +229,7 @@ public class AuthClientTests : AuthTestBase
             scope = "read write"
         };
 
-        SetupHttpResponse(HttpStatusCode.OK, JsonSerializer.Serialize(tokenResponse));        _mockTokenStorage.Setup(x => x.StoreTokenAsync(It.IsAny<string>(), It.IsAny<AuthToken>()))
+        SetupHttpResponse(HttpStatusCode.OK, JsonSerializer.Serialize(tokenResponse)); _mockTokenStorage.Setup(x => x.StoreTokenAsync(It.IsAny<string>(), It.IsAny<AuthToken>()))
             .Returns(Task.CompletedTask);
 
         // Act
@@ -260,7 +264,7 @@ public class AuthClientTests : AuthTestBase
     #endregion
 
     #region Refresh Token Tests
-      [Fact]
+    [Fact]
     public async Task RefreshTokenAsync_WithValidRefreshToken_ShouldReturnSuccess()
     {
         // Arrange
@@ -286,7 +290,8 @@ public class AuthClientTests : AuthTestBase
         result.Token.Should().NotBeNull();
         result.Token!.AccessToken.Should().Be("new-access-token");
         result.Token.RefreshToken.Should().Be("new-refresh-token");
-    }    [Fact]
+    }
+    [Fact]
     public async Task RefreshTokenAsync_WithInvalidRefreshToken_ShouldReturnError()
     {
         // Arrange
@@ -302,7 +307,7 @@ public class AuthClientTests : AuthTestBase
         var result = await _client.RefreshTokenAsync("invalid-refresh-token");
 
         // Assert
-        result.IsSuccess.Should().BeFalse();        result.ErrorCode.Should().Be("invalid_grant");
+        result.IsSuccess.Should().BeFalse(); result.ErrorCode.Should().Be("invalid_grant");
         result.ErrorDescription.Should().Be("Refresh token is invalid");
     }
 
@@ -395,7 +400,7 @@ public class AuthClientTests : AuthTestBase
     #endregion
 
     #region Token Storage Tests
-    
+
     [Fact]
     public void StoreTokenAsync_WithValidToken_ShouldCallTokenStorage()
     {
@@ -410,8 +415,8 @@ public class AuthClientTests : AuthTestBase
 
         // Assert
         _mockTokenStorage.Verify(x => x.StoreTokenAsync(It.IsAny<string>(), It.IsAny<AuthToken>()), Times.Never);
-    }    
-    
+    }
+
     [Fact]
     public void GetStoredTokenAsync_WithExistingToken_ShouldReturnToken()
     {
@@ -421,36 +426,36 @@ public class AuthClientTests : AuthTestBase
         _mockTokenStorage.Setup(x => x.GetToken("test-key"))
             .Returns(token);        // Act - Using CurrentToken property since GetStoredTokenAsync isn't exposed
         var result = _client.CurrentToken;
-        
+
         // Assert
         // Note: This test needs to be updated based on actual API usage
         // CurrentToken property returns the currently authenticated token
     }
-      [Fact]
+    [Fact]
     public void DeleteStoredTokenAsync_WithExistingToken_ShouldCallTokenStorage()
     {
         // Arrange
         _mockTokenStorage.Setup(x => x.ClearToken("test-key"))
             .Verifiable();
-            
+
         // Act
         _client.ClearTokens(); // Using the available ClearTokens method
-          // Assert
-        // Note: ClearTokens clears all tokens, not a specific key
+                               // Assert
+                               // Note: ClearTokens clears all tokens, not a specific key
         _mockTokenStorage.Verify(x => x.ClearAllTokens(), Times.Never); // This will be called internally
     }
 
     #endregion
 
     #region Server Discovery Tests
-      [Fact]
+    [Fact]
     public async Task DiscoverServerAsync_WithValidResponse_ShouldReturnServerInfo()
     {
         // Arrange
         var discoveryResponse = new
         {
             issuer = "https://test-auth.example.com",
-            authorization_endpoint = "https://test-auth.example.com/authorize", 
+            authorization_endpoint = "https://test-auth.example.com/authorize",
             token_endpoint = "https://test-auth.example.com/token",
             introspection_endpoint = "https://test-auth.example.com/introspect",
             revocation_endpoint = "https://test-auth.example.com/revoke",
@@ -475,7 +480,7 @@ public class AuthClientTests : AuthTestBase
     #endregion
 
     #region Token Expiration Tests
-      [Fact]
+    [Fact]
     public void IsTokenExpired_WithExpiredToken_ShouldReturnTrue()
     {
         // Arrange
@@ -499,7 +504,8 @@ public class AuthClientTests : AuthTestBase
 
         // Assert
         result.Should().BeFalse();
-    }    [Fact]
+    }
+    [Fact]
     public void IsTokenNearExpiry_WithTokenNearExpiry_ShouldReturnTrue()
     {
         // Arrange
@@ -515,7 +521,7 @@ public class AuthClientTests : AuthTestBase
     #endregion
 
     #region Auto-Refresh Tests
-      [Fact]
+    [Fact]
     public async Task StartAutoRefresh_WithValidToken_ShouldEnableAutoRefresh()
     {
         // Arrange
@@ -553,7 +559,7 @@ public class AuthClientTests : AuthTestBase
         // This test verifies the configuration is set correctly
         config.AutoRefresh.Should().BeTrue();
         config.RefreshBufferSeconds.Should().Be(60);
-        
+
         // Clean up
         client.Dispose();
     }
@@ -561,7 +567,7 @@ public class AuthClientTests : AuthTestBase
     #endregion
 
     #region Concurrent Access Tests
-    
+
     [Fact]
     public async Task ConcurrentTokenRequests_ShouldHandleMultipleRequests()
     {
@@ -606,7 +612,7 @@ public class AuthClientTests : AuthTestBase
         // Construct the token endpoint URL based on the server URL in config
         var tokenUrl = $"{_config.ServerUrl}/token";
         Console.WriteLine($"[AuthClientTests] Setting up response for URL: {tokenUrl}");
-        
+
         if (statusCode == HttpStatusCode.OK)
         {
             // For successful responses, parse the JSON content and use SetSuccessfulTokenResponse
@@ -614,25 +620,25 @@ public class AuthClientTests : AuthTestBase
             {
                 using var doc = JsonDocument.Parse(content);
                 var root = doc.RootElement;
-                
-                var accessToken = root.TryGetProperty("access_token", out var accessTokenProp) 
-                    ? accessTokenProp.GetString() ?? "test-access-token" 
+
+                var accessToken = root.TryGetProperty("access_token", out var accessTokenProp)
+                    ? accessTokenProp.GetString() ?? "test-access-token"
                     : "test-access-token";
-                    
-                var tokenType = root.TryGetProperty("token_type", out var tokenTypeProp) 
-                    ? tokenTypeProp.GetString() ?? "Bearer" 
+
+                var tokenType = root.TryGetProperty("token_type", out var tokenTypeProp)
+                    ? tokenTypeProp.GetString() ?? "Bearer"
                     : "Bearer";
-                    
-                var expiresIn = root.TryGetProperty("expires_in", out var expiresInProp) 
-                    ? expiresInProp.GetInt32() 
+
+                var expiresIn = root.TryGetProperty("expires_in", out var expiresInProp)
+                    ? expiresInProp.GetInt32()
                     : 3600;
-                    
-                var refreshToken = root.TryGetProperty("refresh_token", out var refreshTokenProp) 
-                    ? refreshTokenProp.GetString() 
+
+                var refreshToken = root.TryGetProperty("refresh_token", out var refreshTokenProp)
+                    ? refreshTokenProp.GetString()
                     : null;
-                    
-                var scope = root.TryGetProperty("scope", out var scopeProp) 
-                    ? scopeProp.GetString() ?? "read write" 
+
+                var scope = root.TryGetProperty("scope", out var scopeProp)
+                    ? scopeProp.GetString() ?? "read write"
                     : "read write";
 
                 Console.WriteLine($"[AuthClientTests] Setting successful token response: {accessToken}");
@@ -652,13 +658,13 @@ public class AuthClientTests : AuthTestBase
             {
                 using var doc = JsonDocument.Parse(content);
                 var root = doc.RootElement;
-                
-                var error = root.TryGetProperty("error", out var errorProp) 
-                    ? errorProp.GetString() ?? "invalid_client" 
+
+                var error = root.TryGetProperty("error", out var errorProp)
+                    ? errorProp.GetString() ?? "invalid_client"
                     : "invalid_client";
-                    
-                var errorDescription = root.TryGetProperty("error_description", out var errorDescProp) 
-                    ? errorDescProp.GetString() ?? "Authentication failed" 
+
+                var errorDescription = root.TryGetProperty("error_description", out var errorDescProp)
+                    ? errorDescProp.GetString() ?? "Authentication failed"
                     : "Authentication failed";
 
                 Console.WriteLine($"[AuthClientTests] Setting error token response: {error}");
@@ -669,17 +675,19 @@ public class AuthClientTests : AuthTestBase
                 // If JSON parsing fails, use default error response
                 Console.WriteLine($"[AuthClientTests] JSON parsing failed, using default error response");
                 _mockHttpClient.SetErrorTokenResponse(tokenUrl, "invalid_client", "Authentication failed", (int)statusCode);
-            }        }
-    }    private string CreateTestPrivateKeyFile()
+            }
+        }
+    }
+    private string CreateTestPrivateKeyFile()
     {
         // Create a test RSA private key in PEM format for testing
         var rsa = RSA.Create(2048);
         var privateKeyPem = rsa.ExportRSAPrivateKeyPem();
-        
+
         // Create a temporary file
         var tempPath = Path.GetTempFileName();
         File.WriteAllText(tempPath, $"-----BEGIN RSA PRIVATE KEY-----\n{privateKeyPem}\n-----END RSA PRIVATE KEY-----");
-        
+
         return tempPath;
     }
 
@@ -697,7 +705,8 @@ public class AuthClientTests : AuthTestBase
         string? refreshToken = null,
         string scope = "read write")
     {
-        return new AuthToken        {
+        return new AuthToken
+        {
             AccessToken = accessToken,
             TokenType = tokenType,
             ExpiresAt = DateTime.UtcNow.AddHours(1), // Default to 1 hour from now

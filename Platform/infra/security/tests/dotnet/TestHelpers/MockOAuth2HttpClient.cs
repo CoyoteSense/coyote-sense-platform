@@ -32,11 +32,11 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
         public MockOAuth2HttpClient(ILogger<MockOAuth2HttpClient>? logger = null)
         {
             _logger = logger;
-            
+
             // Set up default successful OAuth2 token response
             SetupDefaultOAuth2Responses();
         }
-        
+
         /// <summary>
         /// Execute a request (main method that all other methods call)
         /// </summary>
@@ -46,7 +46,7 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
                 throw new ArgumentNullException(nameof(request));
 
             // Simulate SSL certificate failures for certain domains
-            if (request.Url.Contains("self-signed.badssl.com") || 
+            if (request.Url.Contains("self-signed.badssl.com") ||
                 request.Url.Contains("expired.badssl.com") ||
                 request.Url.Contains("wrong.host.badssl.com"))
             {
@@ -101,14 +101,14 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
             }
 
             // Try pattern matching for token endpoints
-            if (request.Url.Contains("/oauth2/token") || 
+            if (request.Url.Contains("/oauth2/token") ||
                 request.Url.Contains("/oauth/token") ||
                 request.Url.Contains("/connect/token") ||
                 request.Url.EndsWith("/token"))
             {
                 Console.WriteLine($"[MockHttpClient] OAuth2 token endpoint detected: {request.Url}");
                 _logger?.LogDebug("OAuth2 token endpoint detected: {Url}", request.Url);
-                
+
                 // Check if there's a predefined response for this exact token URL first
                 if (_predefinedResponses.ContainsKey(request.Url))
                 {
@@ -120,7 +120,7 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
             }
 
             // Try pattern matching for discovery endpoints
-            if (request.Url.Contains("/.well-known/openid_configuration") || 
+            if (request.Url.Contains("/.well-known/openid_configuration") ||
                 request.Url.Contains("/.well-known/openid-configuration") ||
                 request.Url.Contains("/.well-known/oauth-authorization-server"))
             {
@@ -140,7 +140,7 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
             {
                 Console.WriteLine($"[MockHttpClient] OAuth2 introspection endpoint detected: {request.Url}");
                 _logger?.LogDebug("OAuth2 introspection endpoint detected: {Url}", request.Url);
-                
+
                 // Check if there's a predefined response for this exact introspection URL first
                 if (_predefinedResponses.TryGetValue(request.Url, out var exactIntrospectResponse))
                 {
@@ -148,7 +148,7 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
                     _logger?.LogDebug("Found exact predefined response for introspection URL: {Url}", request.Url);
                     return Task.FromResult(exactIntrospectResponse);
                 }
-                
+
                 return HandleIntrospectionRequest(request);
             }
 
@@ -165,13 +165,13 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
             _logger?.LogWarning("No predefined response for URL: {Url}", request.Url);
             return Task.FromResult(CreateResponse(404, "Not Found", "text/plain"));
         }
-        
+
         public Task<IHttpResponse> GetAsync(string url, IReadOnlyDictionary<string, string>? headers = null, CancellationToken cancellationToken = default)
         {
             var request = CreateRequest();
             request.Url = url;
             request.Method = Coyote.Infra.Http.HttpMethod.Get;
-            
+
             if (headers != null)
             {
                 foreach (var header in headers)
@@ -189,7 +189,7 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
             request.Url = url;
             request.Method = Coyote.Infra.Http.HttpMethod.Post;
             request.Body = body;
-            
+
             if (headers != null)
             {
                 foreach (var header in headers)
@@ -207,7 +207,7 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
             request.Url = url;
             request.Method = Coyote.Infra.Http.HttpMethod.Post;
             request.SetJsonBody(content);
-            
+
             if (headers != null)
             {
                 foreach (var header in headers)
@@ -225,7 +225,7 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
             request.Url = url;
             request.Method = Coyote.Infra.Http.HttpMethod.Put;
             request.Body = body;
-            
+
             if (headers != null)
             {
                 foreach (var header in headers)
@@ -243,7 +243,7 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
             request.Url = url;
             request.Method = Coyote.Infra.Http.HttpMethod.Put;
             request.SetJsonBody(content);
-            
+
             if (headers != null)
             {
                 foreach (var header in headers)
@@ -260,7 +260,7 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
             var request = CreateRequest();
             request.Url = url;
             request.Method = Coyote.Infra.Http.HttpMethod.Delete;
-            
+
             if (headers != null)
             {
                 foreach (var header in headers)
@@ -278,7 +278,7 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
             request.Url = url;
             request.Method = Coyote.Infra.Http.HttpMethod.Patch;
             request.Body = body;
-            
+
             if (headers != null)
             {
                 foreach (var header in headers)
@@ -313,7 +313,8 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
         public void SetVerifyPeer(bool verify)
         {
             // No-op for mock
-        }        public async Task<bool> PingAsync(string url, CancellationToken cancellationToken = default)
+        }
+        public async Task<bool> PingAsync(string url, CancellationToken cancellationToken = default)
         {
             try
             {
@@ -420,11 +421,11 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
         {
             // Parse form data or check JSON body to determine grant type
             string grantType = GetGrantTypeFromRequest(request);
-            
+
             _logger?.LogDebug("Handling token request with grant type: {GrantType}", grantType);
             _logger?.LogDebug("Request URL: {Url}", request.Url);
             _logger?.LogDebug("Request Body: {Body}", SanitizeRequestBody(request.Body));
-            
+
             // Check for invalid credentials and return error
             if (HasInvalidCredentials(request.Body))
             {
@@ -436,29 +437,29 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
                 var errorJson = JsonSerializer.Serialize(errorResponse);
                 return Task.FromResult(CreateResponse(401, errorJson, "application/json"));
             }
-            
+
             // Return appropriate response based on grant type
             switch (grantType)
             {
                 case "client_credentials":
                     _logger?.LogDebug("Returning client credentials response");
                     return Task.FromResult(CreateClientCredentialsResponse());
-                
+
                 case "password":
                     _logger?.LogDebug("Returning password grant response");
                     return Task.FromResult(CreatePasswordGrantResponse());
-                
+
                 case "refresh_token":
                     _logger?.LogDebug("Returning refresh token response");
                     return Task.FromResult(CreateRefreshTokenResponse());
-                
+
                 case "authorization_code":
                     _logger?.LogDebug("Returning authorization code response");
                     return Task.FromResult(CreateAuthorizationCodeResponse());
-                
+
                 default:
                     _logger?.LogWarning("Unsupported grant type: {GrantType}", grantType);
-                    return Task.FromResult(CreateErrorResponse("unsupported_grant_type", 
+                    return Task.FromResult(CreateErrorResponse("unsupported_grant_type",
                         "The authorization grant type is not supported"));
             }
         }
@@ -481,7 +482,7 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
                         }
                     }
                 }
-                
+
                 // Try JSON parsing
                 try
                 {
@@ -496,7 +497,7 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
                     // Ignore JSON parsing errors
                 }
             }
-            
+
             // Default to client_credentials if not specified
             return "client_credentials";
         }
@@ -548,7 +549,7 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
         {
             // Extract token from request body
             string? token = ExtractTokenFromBody(request.Body);
-            
+
             // Check if token is revoked
             if (!string.IsNullOrEmpty(token) && _revokedTokens.Contains(token))
             {
@@ -558,7 +559,7 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
 
             // Check if token is valid (not tampered)
             bool isValid = string.IsNullOrEmpty(token) || IsValidJwt(token);
-            
+
             var response = new
             {
                 active = isValid,
@@ -578,7 +579,7 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
         {
             // Extract token from request body
             string? token = ExtractTokenFromBody(request.Body);
-            
+
             if (!string.IsNullOrEmpty(token))
             {
                 _revokedTokens.Add(token);
@@ -672,7 +673,8 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
             };
 
             return CreateResponse(400, JsonSerializer.Serialize(response), "application/json");
-        }        private IHttpResponse CreateResponse(int statusCode, string body, string contentType)
+        }
+        private IHttpResponse CreateResponse(int statusCode, string body, string contentType)
         {
             var headers = new Dictionary<string, string>
             {
@@ -682,7 +684,8 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
 
             var response = new MockHttpResponse(statusCode, body, headers);
             return response;
-        }public IHttpRequest CreateRequest()
+        }
+        public IHttpRequest CreateRequest()
         {
             return new MockHttpRequest();
         }
@@ -699,7 +702,7 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
             };
 
             var defaultTokenJson = JsonSerializer.Serialize(defaultTokenResponse);
-            
+
             // Add some common OAuth2 endpoints
             _predefinedResponses["https://oauth.example.com/token"] = CreateResponse(200, defaultTokenJson, "application/json");
             _predefinedResponses["https://oauth.example.com/oauth2/token"] = CreateResponse(200, defaultTokenJson, "application/json");
@@ -719,11 +722,11 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
             {
                 // Replace client_secret value with [REDACTED]
                 sanitized = System.Text.RegularExpressions.Regex.Replace(
-                    sanitized, 
-                    @"client_secret=[^&]*", 
+                    sanitized,
+                    @"client_secret=[^&]*",
                     "client_secret=[REDACTED]");
             }
-            
+
             return sanitized;
         }
 
@@ -734,19 +737,19 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
         {
             var now = DateTime.UtcNow;
             var oneSecondAgo = now.AddSeconds(-1);
-            
+
             // Initialize request count list for this URL if not exists
             if (!_requestCounts.ContainsKey(url))
                 _requestCounts[url] = new List<DateTime>();
-            
+
             var requestTimes = _requestCounts[url];
-            
+
             // Remove requests older than 1 second
             requestTimes.RemoveAll(time => time < oneSecondAgo);
-            
+
             // Add current request time
             requestTimes.Add(now);
-            
+
             // Check if we've exceeded the rate limit
             return requestTimes.Count > RateLimitThreshold;
         }
@@ -762,23 +765,23 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
                 var parts = token.Split('.');
                 if (parts.Length != 3)
                     return false;
-                
+
                 // List of valid test tokens that should be accepted
                 var validTokens = new[]
                 {
                     "mock-access-token-client-credentials",
-                    "mock-access-token-refreshed", 
+                    "mock-access-token-refreshed",
                     "auth-code-token",
                     "test-access-token",
                     "jwt-access-token",
                     "concurrent-token",
                     "new-access-token"
                 };
-                
+
                 // For mock tokens (non-JWT format), accept them
                 if (validTokens.Any(vt => token.Equals(vt)))
                     return true;
-                    
+
                 // For actual JWT tokens, try to decode and check structure
                 try
                 {
@@ -789,14 +792,14 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
                         case 2: payload += "=="; break;
                         case 3: payload += "="; break;
                     }
-                    
+
                     var bytes = Convert.FromBase64String(payload);
                     var json = Encoding.UTF8.GetString(bytes);
-                    
+
                     // If it contains "tampered" claim, it's invalid
                     if (json.Contains("\"tampered\""))
                         return false;
-                        
+
                     return true;
                 }
                 catch
@@ -810,18 +813,18 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
                 return false;
             }
         }        /// <summary>
-        /// Check if request contains invalid credentials
-        /// </summary>
+                 /// Check if request contains invalid credentials
+                 /// </summary>
         private bool HasInvalidCredentials(string? body)
         {
             if (string.IsNullOrEmpty(body))
                 return false;
-                
-            return body.Contains("client_id=invalid-client") || 
+
+            return body.Contains("client_id=invalid-client") ||
                    body.Contains("client_secret=invalid-secret");
         }        /// <summary>
-        /// Set up a successful token response for the specified token URL
-        /// </summary>
+                 /// Set up a successful token response for the specified token URL
+                 /// </summary>
         public void SetSuccessfulTokenResponse(string tokenUrl, string accessToken, string tokenType, int expiresIn, string? refreshToken, string scope)
         {
             var response = new

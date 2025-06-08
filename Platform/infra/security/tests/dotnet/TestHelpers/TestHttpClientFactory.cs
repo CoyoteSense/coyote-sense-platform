@@ -22,14 +22,14 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
         /// <param name="defaultMode">The default runtime mode</param>
         /// <param name="logger">Optional logger</param>
         public TestHttpClientFactory(
-            ICoyoteHttpClient httpClient, 
+            ICoyoteHttpClient httpClient,
             RuntimeMode defaultMode = RuntimeMode.Testing,
             ILogger<TestHttpClientFactory>? logger = null)
         {
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _defaultMode = defaultMode;
             _logger = logger;
-            
+
             _logger?.LogDebug("Created TestHttpClientFactory with mode: {Mode}", defaultMode);
         }
 

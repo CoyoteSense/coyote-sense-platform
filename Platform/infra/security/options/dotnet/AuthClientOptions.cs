@@ -11,13 +11,13 @@ public class ClientCredentialsOptions
 {
     [Required]
     public string ServerUrl { get; set; } = string.Empty;
-    
+
     [Required]
     public string ClientId { get; set; } = string.Empty;
-    
+
     [Required]
     public string ClientSecret { get; set; } = string.Empty;
-    
+
     public List<string> DefaultScopes { get; set; } = new();
     public int TimeoutMs { get; set; } = 30000;
     public bool AutoRefresh { get; set; } = true;
@@ -34,18 +34,18 @@ public class MtlsOptions
 {
     [Required]
     public string ServerUrl { get; set; } = string.Empty;
-    
+
     [Required]
     public string ClientId { get; set; } = string.Empty;
-    
+
     [Required]
     public string ClientCertPath { get; set; } = string.Empty;
-    
+
     [Required]
     public string ClientKeyPath { get; set; } = string.Empty;
-    
+
     public string? CaCertPath { get; set; }
-    
+
     public List<string> DefaultScopes { get; set; } = new();
     public int TimeoutMs { get; set; } = 30000;
     public bool AutoRefresh { get; set; } = true;
@@ -62,21 +62,21 @@ public class JwtBearerOptions
 {
     [Required]
     public string ServerUrl { get; set; } = string.Empty;
-    
+
     [Required]
     public string ClientId { get; set; } = string.Empty;
-    
+
     [Required]
     public string JwtSigningKeyPath { get; set; } = string.Empty;
-    
+
     [Required]
     public string JwtIssuer { get; set; } = string.Empty;
-    
+
     [Required]
     public string JwtAudience { get; set; } = string.Empty;
-    
+
     public string JwtAlgorithm { get; set; } = "RS256";
-    
+
     public List<string> DefaultScopes { get; set; } = new();
     public int TimeoutMs { get; set; } = 30000;
     public bool AutoRefresh { get; set; } = true;
@@ -93,17 +93,17 @@ public class AuthorizationCodeOptions
 {
     [Required]
     public string ServerUrl { get; set; } = string.Empty;
-    
+
     [Required]
     public string ClientId { get; set; } = string.Empty;
-    
+
     [Required]
     public string RedirectUri { get; set; } = string.Empty;
-    
+
     public string? ClientSecret { get; set; }
-    
+
     public bool UsePkce { get; set; } = true;
-    
+
     public List<string> DefaultScopes { get; set; } = new();
     public int TimeoutMs { get; set; } = 30000;
     public bool AutoRefresh { get; set; } = true;
@@ -135,7 +135,7 @@ public static class AuthOptionsExtensions
             VerifySsl = options.VerifySsl
         };
     }
-    
+
     public static AuthClientConfig ToAuthClientConfig(this MtlsOptions options)
     {
         return new AuthClientConfig
@@ -155,7 +155,7 @@ public static class AuthOptionsExtensions
             VerifySsl = options.VerifySsl
         };
     }
-    
+
     public static AuthClientConfig ToAuthClientConfig(this JwtBearerOptions options)
     {
         return new AuthClientConfig
@@ -176,7 +176,7 @@ public static class AuthOptionsExtensions
             VerifySsl = options.VerifySsl
         };
     }
-    
+
     public static AuthClientConfig ToAuthClientConfig(this AuthorizationCodeOptions options)
     {
         return new AuthClientConfig

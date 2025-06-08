@@ -20,7 +20,7 @@ public class MockHttpResponse : IHttpResponse
     {
         StatusCode = statusCode;
         Body = body;
-        
+
         if (headers != null)
         {
             foreach (var header in headers)
@@ -28,7 +28,7 @@ public class MockHttpResponse : IHttpResponse
                 _headers[header.Key] = header.Value;
             }
         }
-        
+
         // Set default Content-Type if not specified
         if (!_headers.ContainsKey("Content-Type") && !string.IsNullOrEmpty(body))
         {

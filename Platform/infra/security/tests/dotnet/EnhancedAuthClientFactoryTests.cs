@@ -65,7 +65,7 @@ public class EnhancedAuthClientFactoryTests
         // Act & Assert
         var exception = Assert.Throws<ArgumentException>(() =>
             AuthClientFactory.CreateFromOptions(invalidOptions));
-        
+
         Assert.Contains("ServerUrl", exception.Message);
         _output.WriteLine("✅ Validation correctly rejected invalid options");
     }
@@ -143,7 +143,7 @@ public class EnhancedAuthClientFactoryTests
     {
         // Arrange
         const string testSecret = "my-super-secret-key";
-        
+
         using var provider = new SecureCredentialProvider();
 
         // Act
@@ -183,7 +183,8 @@ public class EnhancedAuthClientFactoryTests
         Assert.Equal(mtlsOptions.TimeoutMs, config.TimeoutMs);
         Assert.Equal(mtlsOptions.AutoRefresh, config.AutoRefresh);
         _output.WriteLine("✅ Options to config conversion working correctly");
-    }    [Fact]
+    }
+    [Fact]
     public async Task ThreadSafeHttpClientFactory_ShouldBeThreadSafe()
     {
         // Arrange & Act
@@ -213,7 +214,7 @@ public class EnhancedAuthClientFactoryTests
     public void DependencyInjection_ShouldRegisterServicesCorrectly()
     {
         // Arrange
-        var services = new ServiceCollection();        var configuration = new ConfigurationBuilder()
+        var services = new ServiceCollection(); var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["Auth:ServerUrl"] = "https://auth.example.com",
@@ -255,15 +256,15 @@ public class EnhancedAuthClientFactoryTests
         var services = new ServiceCollection();
         services.AddLogging();
         var serviceProvider = services.BuildServiceProvider();
-          using var pool = new AuthClientPool(serviceProvider, 
-            serviceProvider.GetRequiredService<ILogger<AuthClientPool>>());
+        using var pool = new AuthClientPool(serviceProvider,
+          serviceProvider.GetRequiredService<ILogger<AuthClientPool>>());
 
         var clientCredOptions = new ClientCredentialsOptions
         {
             ServerUrl = "https://auth.example.com",
             ClientId = "client1",
             ClientSecret = "secret1"
-        };        var mtlsOptions = new MtlsOptions
+        }; var mtlsOptions = new MtlsOptions
         {
             ServerUrl = "https://auth.example.com",
             ClientId = "client2",
@@ -283,7 +284,8 @@ public class EnhancedAuthClientFactoryTests
         Assert.Same(client1, client1Again); // Should return same instance
         Assert.Equal(2, pool.ActiveClientCount);
         _output.WriteLine("✅ Client pool managing multiple clients correctly");
-    }    [Fact]
+    }
+    [Fact]
     public void ModernFactoryMethods_ShouldWork()
     {
         // Arrange & Act
@@ -294,7 +296,7 @@ public class EnhancedAuthClientFactoryTests
             ClientSecret = "test-secret",
             DefaultScopes = new List<string> { "modern.scope" }
         };
-        
+
         using var client = AuthClientFactory.CreateFromOptions(options);
 
         // Assert

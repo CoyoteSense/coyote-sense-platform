@@ -32,10 +32,10 @@ public static class AuthClientServiceCollectionExtensions
             var logger = provider.GetService<IAuthLogger>();
             var tokenStorage = provider.GetService<IAuthTokenStorage>();
             var httpClient = provider.GetService<ICoyoteHttpClient>();
-            
+
             return AuthClientFactory.CreateFromOptions(options.Value, tokenStorage, logger, httpClient);
         });
-        
+
         return services;
     }
 
@@ -53,10 +53,10 @@ public static class AuthClientServiceCollectionExtensions
             var logger = provider.GetService<IAuthLogger>();
             var tokenStorage = provider.GetService<IAuthTokenStorage>();
             var httpClient = provider.GetService<ICoyoteHttpClient>();
-            
+
             return AuthClientFactory.CreateFromOptions(options.Value, tokenStorage, logger, httpClient);
         });
-        
+
         return services;
     }
 
@@ -74,10 +74,10 @@ public static class AuthClientServiceCollectionExtensions
             var logger = provider.GetService<IAuthLogger>();
             var tokenStorage = provider.GetService<IAuthTokenStorage>();
             var httpClient = provider.GetService<ICoyoteHttpClient>();
-            
+
             return AuthClientFactory.CreateFromOptions(options.Value, tokenStorage, logger, httpClient);
         });
-        
+
         return services;
     }
 
@@ -95,10 +95,10 @@ public static class AuthClientServiceCollectionExtensions
             var logger = provider.GetService<IAuthLogger>();
             var tokenStorage = provider.GetService<IAuthTokenStorage>();
             var httpClient = provider.GetService<ICoyoteHttpClient>();
-            
+
             return AuthClientFactory.CreateFromOptions(options.Value, tokenStorage, logger, httpClient);
         });
-        
+
         return services;
     }
 
@@ -110,7 +110,7 @@ public static class AuthClientServiceCollectionExtensions
         services.AddSingleton<IAuthTokenStorage, InMemoryTokenStorage>();
         services.AddSingleton<IAuthLogger, MicrosoftLoggingAdapter>();
         services.AddScoped<AuthClientPool>();
-        
+
         return services;
     }
 }
@@ -272,7 +272,7 @@ public class AuthClientHealthService : BackgroundService
 
         // Add specific health check logic here
         // For example, testing token validity, connection health, etc.
-        
+
         await Task.CompletedTask;
     }
 }

@@ -9,25 +9,25 @@ namespace Coyote.Infra.Security.Auth;
 /// </summary>
 public enum AuthMode
 {    /// <summary>
-    /// Standard OAuth2 client credentials flow (RFC 6749)
-    /// </summary>
+     /// Standard OAuth2 client credentials flow (RFC 6749)
+     /// </summary>
     ClientCredentials,
-    
+
     /// <summary>
     /// Client credentials with mutual TLS authentication (RFC 8705)
     /// </summary>
     ClientCredentialsMtls,
-    
+
     /// <summary>
     /// JWT Bearer assertion flow (RFC 7523)
     /// </summary>
     JwtBearer,
-    
+
     /// <summary>
     /// Authorization code flow (RFC 6749)
     /// </summary>
     AuthorizationCode,
-    
+
     /// <summary>
     /// Authorization code flow with PKCE (RFC 7636)
     /// </summary>
@@ -44,8 +44,8 @@ public class AuthClientConfig
     /// Authentication mode to use
     /// </summary>
     public AuthMode AuthMode { get; set; } = AuthMode.ClientCredentials;    /// <summary>
-    /// Authentication server base URL
-    /// </summary>
+                                                                            /// Authentication server base URL
+                                                                            /// </summary>
     public string ServerUrl { get; set; } = string.Empty;
 
     /// <summary>
@@ -139,7 +139,7 @@ public class AuthClientConfig
     public bool VerifySsl { get; set; } = true;
 
     // Helper methods for authentication mode checking
-    
+
     /// <summary>
     /// Check if using client credentials mode
     /// </summary>
@@ -158,15 +158,15 @@ public class AuthClientConfig
     /// <summary>
     /// Check if using any authorization code mode
     /// </summary>
-    public bool IsAuthorizationCodeMode() => 
+    public bool IsAuthorizationCodeMode() =>
         AuthMode == AuthMode.AuthorizationCode || AuthMode == AuthMode.AuthorizationCodePkce;
 
     /// <summary>
     /// Check if certificates are required for this mode
     /// </summary>
     public bool RequiresCertificates() => IsMtlsMode();    /// <summary>
-    /// Check if client secret is required for this mode
-    /// </summary>
+                                                           /// Check if client secret is required for this mode
+                                                           /// </summary>
     public bool RequiresClientSecret() => IsClientCredentialsMode();
 
     /// <summary>
@@ -178,8 +178,8 @@ public class AuthClientConfig
     /// Check if redirect URI is required for this mode
     /// </summary>
     public bool RequiresRedirectUri() => IsAuthorizationCodeMode();    /// <summary>
-    /// Validate configuration for the selected authentication mode
-    /// </summary>
+                                                                       /// Validate configuration for the selected authentication mode
+                                                                       /// </summary>
     public bool IsValid()
     {
         if (string.IsNullOrEmpty(ClientId) || string.IsNullOrEmpty(ServerUrl))
@@ -190,7 +190,7 @@ public class AuthClientConfig
         return AuthMode switch
         {
             AuthMode.ClientCredentials => !string.IsNullOrEmpty(ClientSecret),
-            AuthMode.ClientCredentialsMtls => !string.IsNullOrEmpty(ClientCertPath) && 
+            AuthMode.ClientCredentialsMtls => !string.IsNullOrEmpty(ClientCertPath) &&
                                             !string.IsNullOrEmpty(ClientKeyPath),
             AuthMode.JwtBearer => !string.IsNullOrEmpty(JwtSigningKeyPath),
             AuthMode.AuthorizationCode or AuthMode.AuthorizationCodePkce => !string.IsNullOrEmpty(RedirectUri),
@@ -250,7 +250,8 @@ public interface IAuthLogger
 /// In-memory token storage implementation
 /// </summary>
 public class InMemoryTokenStorage : IAuthTokenStorage
-{    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, AuthToken> _tokens = new();
+{
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, AuthToken> _tokens = new();
 
     /// <summary>
     /// Stores an authentication token for the specified client
@@ -290,7 +291,8 @@ public class InMemoryTokenStorage : IAuthTokenStorage
 /// Console logger implementation
 /// </summary>
 public class ConsoleAuthLogger : IAuthLogger
-{    private readonly string _prefix;
+{
+    private readonly string _prefix;
 
     /// <summary>
     /// Initializes a new instance of the ConsoleAuthLogger
@@ -312,7 +314,8 @@ public class ConsoleAuthLogger : IAuthLogger
     /// Logs an error message to the console
     /// </summary>
     public void LogError(string message)
-    {        Console.WriteLine($"[{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}] [{_prefix}] ERROR: {message}");
+    {
+        Console.WriteLine($"[{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}] [{_prefix}] ERROR: {message}");
     }
 
     /// <summary>
@@ -333,12 +336,12 @@ public class NullAuthLogger : IAuthLogger
     /// Logs an informational message (no-op)
     /// </summary>
     public void LogInfo(string message) { }
-    
+
     /// <summary>
     /// Logs an error message (no-op)
     /// </summary>
     public void LogError(string message) { }
-    
+
     /// <summary>
     /// Logs a debug message (no-op)
     /// </summary>

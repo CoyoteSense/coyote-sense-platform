@@ -25,32 +25,33 @@ public class AuthSecurityTests : IDisposable
     private readonly MockOAuth2Server _mockServer;
     private readonly ServiceProvider _serviceProvider;
     private readonly IAuthClient _client;
-    private bool _disposed;    public AuthSecurityTests(ITestOutputHelper output)
+    private bool _disposed; public AuthSecurityTests(ITestOutputHelper output)
     {
         _output = output;
         _mockServer = new MockOAuth2Server();
-        
-        var config = new AuthClientConfig        {
+
+        var config = new AuthClientConfig
+        {
             ServerUrl = _mockServer.BaseUrl,
             ClientId = "test-client",
             ClientSecret = "test-secret",
             DefaultScopes = new List<string> { "api.read", "api.write" },
             AutoRefresh = true
-        };        var services = new ServiceCollection();
+        }; var services = new ServiceCollection();
         services.AddLogging(builder => builder.AddConsole().SetMinimumLevel(LogLevel.Warning));
-        
+
         // Use our OAuth2 mock HTTP client instead of the generic mock
         services.AddSingleton<ICoyoteHttpClient, MockOAuth2HttpClient>();
-        services.AddSingleton<Coyote.Infra.Http.Factory.IHttpClientFactory>(provider => 
+        services.AddSingleton<Coyote.Infra.Http.Factory.IHttpClientFactory>(provider =>
         {
             var httpClient = provider.GetRequiredService<ICoyoteHttpClient>();
             return new TestHttpClientFactory(httpClient);
         });
-        
+
         services.AddSingleton(config);
         services.AddTransient<IAuthTokenStorage, InMemoryTokenStorage>();
         services.AddTransient<IAuthClient, AuthClient>();
-        
+
         _serviceProvider = services.BuildServiceProvider();
         _client = _serviceProvider.GetRequiredService<IAuthClient>();
     }
@@ -65,24 +66,24 @@ public class AuthSecurityTests : IDisposable
         {
             builder.AddProvider(new TestLoggerProvider(logMessages));
             builder.SetMinimumLevel(LogLevel.Trace);
-        });        var secureConfig = new AuthClientConfig
+        }); var secureConfig = new AuthClientConfig
         {
             ServerUrl = _mockServer.BaseUrl,
             ClientId = "test-client",
             ClientSecret = "super-secret-that-should-not-appear-in-logs",
             DefaultScopes = new List<string> { "api.read" }
-        };        var services = new ServiceCollection();
+        }; var services = new ServiceCollection();
         services.AddSingleton<ILoggerFactory>(loggerFactory);
         services.AddLogging();
-        
+
         // Register the Coyote HTTP client factory
         services.AddSingleton<ICoyoteHttpClient, MockOAuth2HttpClient>();
-        services.AddSingleton<Coyote.Infra.Http.Factory.IHttpClientFactory>(provider => 
+        services.AddSingleton<Coyote.Infra.Http.Factory.IHttpClientFactory>(provider =>
         {
             var httpClient = provider.GetRequiredService<ICoyoteHttpClient>();
             return new TestHttpClientFactory(httpClient);
         });
-        
+
         services.AddSingleton(secureConfig);
         services.AddTransient<IAuthTokenStorage, InMemoryTokenStorage>();
         services.AddTransient<IAuthClient, AuthClient>();
@@ -95,9 +96,9 @@ public class AuthSecurityTests : IDisposable
 
         // Assert - Check that client secret is not logged
         var allLogMessages = string.Join(" ", logMessages);
-        allLogMessages.Should().NotContain("super-secret-that-should-not-appear-in-logs", 
+        allLogMessages.Should().NotContain("super-secret-that-should-not-appear-in-logs",
             "Client secret should never appear in log messages");
-          // But should contain some indication of authentication activity
+        // But should contain some indication of authentication activity
         allLogMessages.Should().Contain("client");
     }
 
@@ -106,17 +107,17 @@ public class AuthSecurityTests : IDisposable
     public async Task AccessToken_ShouldBeStoredSecurely()
     {
         // Arrange
-        var secureTokenStorage = new SecureInMemoryTokenStorage();        var services = new ServiceCollection();
+        var secureTokenStorage = new SecureInMemoryTokenStorage(); var services = new ServiceCollection();
         services.AddLogging(builder => builder.AddConsole().SetMinimumLevel(LogLevel.Warning));
-        
+
         // Register the Coyote HTTP client factory
         services.AddSingleton<ICoyoteHttpClient, MockOAuth2HttpClient>();
-        services.AddSingleton<Coyote.Infra.Http.Factory.IHttpClientFactory>(provider => 
+        services.AddSingleton<Coyote.Infra.Http.Factory.IHttpClientFactory>(provider =>
         {
             var httpClient = provider.GetRequiredService<ICoyoteHttpClient>();
             return new TestHttpClientFactory(httpClient);
         });
-        
+
         services.AddSingleton(new AuthClientConfig
         {
             ServerUrl = _mockServer.BaseUrl,
@@ -135,21 +136,22 @@ public class AuthSecurityTests : IDisposable
 
         // Assert
         result.IsSuccess.Should().BeTrue();
-        
+
         // Verify token is stored securely (encrypted)
         var storedTokens = secureTokenStorage.GetRawStoredTokens();
         storedTokens.Should().NotBeEmpty();
-          // The stored token should be different from the actual token (encrypted)
+        // The stored token should be different from the actual token (encrypted)
         storedTokens.Values.Should().AllSatisfy(encryptedToken =>
         {
             encryptedToken.Should().NotBe(result.Token!.AccessToken);
         });
-    }    [Fact]
+    }
+    [Fact]
     [Trait("Category", "Security")]
     public async Task InvalidCertificate_ShouldRejectConnection()
     {        // This test validates that the client properly handles SSL certificate validation errors
-        // The AuthClient should catch SSL certificate exceptions and return appropriate error results
-        
+             // The AuthClient should catch SSL certificate exceptions and return appropriate error results
+
         // Arrange - Create client with certificate validation enabled
         var httpsConfig = new AuthClientConfig
         {
@@ -157,17 +159,17 @@ public class AuthSecurityTests : IDisposable
             ClientId = "test-client",
             ClientSecret = "test-secret",
             DefaultScopes = new List<string> { "api.read" }
-        };        var services = new ServiceCollection();
+        }; var services = new ServiceCollection();
         services.AddLogging(builder => builder.AddConsole());
-        
+
         // Register the Coyote HTTP client factory
         services.AddSingleton<ICoyoteHttpClient, MockOAuth2HttpClient>();
-        services.AddSingleton<Coyote.Infra.Http.Factory.IHttpClientFactory>(provider => 
+        services.AddSingleton<Coyote.Infra.Http.Factory.IHttpClientFactory>(provider =>
         {
             var httpClient = provider.GetRequiredService<ICoyoteHttpClient>();
             return new TestHttpClientFactory(httpClient);
         });
-        
+
         services.AddSingleton(httpsConfig);
         services.AddTransient<IAuthTokenStorage, InMemoryTokenStorage>();
         services.AddTransient<IAuthClient, AuthClient>();
@@ -177,7 +179,7 @@ public class AuthSecurityTests : IDisposable
 
         // Act
         var result = await httpsClient.AuthenticateClientCredentialsAsync();
-          // Assert - Should return error result for SSL certificate validation failure
+        // Assert - Should return error result for SSL certificate validation failure
         result.IsSuccess.Should().BeFalse();
         result.ErrorCode.Should().Be("authentication_error");
         result.ErrorDescription.Should().Be("Authentication failed");
@@ -189,17 +191,18 @@ public class AuthSecurityTests : IDisposable
     public async Task JwtValidation_ShouldRejectTamperedTokens()
     {
         // Arrange - Get a valid token first
-        var result = await _client.AuthenticateClientCredentialsAsync();        result.IsSuccess.Should().BeTrue();
+        var result = await _client.AuthenticateClientCredentialsAsync(); result.IsSuccess.Should().BeTrue();
 
         var originalToken = result.Token!.AccessToken!;
-        
+
         // Tamper with the token by modifying the payload
         var tamperedToken = TamperWithJwt(originalToken);        // Act - Try to introspect the tampered token
         var introspectionResult = await _client.IntrospectTokenAsync(tamperedToken);
 
         // Assert - Tampered token should be invalid
         introspectionResult.Should().BeFalse();
-    }    [Fact]
+    }
+    [Fact]
     [Trait("Category", "Security")]
     public async Task ExpiredToken_ShouldBeRejected()
     {
@@ -209,7 +212,8 @@ public class AuthSecurityTests : IDisposable
 
         // Assert
         introspectionResult.Should().BeFalse();
-    }[Fact]
+    }
+    [Fact]
     [Trait("Category", "Security")]
     public async Task PKCE_ShouldGenerateSecureChallenge()
     {
@@ -218,7 +222,8 @@ public class AuthSecurityTests : IDisposable
         // For now, skip this test until the helper is available
         await Task.CompletedTask;
         Assert.True(true, "PKCE test placeholder - requires OAuth2PkceHelper implementation");
-    }    [Fact]
+    }
+    [Fact]
     [Trait("Category", "Security")]
     public void State_ShouldGenerateSecureRandomValue()
     {
@@ -231,17 +236,18 @@ public class AuthSecurityTests : IDisposable
         state1.Should().NotBeNullOrEmpty();
         state2.Should().NotBeNullOrEmpty();
         state3.Should().NotBeNullOrEmpty();
-        
+
         // All states should be different
         state1.Should().NotBe(state2);
         state2.Should().NotBe(state3);
         state1.Should().NotBe(state3);
-        
+
         // States should be sufficiently long
         state1.Length.Should().BeGreaterOrEqualTo(16);
         state2.Length.Should().BeGreaterOrEqualTo(16);
         state3.Length.Should().BeGreaterOrEqualTo(16);
-    }    [Fact]
+    }
+    [Fact]
     [Trait("Category", "Security")]
     public void Nonce_ShouldGenerateSecureRandomValue()
     {
@@ -254,12 +260,12 @@ public class AuthSecurityTests : IDisposable
         nonce1.Should().NotBeNullOrEmpty();
         nonce2.Should().NotBeNullOrEmpty();
         nonce3.Should().NotBeNullOrEmpty();
-        
+
         // All nonces should be different
         nonce1.Should().NotBe(nonce2);
         nonce2.Should().NotBe(nonce3);
         nonce1.Should().NotBe(nonce3);
-        
+
         // Nonces should be sufficiently long
         nonce1.Length.Should().BeGreaterOrEqualTo(16);
         nonce2.Length.Should().BeGreaterOrEqualTo(16);
@@ -271,17 +277,17 @@ public class AuthSecurityTests : IDisposable
     public async Task TokenStorage_ShouldClearTokensOnDispose()
     {
         // Arrange
-        var disposableStorage = new DisposableTokenStorage();        var services = new ServiceCollection();
+        var disposableStorage = new DisposableTokenStorage(); var services = new ServiceCollection();
         services.AddLogging(builder => builder.AddConsole());
-        
+
         // Register the Coyote HTTP client factory
         services.AddSingleton<ICoyoteHttpClient, MockOAuth2HttpClient>();
-        services.AddSingleton<Coyote.Infra.Http.Factory.IHttpClientFactory>(provider => 
+        services.AddSingleton<Coyote.Infra.Http.Factory.IHttpClientFactory>(provider =>
         {
             var httpClient = provider.GetRequiredService<ICoyoteHttpClient>();
             return new TestHttpClientFactory(httpClient);
         });
-        
+
         services.AddSingleton(new AuthClientConfig
         {
             ServerUrl = _mockServer.BaseUrl,
@@ -308,7 +314,8 @@ public class AuthSecurityTests : IDisposable
 
     [Fact]
     [Trait("Category", "Security")]
-    public async Task RateLimiting_ShouldPreventBruteForceAttacks()    {
+    public async Task RateLimiting_ShouldPreventBruteForceAttacks()
+    {
         // Arrange - Create client with invalid credentials
         var invalidConfig = new AuthClientConfig
         {
@@ -321,17 +328,17 @@ public class AuthSecurityTests : IDisposable
             // {
             //     MaxRetries = 0 // Disable retries for this test
             // }
-        };        var services = new ServiceCollection();
+        }; var services = new ServiceCollection();
         services.AddLogging(builder => builder.AddConsole());
-        
+
         // Register the Coyote HTTP client factory
         services.AddSingleton<ICoyoteHttpClient, MockOAuth2HttpClient>();
-        services.AddSingleton<Coyote.Infra.Http.Factory.IHttpClientFactory>(provider => 
+        services.AddSingleton<Coyote.Infra.Http.Factory.IHttpClientFactory>(provider =>
         {
             var httpClient = provider.GetRequiredService<ICoyoteHttpClient>();
             return new TestHttpClientFactory(httpClient);
         });
-        
+
         services.AddSingleton(invalidConfig);
         services.AddTransient<IAuthTokenStorage, InMemoryTokenStorage>();
         services.AddTransient<IAuthClient, AuthClient>();
@@ -353,7 +360,7 @@ public class AuthSecurityTests : IDisposable
             // TODO: ErrorCode property not available in current AuthResult
             // result.ErrorCode.Should().Be("invalid_client");
         });
-        
+
         // Note: In a real implementation, the server would implement rate limiting
         // and subsequent requests would be throttled or blocked
     }
@@ -364,11 +371,11 @@ public class AuthSecurityTests : IDisposable
         {
             var handler = new JwtSecurityTokenHandler();
             var jwt = handler.ReadJwtToken(originalToken);
-            
+
             // Create a new token with modified claims
             var claims = jwt.Claims.ToList();
             claims.Add(new System.Security.Claims.Claim("tampered", "true"));
-            
+
             var tokenDescriptor = new SecurityTokenDescriptor
             {
                 Subject = new System.Security.Claims.ClaimsIdentity(claims),
@@ -387,11 +394,12 @@ public class AuthSecurityTests : IDisposable
             // If tampering fails, just modify the token string directly
             return originalToken.Substring(0, originalToken.Length - 5) + "XXXXX";
         }
-    }    private string CreateExpiredJwt()
+    }
+    private string CreateExpiredJwt()
     {
         var handler = new JwtSecurityTokenHandler();
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("test-secret-key-for-expired-token"));
-        
+
         var now = DateTime.UtcNow;
         var tokenDescriptor = new SecurityTokenDescriptor
         {
@@ -465,7 +473,8 @@ public class AuthSecurityTests : IDisposable
             using var rng = RandomNumberGenerator.Create();
             _encryptionKey = new byte[32];
             rng.GetBytes(_encryptionKey);
-        }        public AuthToken? GetToken(string clientId)
+        }
+        public AuthToken? GetToken(string clientId)
         {
             if (_encryptedTokens.TryGetValue(clientId, out var encryptedToken))
             {
@@ -505,29 +514,29 @@ public class AuthSecurityTests : IDisposable
             using var encryptor = aes.CreateEncryptor();
             var plaintextBytes = Encoding.UTF8.GetBytes(plaintext);
             var ciphertextBytes = encryptor.TransformFinalBlock(plaintextBytes, 0, plaintextBytes.Length);
-            
+
             var result = new byte[aes.IV.Length + ciphertextBytes.Length];
             Array.Copy(aes.IV, 0, result, 0, aes.IV.Length);
             Array.Copy(ciphertextBytes, 0, result, aes.IV.Length, ciphertextBytes.Length);
-            
+
             return Convert.ToBase64String(result);
         }
 
         private string Decrypt(string ciphertext)
         {
             var data = Convert.FromBase64String(ciphertext);
-            
+
             using var aes = Aes.Create();
             aes.Key = _encryptionKey;
-            
+
             var iv = new byte[aes.IV.Length];
             var encrypted = new byte[data.Length - iv.Length];
-            
+
             Array.Copy(data, 0, iv, 0, iv.Length);
             Array.Copy(data, iv.Length, encrypted, 0, encrypted.Length);
-            
+
             aes.IV = iv;
-            
+
             using var decryptor = aes.CreateDecryptor();
             var decryptedBytes = decryptor.TransformFinalBlock(encrypted, 0, encrypted.Length);
             return Encoding.UTF8.GetString(decryptedBytes);
@@ -535,7 +544,8 @@ public class AuthSecurityTests : IDisposable
     }
 
     private class DisposableTokenStorage : IAuthTokenStorage, IDisposable
-    {        private Dictionary<string, AuthToken>? _tokens = new();
+    {
+        private Dictionary<string, AuthToken>? _tokens = new();
 
         public AuthToken? GetToken(string clientId)
         {

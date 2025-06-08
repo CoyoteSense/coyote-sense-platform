@@ -37,16 +37,16 @@ namespace Coyote.Infra.Security.Tests.Unit
             // Setup DI container
             var services = new ServiceCollection();
             services.AddLogging(builder => builder.AddConsole().SetMinimumLevel(LogLevel.Debug));
-            
+
             // Register our custom OAuth2 mock HTTP client
             services.AddSingleton<MockOAuth2HttpClient>();
             services.AddSingleton<ICoyoteHttpClient>(provider => provider.GetRequiredService<MockOAuth2HttpClient>());
-            services.AddSingleton<Coyote.Infra.Http.Factory.IHttpClientFactory>(provider => 
+            services.AddSingleton<Coyote.Infra.Http.Factory.IHttpClientFactory>(provider =>
             {
                 var httpClient = provider.GetRequiredService<ICoyoteHttpClient>();
                 return new TestHttpClientFactory(httpClient);
             });
-            
+
             services.AddSingleton(_config);
             services.AddTransient<IAuthTokenStorage, InMemoryTokenStorage>();
             services.AddTransient<IAuthClient, AuthClient>();
@@ -65,7 +65,7 @@ namespace Coyote.Infra.Security.Tests.Unit
             // Assert
             result.Should().NotBeNull();
             result.IsSuccess.Should().BeTrue();
-            
+
             result.Token.Should().NotBeNull();
             result.Token!.AccessToken.Should().NotBeNullOrEmpty();
             result.Token.TokenType.Should().Be("Bearer");
@@ -78,8 +78,9 @@ namespace Coyote.Infra.Security.Tests.Unit
                 _serviceProvider?.Dispose();
                 _disposed = true;
             }
-        }    }
-    
+        }
+    }
+
     /// <summary>
     /// In-memory token storage for testing
     /// </summary>
@@ -98,24 +99,24 @@ namespace Coyote.Infra.Security.Tests.Unit
             _tokens[key] = token;
             return Task.CompletedTask;
         }
-        
+
         public Task ClearTokenAsync(string key)
         {
             _tokens.Remove(key);
             return Task.CompletedTask;
         }
-        
+
         public AuthToken? GetToken(string clientId)
         {
             _tokens.TryGetValue(clientId, out var token);
             return token;
         }
-        
+
         public void ClearToken(string clientId)
         {
             _tokens.Remove(clientId);
         }
-        
+
         public void ClearAllTokens()
         {
             _tokens.Clear();

@@ -35,8 +35,8 @@ public class AuthClient : IAuthClient
     private readonly object _disposeLock = new();
     private volatile AuthToken? _currentToken;
     private volatile bool _disposed;/// <summary>
-    /// DI constructor: uses Microsoft ILogger, HTTP client factory, and optional token storage
-    /// </summary>
+                                    /// DI constructor: uses Microsoft ILogger, HTTP client factory, and optional token storage
+                                    /// </summary>
     [ActivatorUtilitiesConstructor]
     public AuthClient(
         AuthClientConfig config,
@@ -45,13 +45,13 @@ public class AuthClient : IAuthClient
         IAuthTokenStorage? tokenStorage = null)
     {
         _config = config ?? throw new ArgumentNullException(nameof(config));
-        
+
         // Validate configuration
         if (!_config.IsValid())
         {
             throw new ArgumentException("Invalid authentication configuration. Please check required fields for the selected authentication mode.", nameof(config));
         }
-        
+
         // Use provided or default HTTP client
         _httpClient = httpClientFactory.CreateHttpClient();
         _tokenStorage = tokenStorage ?? new InMemoryTokenStorage();
@@ -68,8 +68,8 @@ public class AuthClient : IAuthClient
         {
             _refreshTimer = new Timer(OnRefreshTimer, null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
         }
-    }    
-    
+    }
+
     /// <summary>
     /// Core constructor with IAuthLogger for manual instantiation
     /// </summary>
@@ -80,13 +80,13 @@ public class AuthClient : IAuthClient
         IAuthLogger? logger = null)
     {
         _config = config ?? throw new ArgumentNullException(nameof(config));
-        
+
         // Validate configuration
         if (!_config.IsValid())
         {
             throw new ArgumentException("Invalid authentication configuration. Please check required fields for the selected authentication mode.", nameof(config));
         }
-        
+
         // Use provided or default HTTP client
         _httpClient = httpClient ?? AuthClientFactory.GetDefaultHttpClient();
         _tokenStorage = tokenStorage ?? new InMemoryTokenStorage();
@@ -102,7 +102,7 @@ public class AuthClient : IAuthClient
         if (_config.AutoRefresh)
         {
             _refreshTimer = new Timer(OnRefreshTimer, null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
-        }    
+        }
     }
 
     /// <summary>
@@ -148,7 +148,7 @@ public class AuthClient : IAuthClient
             }
 
             var result = await MakeTokenRequestAsync(parameters, cancellationToken);
-            
+
             if (result.IsSuccess)
             {
                 _logger.LogInfo("Client Credentials authentication successful");
@@ -165,7 +165,7 @@ public class AuthClient : IAuthClient
         {
             _logger.LogError($"Client Credentials authentication error: {ex.Message}");
             return AuthResult.Error("authentication_error", "Authentication failed", ex.Message);
-        }    
+        }
     }
 
     /// <summary>
@@ -186,7 +186,7 @@ public class AuthClient : IAuthClient
                 throw new InvalidOperationException("JWT signing key path is required for JWT Bearer flow");
             }
 
-            var jwtAssertion = CreateJwtAssertion(subject);            var parameters = new Dictionary<string, string>
+            var jwtAssertion = CreateJwtAssertion(subject); var parameters = new Dictionary<string, string>
             {
                 ["grant_type"] = "urn:ietf:params:oauth:grant-type:jwt-bearer",
                 ["assertion"] = jwtAssertion,
@@ -203,7 +203,7 @@ public class AuthClient : IAuthClient
             }
 
             var result = await MakeTokenRequestAsync(parameters, cancellationToken);
-            
+
             if (result.IsSuccess)
             {
                 _logger.LogInfo("JWT Bearer authentication successful");
@@ -220,7 +220,7 @@ public class AuthClient : IAuthClient
         {
             _logger.LogError($"JWT Bearer authentication error: {ex.Message}");
             return AuthResult.Error("authentication_error", "Authentication failed", ex.Message);
-        }    
+        }
     }
 
     /// <summary>
@@ -256,7 +256,7 @@ public class AuthClient : IAuthClient
             }
 
             var result = await MakeTokenRequestAsync(parameters, cancellationToken);
-            
+
             if (result.IsSuccess)
             {
                 _logger.LogInfo("Authorization Code authentication successful");
@@ -273,7 +273,7 @@ public class AuthClient : IAuthClient
         {
             _logger.LogError($"Authorization Code authentication error: {ex.Message}");
             return AuthResult.Error("authentication_error", "Authentication failed", ex.Message);
-        }    
+        }
     }
 
     /// <summary>
@@ -313,7 +313,7 @@ public class AuthClient : IAuthClient
         var queryString = string.Join("&", parameters.Select(kv => $"{UrlEncode(kv.Key)}={UrlEncode(kv.Value)}"));
         var authorizationUrl = $"{_config.ServerUrl}/authorize?{queryString}";
 
-        return (authorizationUrl, codeVerifier, actualState);    
+        return (authorizationUrl, codeVerifier, actualState);
     }
 
     /// <summary>
@@ -341,7 +341,7 @@ public class AuthClient : IAuthClient
             }
 
             var result = await MakeTokenRequestAsync(parameters, cancellationToken);
-            
+
             if (result.IsSuccess)
             {
                 _logger.LogInfo("Token refresh successful");
@@ -358,7 +358,7 @@ public class AuthClient : IAuthClient
         {
             _logger.LogError($"Token refresh error: {ex.Message}");
             return AuthResult.Error("refresh_error", "Token refresh failed", ex.Message);
-        }    
+        }
     }
 
     /// <summary>
@@ -385,7 +385,8 @@ public class AuthClient : IAuthClient
             {
                 return refreshResult.Token;
             }
-        }        return _currentToken.IsExpired ? null : _currentToken;
+        }
+        return _currentToken.IsExpired ? null : _currentToken;
     }
 
     /// <summary>
@@ -449,7 +450,7 @@ public class AuthClient : IAuthClient
             }
 
             _logger.LogInfo("Introspecting token");
-            
+
             var parameters = new Dictionary<string, string>
             {
                 ["token"] = token
@@ -470,7 +471,7 @@ public class AuthClient : IAuthClient
 
             using var doc = JsonDocument.Parse(response.Body);
             var active = doc.RootElement.TryGetProperty("active", out var activeProp) && activeProp.GetBoolean();
-            
+
             _logger.LogInfo($"Token introspection result: {(active ? "active" : "inactive")}");
             return active;
         }
@@ -478,7 +479,7 @@ public class AuthClient : IAuthClient
         {
             _logger.LogError($"Token introspection error: {ex.Message}");
             return false;
-        }    
+        }
     }
 
     /// <summary>
@@ -499,7 +500,7 @@ public class AuthClient : IAuthClient
         {
             _logger.LogError($"Connection test error: {ex.Message}");
             return false;
-        }    
+        }
     }
 
     /// <summary>
@@ -514,7 +515,7 @@ public class AuthClient : IAuthClient
             _logger.LogInfo("Getting auth server information");
 
             var response = await _httpClient.GetAsync($"{_config.ServerUrl}/.well-known/oauth-authorization-server", cancellationToken: cancellationToken);
-            
+
             if (!response.IsSuccess)
             {
                 // Fallback - create info from known endpoints
@@ -537,10 +538,10 @@ public class AuthClient : IAuthClient
                 TokenEndpoint = root.TryGetProperty("token_endpoint", out var tokenProp) ? tokenProp.GetString() ?? "" : $"{_config.ServerUrl}/token",
                 IntrospectionEndpoint = root.TryGetProperty("introspection_endpoint", out var introspectProp) ? introspectProp.GetString() : $"{_config.ServerUrl}/introspect",
                 RevocationEndpoint = root.TryGetProperty("revocation_endpoint", out var revokeProp) ? revokeProp.GetString() : $"{_config.ServerUrl}/revoke",
-                GrantTypesSupported = root.TryGetProperty("grant_types_supported", out var grantsProp) ? 
+                GrantTypesSupported = root.TryGetProperty("grant_types_supported", out var grantsProp) ?
                     grantsProp.EnumerateArray().Select(x => x.GetString() ?? "").ToList() :
                     new List<string> { "client_credentials", "authorization_code", "refresh_token" },
-                ScopesSupported = root.TryGetProperty("scopes_supported", out var scopesProp) ? 
+                ScopesSupported = root.TryGetProperty("scopes_supported", out var scopesProp) ?
                     scopesProp.EnumerateArray().Select(x => x.GetString() ?? "").ToList() :
                     new List<string>()
             };
@@ -549,7 +550,7 @@ public class AuthClient : IAuthClient
         {
             _logger.LogError($"Get server info error: {ex.Message}");
             return null;
-        }    
+        }
     }
 
     /// <summary>
@@ -557,7 +558,7 @@ public class AuthClient : IAuthClient
     /// </summary>
     public void ClearTokens()
     {
-        _logger.LogInfo("Clearing stored tokens");        _currentToken = null;
+        _logger.LogInfo("Clearing stored tokens"); _currentToken = null;
         _tokenStorage.ClearToken(_config.ClientId);
     }
 
@@ -578,12 +579,12 @@ public class AuthClient : IAuthClient
         {
             _httpClient.SetClientCertificate(_config.ClientCertPath, _config.ClientKeyPath);
         }
-    }    
-    
+    }
+
     private async Task<AuthResult> MakeTokenRequestAsync(Dictionary<string, string> parameters, CancellationToken cancellationToken)
     {
         var formContent = CreateFormUrlEncodedContent(parameters);
-        
+
         var headers = new Dictionary<string, string>
         {
             ["Content-Type"] = "application/x-www-form-urlencoded"
@@ -599,13 +600,14 @@ public class AuthClient : IAuthClient
                 var root = doc.RootElement;
                 var error = root.TryGetProperty("error", out var errorProp) ? errorProp.GetString() : "unknown_error";
                 var errorDescription = root.TryGetProperty("error_description", out var descProp) ? descProp.GetString() : null;
-                
+
                 return AuthResult.Error(error ?? "unknown_error", errorDescription, $"HTTP {response.StatusCode}");
             }
             catch
             {
                 return AuthResult.Error("http_error", $"HTTP {response.StatusCode}", response.Body);
-            }        }
+            }
+        }
 
         try
         {
@@ -613,13 +615,13 @@ public class AuthClient : IAuthClient
             Console.WriteLine($"[AuthClient] Response body length: {response.Body?.Length ?? 0}");
             Console.WriteLine($"[AuthClient] Response status: {response.StatusCode}");
             Console.WriteLine($"[AuthClient] Response is success: {response.IsSuccess}");
-            
+
             if (string.IsNullOrWhiteSpace(response.Body))
             {
                 Console.WriteLine($"[AuthClient] ERROR: Response body is null or empty!");
                 return AuthResult.Error("empty_response", "Server returned empty response", "No response body received");
             }
-            
+
             using var doc = JsonDocument.Parse(response.Body);
             var root = doc.RootElement;
 
@@ -740,7 +742,7 @@ public class AuthClient : IAuthClient
             .Where(kvp => !string.IsNullOrEmpty(kvp.Value))
             .Select(kvp => $"{UrlEncode(kvp.Key)}={UrlEncode(kvp.Value)}")
             .ToArray();
-        
+
         return string.Join("&", encoded);
     }
 
@@ -784,7 +786,7 @@ public class AuthClient : IAuthClient
                     _logger.LogError($"Background token refresh failed: {ex.Message}");
                 }
             });
-        }    
+        }
     }
 
     /// <summary>
@@ -800,7 +802,7 @@ public class AuthClient : IAuthClient
                 _refreshTimer?.Dispose();
                 _httpClient?.Dispose();
             }
-            _disposed = true;        
+            _disposed = true;
         }
     }
 

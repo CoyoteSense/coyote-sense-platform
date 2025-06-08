@@ -140,9 +140,9 @@ public class MockOAuth2Server : IDisposable
             .Given(Request.Create().WithPath("/health").UsingGet())
             .RespondWith(Response.Create()
                 .WithStatusCode(HttpStatusCode.OK)
-                .WithHeader("Content-Type", "application/json")                .WithBody(JsonSerializer.Serialize(new { status = "healthy", timestamp = DateTimeOffset.UtcNow })));
+                .WithHeader("Content-Type", "application/json").WithBody(JsonSerializer.Serialize(new { status = "healthy", timestamp = DateTimeOffset.UtcNow })));
     }
-    
+
     private WireMock.ResponseMessage HandleTokenRequest(WireMock.IRequestMessage request)
     {
         try
@@ -153,7 +153,7 @@ public class MockOAuth2Server : IDisposable
             var grantType = formData.GetValueOrDefault("grant_type", string.Empty);
             var clientId = ExtractClientId(request, formData);
             var clientSecret = ExtractClientSecret(request, formData);
-            
+
             Console.WriteLine($"[MockOAuth2Server] Token request received:");
             Console.WriteLine($"  Grant Type: {grantType}");
             Console.WriteLine($"  Client ID: {clientId}");
@@ -164,7 +164,8 @@ public class MockOAuth2Server : IDisposable
             {
                 Console.WriteLine($"[MockOAuth2Server] Client validation failed for {clientId}");
                 return CreateErrorResponse(HttpStatusCode.Unauthorized, "invalid_client", "Invalid client credentials");
-            }            var responseMessage = grantType switch
+            }
+            var responseMessage = grantType switch
             {
                 "client_credentials" => HandleClientCredentialsGrant(clientId, formData),
                 "urn:ietf:params:oauth:grant-type:jwt-bearer" => HandleJwtBearerGrant(clientId, formData),
@@ -172,8 +173,9 @@ public class MockOAuth2Server : IDisposable
                 "refresh_token" => HandleRefreshTokenGrant(clientId, formData),
                 _ => CreateErrorResponse(HttpStatusCode.BadRequest, "unsupported_grant_type", "Unsupported grant type")
             };
-            
-            return responseMessage;        }
+
+            return responseMessage;
+        }
         catch (Exception ex)
         {
             return CreateErrorResponse(HttpStatusCode.InternalServerError, "server_error", ex.Message);
@@ -184,7 +186,7 @@ public class MockOAuth2Server : IDisposable
     {
         var scope = formData.GetValueOrDefault("scope", "api.read");
         var token = GenerateAccessToken(clientId, scope);
-        
+
         var tokenInfo = new MockTokenInfo
         {
             AccessToken = token,
@@ -196,28 +198,29 @@ public class MockOAuth2Server : IDisposable
             IsActive = true
         };
 
-        _activeTokens[token] = tokenInfo;        var response = new
+        _activeTokens[token] = tokenInfo; var response = new
         {
             access_token = token,
             token_type = "Bearer",
             expires_in = 3600,
             scope
-        };        return new WireMock.ResponseMessage 
-        { 
+        }; return new WireMock.ResponseMessage
+        {
             StatusCode = (int)HttpStatusCode.OK,
-            Headers = new Dictionary<string, WireMockList<string>> 
-            { 
+            Headers = new Dictionary<string, WireMockList<string>>
+            {
                 ["Content-Type"] = new WireMockList<string>("application/json")
             },
-            BodyData = new WireMock.Util.BodyData 
-            { 
-                BodyAsString = JsonSerializer.Serialize(response) 
+            BodyData = new WireMock.Util.BodyData
+            {
+                BodyAsString = JsonSerializer.Serialize(response)
             }
         };
-    }    private WireMock.ResponseMessage HandleJwtBearerGrant(string clientId, Dictionary<string, string> formData)
+    }
+    private WireMock.ResponseMessage HandleJwtBearerGrant(string clientId, Dictionary<string, string> formData)
     {
         var assertion = formData.GetValueOrDefault("assertion", string.Empty);
-        
+
         // Debug: Log the JWT assertion details
         Console.WriteLine($"[MockOAuth2Server] JWT Bearer Grant Request:");
         Console.WriteLine($"  Client ID: {clientId}");
@@ -227,21 +230,21 @@ public class MockOAuth2Server : IDisposable
         {
             Console.WriteLine($"  Assertion (first 50 chars): {assertion.Substring(0, Math.Min(50, assertion.Length))}...");
         }
-        
+
         // Validate JWT assertion
         if (!ValidateJwtAssertion(assertion))
         {
             Console.WriteLine($"[MockOAuth2Server] JWT validation failed");
             return CreateErrorResponse(HttpStatusCode.BadRequest, "invalid_grant", "Invalid JWT assertion");
         }
-          Console.WriteLine($"[MockOAuth2Server] JWT validation succeeded");
+        Console.WriteLine($"[MockOAuth2Server] JWT validation succeeded");
 
         var scope = formData.GetValueOrDefault("scope", "api.read");
         var token = GenerateAccessToken(clientId, scope);
-        
+
         Console.WriteLine($"[MockOAuth2Server] Generating access token for client '{clientId}' with scope '{scope}'");
         Console.WriteLine($"[MockOAuth2Server] Generated token: {token.Substring(0, Math.Min(20, token.Length))}...");
-        
+
         var tokenInfo = new MockTokenInfo
         {
             AccessToken = token,
@@ -251,7 +254,7 @@ public class MockOAuth2Server : IDisposable
             ClientId = clientId,
             IssuedAt = DateTimeOffset.UtcNow,
             IsActive = true
-        };        _activeTokens[token] = tokenInfo;        var response = new
+        }; _activeTokens[token] = tokenInfo; var response = new
         {
             access_token = token,
             token_type = "Bearer",
@@ -261,15 +264,15 @@ public class MockOAuth2Server : IDisposable
 
         var jsonResponse = JsonSerializer.Serialize(response);
         Console.WriteLine($"[MockOAuth2Server] JWT Bearer response JSON: {jsonResponse}");
-        Console.WriteLine($"[MockOAuth2Server] JSON length: {jsonResponse.Length}");        return new WireMock.ResponseMessage 
-        { 
+        Console.WriteLine($"[MockOAuth2Server] JSON length: {jsonResponse.Length}"); return new WireMock.ResponseMessage
+        {
             StatusCode = (int)HttpStatusCode.OK,
-            Headers = new Dictionary<string, WireMockList<string>> 
-            { 
+            Headers = new Dictionary<string, WireMockList<string>>
+            {
                 ["Content-Type"] = new WireMockList<string>("application/json")
             },
-            BodyData = new WireMock.Util.BodyData 
-            { 
+            BodyData = new WireMock.Util.BodyData
+            {
                 BodyAsString = jsonResponse,
                 DetectedBodyType = WireMock.Types.BodyType.String
             }
@@ -280,7 +283,7 @@ public class MockOAuth2Server : IDisposable
     {
         var code = formData.GetValueOrDefault("code", string.Empty);
         var redirectUri = formData.GetValueOrDefault("redirect_uri", string.Empty);
-        
+
         // Simple validation - in real implementation, this would be more robust
         if (string.IsNullOrEmpty(code) || code != "test-auth-code")
         {
@@ -290,7 +293,7 @@ public class MockOAuth2Server : IDisposable
         var scope = "api.read api.write";
         var accessToken = GenerateAccessToken(clientId, scope);
         var refreshToken = GenerateRefreshToken(clientId);
-        
+
         var tokenInfo = new MockTokenInfo
         {
             AccessToken = accessToken,
@@ -301,41 +304,42 @@ public class MockOAuth2Server : IDisposable
             ClientId = clientId,
             IssuedAt = DateTimeOffset.UtcNow,
             IsActive = true
-        };        _activeTokens[accessToken] = tokenInfo;        var response = new
+        }; _activeTokens[accessToken] = tokenInfo; var response = new
         {
             access_token = accessToken,
             token_type = "Bearer",
             expires_in = 3600,
             refresh_token = refreshToken,
-            scope        };
+            scope
+        };
 
         var jsonResponse = JsonSerializer.Serialize(response);
         Console.WriteLine($"[MockOAuth2Server] JWT Bearer response JSON: {jsonResponse}");
-        
-        var responseMessage = new WireMock.ResponseMessage 
-        { 
+
+        var responseMessage = new WireMock.ResponseMessage
+        {
             StatusCode = (int)HttpStatusCode.OK,
-            Headers = new Dictionary<string, WireMockList<string>> 
-            { 
+            Headers = new Dictionary<string, WireMockList<string>>
+            {
                 ["Content-Type"] = new WireMockList<string>("application/json")
             },
-            BodyData = new WireMock.Util.BodyData 
-            { 
-                BodyAsString = jsonResponse 
+            BodyData = new WireMock.Util.BodyData
+            {
+                BodyAsString = jsonResponse
             }
         };
-        
+
         Console.WriteLine($"[MockOAuth2Server] Returning response with status: {responseMessage.StatusCode}");
         Console.WriteLine($"[MockOAuth2Server] Response headers: {string.Join(", ", responseMessage.Headers.Keys)}");
         Console.WriteLine($"[MockOAuth2Server] Response body length: {jsonResponse.Length}");
-        
+
         return responseMessage;
     }
 
     private WireMock.ResponseMessage HandleRefreshTokenGrant(string clientId, Dictionary<string, string> formData)
     {
         var refreshToken = formData.GetValueOrDefault("refresh_token", string.Empty);
-        
+
         // Find the token info associated with this refresh token
         var tokenInfo = _activeTokens.Values.FirstOrDefault(t => t.RefreshToken == refreshToken && t.ClientId == clientId);
         if (tokenInfo == null)
@@ -346,10 +350,10 @@ public class MockOAuth2Server : IDisposable
         // Generate new access token
         var newAccessToken = GenerateAccessToken(clientId, tokenInfo.Scope);
         var newRefreshToken = GenerateRefreshToken(clientId);
-        
+
         // Remove old token and add new one
         _activeTokens.Remove(tokenInfo.AccessToken);
-        
+
         var newTokenInfo = new MockTokenInfo
         {
             AccessToken = newAccessToken,
@@ -362,23 +366,23 @@ public class MockOAuth2Server : IDisposable
             IsActive = true
         };
 
-        _activeTokens[newAccessToken] = newTokenInfo;        var response = new
+        _activeTokens[newAccessToken] = newTokenInfo; var response = new
         {
             access_token = newAccessToken,
             token_type = "Bearer",
             expires_in = 3600,
             refresh_token = newRefreshToken,
             scope = tokenInfo.Scope
-        };        return new WireMock.ResponseMessage 
-        { 
+        }; return new WireMock.ResponseMessage
+        {
             StatusCode = (int)HttpStatusCode.OK,
-            Headers = new Dictionary<string, WireMockList<string>> 
-            { 
+            Headers = new Dictionary<string, WireMockList<string>>
+            {
                 ["Content-Type"] = new WireMockList<string>("application/json")
             },
-            BodyData = new WireMock.Util.BodyData 
-            { 
-                BodyAsString = JsonSerializer.Serialize(response) 
+            BodyData = new WireMock.Util.BodyData
+            {
+                BodyAsString = JsonSerializer.Serialize(response)
             }
         };
     }
@@ -398,21 +402,22 @@ public class MockOAuth2Server : IDisposable
             if (!ValidateClient(clientId, clientSecret, "introspection"))
             {
                 return CreateErrorResponse(HttpStatusCode.Unauthorized, "invalid_client", "Invalid client credentials");
-            }            var tokenInfo = _activeTokens.GetValueOrDefault(token);
+            }
+            var tokenInfo = _activeTokens.GetValueOrDefault(token);
             if (tokenInfo == null || !tokenInfo.IsActive)
             {
                 var inactiveResponse = new { active = false };
 
-                return new WireMock.ResponseMessage 
-                { 
+                return new WireMock.ResponseMessage
+                {
                     StatusCode = (int)HttpStatusCode.OK,
-                    Headers = new Dictionary<string, WireMockList<string>> 
-                    { 
+                    Headers = new Dictionary<string, WireMockList<string>>
+                    {
                         ["Content-Type"] = new WireMockList<string>("application/json")
                     },
-                    BodyData = new WireMock.Util.BodyData 
-                    { 
-                        BodyAsString = JsonSerializer.Serialize(inactiveResponse) 
+                    BodyData = new WireMock.Util.BodyData
+                    {
+                        BodyAsString = JsonSerializer.Serialize(inactiveResponse)
                     }
                 };
             }
@@ -425,16 +430,16 @@ public class MockOAuth2Server : IDisposable
                 token_type = tokenInfo.TokenType,
                 exp = ((DateTimeOffset)tokenInfo.IssuedAt.AddSeconds(tokenInfo.ExpiresIn)).ToUnixTimeSeconds(),
                 iat = tokenInfo.IssuedAt.ToUnixTimeSeconds()
-            };            return new WireMock.ResponseMessage 
-            { 
+            }; return new WireMock.ResponseMessage
+            {
                 StatusCode = (int)HttpStatusCode.OK,
-                Headers = new Dictionary<string, WireMockList<string>> 
-                { 
+                Headers = new Dictionary<string, WireMockList<string>>
+                {
                     ["Content-Type"] = new WireMockList<string>("application/json")
                 },
-                BodyData = new WireMock.Util.BodyData 
-                { 
-                    BodyAsString = JsonSerializer.Serialize(activeResponse) 
+                BodyData = new WireMock.Util.BodyData
+                {
+                    BodyAsString = JsonSerializer.Serialize(activeResponse)
                 }
             };
         }
@@ -465,11 +470,11 @@ public class MockOAuth2Server : IDisposable
                 tokenInfo.IsActive = false;
             }
 
-            return new WireMock.ResponseMessage 
-            { 
+            return new WireMock.ResponseMessage
+            {
                 StatusCode = (int)HttpStatusCode.OK,
-                Headers = new Dictionary<string, WireMockList<string>> 
-                { 
+                Headers = new Dictionary<string, WireMockList<string>>
+                {
                     ["Content-Type"] = new WireMockList<string>("application/json")
                 }
             };
@@ -511,13 +516,14 @@ public class MockOAuth2Server : IDisposable
         var bytes = new byte[32];
         rng.GetBytes(bytes);
         return Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
-    }    private bool ValidateClient(string clientId, string clientSecret, string grantType)
+    }
+    private bool ValidateClient(string clientId, string clientSecret, string grantType)
     {
         Console.WriteLine($"[MockOAuth2Server] ValidateClient called:");
         Console.WriteLine($"  Client ID: '{clientId}'");
         Console.WriteLine($"  Client Secret: '{clientSecret}'");
         Console.WriteLine($"  Grant Type: '{grantType}'");
-        
+
         if (!_registeredClients.TryGetValue(clientId, out var client))
         {
             Console.WriteLine($"[MockOAuth2Server] Client '{clientId}' not found in registered clients");
@@ -526,7 +532,7 @@ public class MockOAuth2Server : IDisposable
         }
 
         Console.WriteLine($"[MockOAuth2Server] Found client: ID='{client.ClientId}', Secret='{client.ClientSecret}'");
-        
+
         // JWT Bearer flow does not require client secret - the JWT assertion provides authentication
         if (grantType == "urn:ietf:params:oauth:grant-type:jwt-bearer")
         {
@@ -546,12 +552,13 @@ public class MockOAuth2Server : IDisposable
 
         Console.WriteLine($"[MockOAuth2Server] Client validation successful for '{clientId}'");
         return true;
-    }private bool ValidateJwtAssertion(string assertion)
+    }
+    private bool ValidateJwtAssertion(string assertion)
     {
         try
         {
             Console.WriteLine($"[MockOAuth2Server] Validating JWT assertion...");
-            
+
             var tokenHandler = new JwtSecurityTokenHandler();
             if (!tokenHandler.CanReadToken(assertion))
             {
@@ -601,10 +608,11 @@ public class MockOAuth2Server : IDisposable
         }
 
         return string.Empty;
-    }    private string ExtractClientSecret(WireMock.IRequestMessage request, Dictionary<string, string> formData)
+    }
+    private string ExtractClientSecret(WireMock.IRequestMessage request, Dictionary<string, string> formData)
     {
         Console.WriteLine($"[MockOAuth2Server] ExtractClientSecret called:");
-        
+
         // Try form data first
         if (formData.TryGetValue("client_secret", out var clientSecret))
         {
@@ -653,7 +661,8 @@ public class MockOAuth2Server : IDisposable
         }
 
         return result;
-    }    private WireMock.ResponseMessage CreateErrorResponse(HttpStatusCode statusCode, string error, string description)
+    }
+    private WireMock.ResponseMessage CreateErrorResponse(HttpStatusCode statusCode, string error, string description)
     {
         var errorResponse = new
         {
@@ -661,17 +670,18 @@ public class MockOAuth2Server : IDisposable
             error_description = description
         };
 
-        return new WireMock.ResponseMessage 
-        { 
+        return new WireMock.ResponseMessage
+        {
             StatusCode = (int)statusCode,
-            Headers = new Dictionary<string, WireMockList<string>> 
-            { 
+            Headers = new Dictionary<string, WireMockList<string>>
+            {
                 ["Content-Type"] = new WireMockList<string>("application/json")
             },
-            BodyData = new WireMock.Util.BodyData 
-            { 
-                BodyAsString = JsonSerializer.Serialize(errorResponse) 
-            }        };
+            BodyData = new WireMock.Util.BodyData
+            {
+                BodyAsString = JsonSerializer.Serialize(errorResponse)
+            }
+        };
     }
 
     /// <summary>

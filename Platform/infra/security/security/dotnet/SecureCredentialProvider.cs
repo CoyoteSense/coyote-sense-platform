@@ -20,12 +20,12 @@ public class SecureCredentialProvider : IDisposable
     {
         _clientSecret?.Dispose();
         _clientSecret = new SecureString();
-        
+
         foreach (char c in clientSecret)
         {
             _clientSecret.AppendChar(c);
         }
-        
+
         _clientSecret.MakeReadOnly();
     }
 
@@ -36,12 +36,12 @@ public class SecureCredentialProvider : IDisposable
     {
         _privateKey?.Dispose();
         _privateKey = new SecureString();
-        
+
         foreach (char c in privateKey)
         {
             _privateKey.AppendChar(c);
         }
-        
+
         _privateKey.MakeReadOnly();
     }
 
@@ -51,7 +51,7 @@ public class SecureCredentialProvider : IDisposable
     public string? GetClientSecret()
     {
         if (_clientSecret == null) return null;
-        
+
         IntPtr ptr = IntPtr.Zero;
         try
         {
@@ -73,7 +73,7 @@ public class SecureCredentialProvider : IDisposable
     public string? GetPrivateKey()
     {
         if (_privateKey == null) return null;
-        
+
         IntPtr ptr = IntPtr.Zero;
         try
         {
@@ -119,22 +119,22 @@ public enum CredentialSource
     /// Load from environment variables
     /// </summary>
     Environment,
-    
+
     /// <summary>
     /// Load from Azure Key Vault
     /// </summary>
     AzureKeyVault,
-    
+
     /// <summary>
     /// Load from file system (least secure)
     /// </summary>
     FileSystem,
-    
+
     /// <summary>
     /// Load from Windows Credential Manager
     /// </summary>
     WindowsCredentialManager,
-    
+
     /// <summary>
     /// Provided directly in memory
     /// </summary>
@@ -147,7 +147,7 @@ public enum CredentialSource
 public class CredentialConfiguration
 {
     public CredentialSource Source { get; set; } = CredentialSource.Environment;
-    
+
     /// <summary>
     /// For Environment source: variable name
     /// For AzureKeyVault: secret name
@@ -155,12 +155,12 @@ public class CredentialConfiguration
     /// For WindowsCredentialManager: credential name
     /// </summary>
     public string? ClientSecretReference { get; set; }
-    
+
     /// <summary>
     /// For private key/certificate credentials
     /// </summary>
     public string? PrivateKeyReference { get; set; }
-    
+
     /// <summary>
     /// Azure Key Vault URI (if using AzureKeyVault source)
     /// </summary>

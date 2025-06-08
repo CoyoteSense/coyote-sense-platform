@@ -28,10 +28,10 @@ public class SimpleAuthClientTest
         };
         var tokenStorage = new InMemoryTokenStorage();
         var client = new AuthClient(config, httpClient, tokenStorage, new ConsoleAuthLogger());
-        
+
         // Act
         var result = await client.AuthenticateClientCredentialsAsync();
-        
+
         // Assert
         Assert.NotNull(result);
         Assert.True(result.IsSuccess);
@@ -59,24 +59,24 @@ public class InMemoryTokenStorage : IAuthTokenStorage
         _tokens[key] = token;
         return Task.CompletedTask;
     }
-    
+
     public Task ClearTokenAsync(string key)
     {
         _tokens.Remove(key);
         return Task.CompletedTask;
     }
-    
+
     public AuthToken? GetToken(string clientId)
     {
         _tokens.TryGetValue(clientId, out var token);
         return token;
     }
-    
+
     public void ClearToken(string clientId)
     {
         _tokens.Remove(clientId);
     }
-    
+
     public void ClearAllTokens()
     {
         _tokens.Clear();
