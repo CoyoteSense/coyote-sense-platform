@@ -144,13 +144,11 @@ public class AuthSecurityTests : IDisposable
         {
             encryptedToken.Should().NotBe(result.Token!.AccessToken);
         });
-    }
-
-    [Fact]
+    }    [Fact]
     [Trait("Category", "Security")]
     public async Task InvalidCertificate_ShouldRejectConnection()
-    {        // This test would require setting up HTTPS with invalid certificates
-        // For now, we'll test that the client properly validates server certificates
+    {        // This test validates that the client properly handles SSL certificate validation errors
+        // The AuthClient should catch SSL certificate exceptions and return appropriate error results
         
         // Arrange - Create client with certificate validation enabled
         var httpsConfig = new AuthClientConfig
@@ -159,7 +157,6 @@ public class AuthSecurityTests : IDisposable
             ClientId = "test-client",
             ClientSecret = "test-secret",
             DefaultScopes = new List<string> { "api.read" }
-            // TODO: ValidateServerCertificate property not available in current API
         };        var services = new ServiceCollection();
         services.AddLogging(builder => builder.AddConsole());
         
@@ -178,11 +175,13 @@ public class AuthSecurityTests : IDisposable
         using var serviceProvider = services.BuildServiceProvider();
         var httpsClient = serviceProvider.GetRequiredService<IAuthClient>();
 
-        // Act & Assert
-        var exception = await Assert.ThrowsAsync<HttpRequestException>(
-            () => httpsClient.AuthenticateClientCredentialsAsync());
-        
-        exception.Message.Should().Contain("certificate");
+        // Act
+        var result = await httpsClient.AuthenticateClientCredentialsAsync();
+          // Assert - Should return error result for SSL certificate validation failure
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorCode.Should().Be("authentication_error");
+        result.ErrorDescription.Should().Be("Authentication failed");
+        result.ErrorDetails.Should().Contain("certificate");
     }
 
     [Fact]
