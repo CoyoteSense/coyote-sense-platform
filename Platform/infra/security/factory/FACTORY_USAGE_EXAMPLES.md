@@ -7,14 +7,14 @@ This document demonstrates how to use the OAuth2 authentication factories across
 ### TypeScript Example
 
 ```typescript
-import { OAuth2AuthClientFactory, AuthMode } from '../factory/ts/oauth2-client-factory';
+import { AuthClientFactory, AuthMode } from '../factory/ts/oauth2-client-factory';
 import { CoyoteHttpClient } from '../../http/ts';
 
 // Create client using factory methods
 const httpClient = new CoyoteHttpClient();
 
 // Client Credentials flow
-const clientCredsClient = OAuth2AuthClientFactory.createClientCredentials(
+const clientCredsClient = AuthClientFactory.createClientCredentials(
   'https://auth.example.com',
   'my-client-id',
   'my-client-secret',
@@ -23,7 +23,7 @@ const clientCredsClient = OAuth2AuthClientFactory.createClientCredentials(
 );
 
 // mTLS flow
-const mtlsClient = OAuth2AuthClientFactory.createClientCredentialsMtls(
+const mtlsClient = AuthClientFactory.createClientCredentialsMtls(
   'https://auth.example.com',
   'my-client-id',
   '/path/to/client.crt',
@@ -34,7 +34,7 @@ const mtlsClient = OAuth2AuthClientFactory.createClientCredentialsMtls(
 );
 
 // JWT Bearer flow
-const jwtClient = OAuth2AuthClientFactory.createJwtBearer(
+const jwtClient = AuthClientFactory.createJwtBearer(
   'https://auth.example.com',
   'my-client-id',
   '/path/to/signing.key',
@@ -46,7 +46,7 @@ const jwtClient = OAuth2AuthClientFactory.createJwtBearer(
 );
 
 // Authorization Code flow
-const authCodeClient = OAuth2AuthClientFactory.createAuthorizationCode(
+const authCodeClient = AuthClientFactory.createAuthorizationCode(
   'https://auth.example.com',
   'my-client-id',
   'https://my-app.com/callback',
@@ -55,7 +55,7 @@ const authCodeClient = OAuth2AuthClientFactory.createAuthorizationCode(
 );
 
 // Authorization Code with PKCE flow
-const pkceClient = OAuth2AuthClientFactory.createAuthorizationCodePkce(
+const pkceClient = AuthClientFactory.createAuthorizationCodePkce(
   'https://auth.example.com',
   'my-client-id',
   'https://my-app.com/callback',
@@ -64,7 +64,7 @@ const pkceClient = OAuth2AuthClientFactory.createAuthorizationCodePkce(
 );
 
 // Using builder pattern for custom configuration
-const customClient = OAuth2AuthClientFactory.create()
+const customClient = AuthClientFactory.create()
   .serverUrl('https://auth.example.com')
   .clientCredentials('my-client-id', 'my-client-secret')
   .authMode(AuthMode.ClientCredentials)
@@ -78,13 +78,13 @@ const customClient = OAuth2AuthClientFactory.create()
 ### JavaScript Example
 
 ```javascript
-const { OAuth2AuthClientFactory, AuthMode } = require('../factory/js/oauth2-client-factory');
+const { AuthClientFactory, AuthMode } = require('../factory/js/oauth2-client-factory');
 
 // Create client using factory methods
 const httpClient = new HttpClient(); // Your HTTP client implementation
 
 // Client Credentials flow
-const clientCredsClient = OAuth2AuthClientFactory.createClientCredentials(
+const clientCredsClient = AuthClientFactory.createClientCredentials(
   'https://auth.example.com',
   'my-client-id',
   'my-client-secret',
@@ -93,7 +93,7 @@ const clientCredsClient = OAuth2AuthClientFactory.createClientCredentials(
 );
 
 // Using builder pattern
-const customClient = OAuth2AuthClientFactory.create()
+const customClient = AuthClientFactory.create()
   .serverUrl('https://auth.example.com')
   .clientCredentials('my-client-id', 'my-client-secret')
   .authMode(AuthMode.CLIENT_CREDENTIALS)
@@ -105,14 +105,14 @@ const customClient = OAuth2AuthClientFactory.create()
 ## Python Factory Usage
 
 ```python
-from infra.security.factory.py.oauth2_client_factory import OAuth2AuthClientFactory, AuthMode
+from infra.security.factory.py.oauth2_client_factory import AuthClientFactory, AuthMode
 from infra.http.py.http_client import HttpClient
 
 # Create HTTP client
 http_client = HttpClient()
 
 # Client Credentials flow
-client_creds_client = OAuth2AuthClientFactory.create_client_credentials(
+client_creds_client = AuthClientFactory.create_client_credentials(
     server_url='https://auth.example.com',
     client_id='my-client-id',
     client_secret='my-client-secret',
@@ -121,7 +121,7 @@ client_creds_client = OAuth2AuthClientFactory.create_client_credentials(
 )
 
 # mTLS flow
-mtls_client = OAuth2AuthClientFactory.create_client_credentials_mtls(
+mtls_client = AuthClientFactory.create_client_credentials_mtls(
     server_url='https://auth.example.com',
     client_id='my-client-id',
     client_cert_path='/path/to/client.crt',
@@ -132,7 +132,7 @@ mtls_client = OAuth2AuthClientFactory.create_client_credentials_mtls(
 )
 
 # JWT Bearer flow
-jwt_client = OAuth2AuthClientFactory.create_jwt_bearer(
+jwt_client = AuthClientFactory.create_jwt_bearer(
     server_url='https://auth.example.com',
     client_id='my-client-id',
     jwt_signing_key_path='/path/to/signing.key',
@@ -144,7 +144,7 @@ jwt_client = OAuth2AuthClientFactory.create_jwt_bearer(
 )
 
 # Authorization Code flow
-auth_code_client = OAuth2AuthClientFactory.create_authorization_code(
+auth_code_client = AuthClientFactory.create_authorization_code(
     server_url='https://auth.example.com',
     client_id='my-client-id',
     redirect_uri='https://my-app.com/callback',
@@ -153,7 +153,7 @@ auth_code_client = OAuth2AuthClientFactory.create_authorization_code(
 )
 
 # Authorization Code with PKCE flow
-pkce_client = OAuth2AuthClientFactory.create_authorization_code_pkce(
+pkce_client = AuthClientFactory.create_authorization_code_pkce(
     server_url='https://auth.example.com',
     client_id='my-client-id',
     redirect_uri='https://my-app.com/callback',
@@ -162,7 +162,7 @@ pkce_client = OAuth2AuthClientFactory.create_authorization_code_pkce(
 )
 
 # Using builder pattern for custom configuration
-custom_client = (OAuth2AuthClientFactory.create()
+custom_client = (AuthClientFactory.create()
                 .server_url('https://auth.example.com')
                 .client_credentials('my-client-id', 'my-client-secret')
                 .auth_mode(AuthMode.CLIENT_CREDENTIALS)
@@ -184,7 +184,7 @@ using CoyoteSense.Platform.Infra.Http;
 var httpClient = new CoyoteHttpClient();
 
 // Client Credentials flow
-var clientCredsClient = OAuth2AuthClientFactory.CreateClientCredentialsClient(
+var clientCredsClient = AuthClientFactory.CreateClientCredentialsClient(
     serverUrl: "https://auth.example.com",
     clientId: "my-client-id",
     clientSecret: "my-client-secret",
@@ -193,7 +193,7 @@ var clientCredsClient = OAuth2AuthClientFactory.CreateClientCredentialsClient(
 );
 
 // mTLS flow
-var mtlsClient = OAuth2AuthClientFactory.CreateMtlsClient(
+var mtlsClient = AuthClientFactory.CreateMtlsClient(
     serverUrl: "https://auth.example.com",
     clientId: "my-client-id",
     clientCertPath: "/path/to/client.crt",
@@ -204,7 +204,7 @@ var mtlsClient = OAuth2AuthClientFactory.CreateMtlsClient(
 );
 
 // JWT Bearer flow
-var jwtClient = OAuth2AuthClientFactory.CreateJwtBearerClient(
+var jwtClient = AuthClientFactory.CreateJwtBearerClient(
     serverUrl: "https://auth.example.com",
     clientId: "my-client-id",
     jwtKeyPath: "/path/to/signing.key",
@@ -215,7 +215,7 @@ var jwtClient = OAuth2AuthClientFactory.CreateJwtBearerClient(
 );
 
 // Authorization Code flow
-var authCodeClient = OAuth2AuthClientFactory.CreateAuthorizationCodeClient(
+var authCodeClient = AuthClientFactory.CreateAuthorizationCodeClient(
     serverUrl: "https://auth.example.com",
     clientId: "my-client-id",
     redirectUri: "https://my-app.com/callback",

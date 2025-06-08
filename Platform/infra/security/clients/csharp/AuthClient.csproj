@@ -28,6 +28,8 @@
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.2" />
     <PackageReference Include="Microsoft.Extensions.Options" Version="8.0.2" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.0.2" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="8.0.1" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="8.0.0" />
     <PackageReference Include="System.Text.Json" Version="8.0.5" />
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.2.1" />
     <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" Version="8.2.1" />
@@ -36,11 +38,13 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\..\http\interfaces\dotnet\Coyote.Infra.Http.csproj" />
-  </ItemGroup>
-  <ItemGroup>
+  </ItemGroup>  <ItemGroup>
     <Compile Include="..\..\interfaces\dotnet\AuthInterfaces.cs" Link="Interfaces\AuthInterfaces.cs" />
     <Compile Include="..\..\interfaces\dotnet\IAuthClient.cs" Link="Interfaces\IAuthClient.cs" />
     <Compile Include="..\..\factory\dotnet\AuthClientFactory.cs" Link="Factory\AuthClientFactory.cs" />
+    <Compile Include="..\..\options\dotnet\AuthClientOptions.cs" Link="Options\AuthClientOptions.cs" />
+    <Compile Include="..\..\security\dotnet\SecureCredentialProvider.cs" Link="Security\SecureCredentialProvider.cs" />
+    <Compile Include="..\..\extensions\dotnet\AuthClientExtensions.cs" Link="Extensions\AuthClientExtensions.cs" />
   </ItemGroup>
 
 </Project>

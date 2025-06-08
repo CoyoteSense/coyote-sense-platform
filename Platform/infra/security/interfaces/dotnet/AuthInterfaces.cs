@@ -164,12 +164,10 @@ public class AuthClientConfig
     /// <summary>
     /// Check if certificates are required for this mode
     /// </summary>
-    public bool RequiresCertificates() => IsMtlsMode();
-
-    /// <summary>
+    public bool RequiresCertificates() => IsMtlsMode();    /// <summary>
     /// Check if client secret is required for this mode
     /// </summary>
-    public bool RequiresClientSecret() => IsClientCredentialsMode() || IsMtlsMode();
+    public bool RequiresClientSecret() => IsClientCredentialsMode();
 
     /// <summary>
     /// Check if JWT key is required for this mode
@@ -179,9 +177,7 @@ public class AuthClientConfig
     /// <summary>
     /// Check if redirect URI is required for this mode
     /// </summary>
-    public bool RequiresRedirectUri() => IsAuthorizationCodeMode();
-
-    /// <summary>
+    public bool RequiresRedirectUri() => IsAuthorizationCodeMode();    /// <summary>
     /// Validate configuration for the selected authentication mode
     /// </summary>
     public bool IsValid()
@@ -194,8 +190,7 @@ public class AuthClientConfig
         return AuthMode switch
         {
             AuthMode.ClientCredentials => !string.IsNullOrEmpty(ClientSecret),
-            AuthMode.ClientCredentialsMtls => !string.IsNullOrEmpty(ClientSecret) && 
-                                            !string.IsNullOrEmpty(ClientCertPath) && 
+            AuthMode.ClientCredentialsMtls => !string.IsNullOrEmpty(ClientCertPath) && 
                                             !string.IsNullOrEmpty(ClientKeyPath),
             AuthMode.JwtBearer => !string.IsNullOrEmpty(JwtSigningKeyPath),
             AuthMode.AuthorizationCode or AuthMode.AuthorizationCodePkce => !string.IsNullOrEmpty(RedirectUri),

@@ -1,8 +1,13 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+using System.Threading;
+using Microsoft.Extensions.Options;
+using Microsoft.Extensions.DependencyInjection;
 using Coyote.Infra.Http;
 using Coyote.Infra.Http.Factory;
-using Coyote.Infra.Security.Auth;
+using Coyote.Infra.Security.Auth.Options;
+using Coyote.Infra.Security.Auth.Security;
 using HttpFactory = Coyote.Infra.Http.Factory;
 
 namespace Coyote.Infra.Security.Auth;
@@ -15,21 +20,143 @@ namespace Coyote.Infra.Security.Auth;
 /// - OAuth2 + PKCE (RFC 7636)
 /// - JWT Bearer (RFC 7523)
 /// - mTLS Client Credentials (RFC 8705)
+/// 
+/// Provides both traditional factory methods and modern options pattern support
+/// with enhanced security for credential handling.
 /// </summary>
 public static class AuthClientFactory
 {
     private static HttpFactory.IHttpClientFactory? _httpClientFactory;
+    private static readonly object _lock = new object();
 
     /// <summary>
     /// Set the HTTP client factory (typically called during DI setup)
+    /// Thread-safe operation
     /// </summary>
     public static void SetHttpClientFactory(HttpFactory.IHttpClientFactory httpClientFactory)
     {
-        _httpClientFactory = httpClientFactory;
+        lock (_lock)
+        {
+            _httpClientFactory = httpClientFactory;
+        }
     }
+
+    #region Options Pattern Methods (Recommended)
+
+    /// <summary>
+    /// Create authentication client using Client Credentials options pattern
+    /// Recommended approach for production applications
+    /// </summary>
+    public static IAuthClient CreateFromOptions(
+        ClientCredentialsOptions options,
+        IAuthTokenStorage? tokenStorage = null,
+        IAuthLogger? logger = null,
+        ICoyoteHttpClient? httpClient = null)
+    {
+        ValidateOptions(options);
+        var config = options.ToAuthClientConfig();
+        var actualHttpClient = httpClient ?? GetDefaultHttpClient();
+        return new AuthClient(config, actualHttpClient, tokenStorage, logger);
+    }
+
+    /// <summary>
+    /// Create authentication client using mTLS options pattern
+    /// Recommended approach for production applications
+    /// </summary>
+    public static IAuthClient CreateFromOptions(
+        MtlsOptions options,
+        IAuthTokenStorage? tokenStorage = null,
+        IAuthLogger? logger = null,
+        ICoyoteHttpClient? httpClient = null)
+    {
+        ValidateOptions(options);
+        var config = options.ToAuthClientConfig();
+        var actualHttpClient = httpClient ?? GetDefaultHttpClient();
+        return new AuthClient(config, actualHttpClient, tokenStorage, logger);
+    }
+
+    /// <summary>
+    /// Create authentication client using JWT Bearer options pattern
+    /// Recommended approach for production applications
+    /// </summary>
+    public static IAuthClient CreateFromOptions(
+        JwtBearerOptions options,
+        IAuthTokenStorage? tokenStorage = null,
+        IAuthLogger? logger = null,
+        ICoyoteHttpClient? httpClient = null)
+    {
+        ValidateOptions(options);
+        var config = options.ToAuthClientConfig();
+        var actualHttpClient = httpClient ?? GetDefaultHttpClient();
+        return new AuthClient(config, actualHttpClient, tokenStorage, logger);
+    }
+
+    /// <summary>
+    /// Create authentication client using Authorization Code options pattern
+    /// Recommended approach for production applications
+    /// </summary>
+    public static IAuthClient CreateFromOptions(
+        AuthorizationCodeOptions options,
+        IAuthTokenStorage? tokenStorage = null,
+        IAuthLogger? logger = null,
+        ICoyoteHttpClient? httpClient = null)
+    {
+        ValidateOptions(options);
+        var config = options.ToAuthClientConfig();
+        var actualHttpClient = httpClient ?? GetDefaultHttpClient();
+        return new AuthClient(config, actualHttpClient, tokenStorage, logger);
+    }
+
+    /// <summary>
+    /// Create authentication client using IOptions pattern (for DI scenarios)
+    /// </summary>
+    public static IAuthClient CreateFromOptions<T>(
+        IOptions<T> options,
+        IAuthTokenStorage? tokenStorage = null,
+        IAuthLogger? logger = null,
+        ICoyoteHttpClient? httpClient = null)
+        where T : class
+    {
+        return options.Value switch
+        {
+            ClientCredentialsOptions clientCredOptions => CreateFromOptions(clientCredOptions, tokenStorage, logger, httpClient),
+            MtlsOptions mtlsOptions => CreateFromOptions(mtlsOptions, tokenStorage, logger, httpClient),
+            JwtBearerOptions jwtOptions => CreateFromOptions(jwtOptions, tokenStorage, logger, httpClient),
+            AuthorizationCodeOptions authCodeOptions => CreateFromOptions(authCodeOptions, tokenStorage, logger, httpClient),
+            _ => throw new ArgumentException($"Unsupported options type: {typeof(T).Name}")
+        };
+    }
+
+    /// <summary>
+    /// Create authentication client with secure credential provider
+    /// Enhanced security for handling sensitive credentials
+    /// </summary>
+    public static IAuthClient CreateWithSecureCredentials(
+        AuthClientConfig config,
+        SecureCredentialProvider credentialProvider,
+        IAuthTokenStorage? tokenStorage = null,
+        IAuthLogger? logger = null,
+        ICoyoteHttpClient? httpClient = null)
+    {
+        // Apply secure credentials to config
+        if (credentialProvider.HasClientSecret)
+        {
+            config.ClientSecret = credentialProvider.GetClientSecret();
+        }
+        
+        var actualHttpClient = httpClient ?? GetDefaultHttpClient();
+        return new AuthClient(config, actualHttpClient, tokenStorage, logger);
+    }
+
+    #endregion
+
+    #region Traditional Factory Methods (Legacy Support)
+    
     /// <summary>
     /// Create authentication client for Client Credentials flow
+    /// [Legacy] Consider using CreateFromOptions for better maintainability
     /// </summary>
+    [Obsolete("Consider using CreateFromOptions(ClientCredentialsOptions) for better maintainability and validation")]
     public static IAuthClient CreateClientCredentialsClient(
         string serverUrl,
         string clientId,
@@ -49,11 +176,13 @@ public static class AuthClientFactory
 
         var actualHttpClient = httpClient ?? GetDefaultHttpClient();
         return new AuthClient(config, actualHttpClient, tokenStorage, logger);
-    }
-
+    }    
+    
     /// <summary>
     /// Create authentication client for Client Credentials flow with mTLS
+    /// [Legacy] Consider using CreateFromOptions for better maintainability
     /// </summary>
+    [Obsolete("Consider using CreateFromOptions(MtlsOptions) for better maintainability and validation")]
     public static IAuthClient CreateMtlsClient(
         string serverUrl,
         string clientId,
@@ -75,11 +204,11 @@ public static class AuthClientFactory
 
         var actualHttpClient = httpClient ?? GetDefaultHttpClient();
         return new AuthClient(config, actualHttpClient, tokenStorage, logger);
-    }
-
-    /// <summary>
+    }    /// <summary>
     /// Create authentication client for JWT Bearer flow
+    /// [Legacy] Consider using CreateFromOptions for better maintainability
     /// </summary>
+    [Obsolete("Consider using CreateFromOptions(JwtBearerOptions) for better maintainability and validation")]
     public static IAuthClient CreateJwtBearerClient(
         string serverUrl,
         string clientId,
@@ -103,11 +232,13 @@ public static class AuthClientFactory
 
         var actualHttpClient = httpClient ?? GetDefaultHttpClient();
         return new AuthClient(config, actualHttpClient, tokenStorage, logger);
-    }
-
+    }    
+    
     /// <summary>
     /// Create authentication client for Authorization Code flow
+    /// [Legacy] Consider using CreateFromOptions for better maintainability
     /// </summary>
+    [Obsolete("Consider using CreateFromOptions(AuthorizationCodeOptions) for better maintainability and validation")]
     public static IAuthClient CreateAuthorizationCodeClient(
         string serverUrl,
         string clientId,
@@ -127,7 +258,9 @@ public static class AuthClientFactory
 
         var actualHttpClient = httpClient ?? GetDefaultHttpClient();
         return new AuthClient(config, actualHttpClient, tokenStorage, logger);
-    }    /// <summary>
+    }    
+    
+    /// <summary>
     /// Create authentication client with custom configuration
     /// </summary>
     public static IAuthClient CreateCustomClient(
@@ -145,92 +278,77 @@ public static class AuthClientFactory
     /// </summary>
     public static AuthClientBuilder CreateBuilder(string serverUrl, string clientId)
     {
-        return new AuthClientBuilder(serverUrl, clientId);
-    }
+        return new AuthClientBuilder(serverUrl, clientId);    }
 
+    #endregion
+
+    #region Validation and Helper Methods
+
+    /// <summary>
+    /// Validate options using data annotations
+    /// </summary>
+    private static void ValidateOptions(object options)
+    {
+        var context = new ValidationContext(options);
+        var results = new List<ValidationResult>();
+        
+        if (!Validator.TryValidateObject(options, context, results, true))
+        {
+            var errors = string.Join(", ", results.Select(r => r.ErrorMessage));
+            throw new ArgumentException($"Invalid options: {errors}");
+        }
+    }    /// <summary>
+    /// Thread-safe HTTP client retrieval
+    /// </summary>
     internal static ICoyoteHttpClient GetDefaultHttpClient()
-    {
-        // Use the injected HTTP client factory if available
-        if (_httpClientFactory != null)
+    {        lock (_lock)
         {
-            return _httpClientFactory.CreateHttpClient();
-        }
+            // Use the injected HTTP client factory if available
+            if (_httpClientFactory != null)
+            {
+                return _httpClientFactory.CreateHttpClient();
+            }
 
-        // Fallback to creating a simple HTTP client with default options
-        var options = new HttpClientOptions
-        {
-            DefaultTimeoutMs = 30000,
-            UserAgent = "CoyoteAuth/1.0",
-            VerifyPeer = true,
-            FollowRedirects = true
-        };
-        
-        return new SimpleHttpClient(options);
-    }
-}
-
-/// <summary>
-/// Simple HTTP client implementation for AuthClientFactory
-/// </summary>
-internal class SimpleHttpClient : BaseHttpClient
-{
-    public SimpleHttpClient(HttpClientOptions options) : base(options) { }    public override async Task<IHttpResponse> ExecuteAsync(IHttpRequest request, CancellationToken cancellationToken = default)
-    {
-        // Simple implementation using HttpClient
-        using var httpClient = new HttpClient();
-        httpClient.Timeout = TimeSpan.FromMilliseconds(request.TimeoutMs ?? 30000);
-        
-        var httpRequestMessage = new HttpRequestMessage(
-            GetHttpMethod(request.Method), 
-            request.Url);
+            // Create a minimal service provider for HTTP client factory
+            var services = new Microsoft.Extensions.DependencyInjection.ServiceCollection();
+            services.AddLogging();
             
-        if (!string.IsNullOrEmpty(request.Body))
-        {
-            httpRequestMessage.Content = new StringContent(request.Body);
+            // Register all HTTP client implementations
+            services.AddTransient<Coyote.Infra.Http.Modes.Real.RealHttpClient>();
+            services.AddTransient<Coyote.Infra.Http.Modes.Mock.MockHttpClient>();
+            services.AddTransient<Coyote.Infra.Http.Modes.Record.RecordingHttpClient>();
+            services.AddTransient<Coyote.Infra.Http.Modes.Replay.ReplayHttpClient>();
+            services.AddTransient<Coyote.Infra.Http.Modes.Simulation.SimulationHttpClient>();
+            services.AddTransient<Coyote.Infra.Http.Modes.Debug.DebugHttpClient>();
+            
+            var serviceProvider = services.BuildServiceProvider();
+
+            // Create a proper HTTP client using the platform's factory infrastructure
+            var factory = new HttpFactory.HttpClientFactory(
+                serviceProvider: serviceProvider,
+                modeOptions: Microsoft.Extensions.Options.Options.Create(new HttpClientModeOptions 
+                { 
+                    Mode = RuntimeMode.Production 
+                }),
+                httpOptions: Microsoft.Extensions.Options.Options.Create(new HttpClientOptions
+                {
+                    DefaultTimeoutMs = 30000,
+                    UserAgent = "CoyoteAuth/1.0",
+                    VerifyPeer = true,
+                    FollowRedirects = true,
+                    DefaultHeaders = new Dictionary<string, string>
+                    {
+                        ["Accept"] = "application/json"
+                    }
+                }),
+                logger: Microsoft.Extensions.Logging.Abstractions.NullLogger<HttpFactory.HttpClientFactory>.Instance
+            );
+            
+            return factory.CreateHttpClient();
         }
-        
-        foreach (var header in request.Headers)
-        {
-            httpRequestMessage.Headers.TryAddWithoutValidation(header.Key, header.Value);
-        }
-        
-        var response = await httpClient.SendAsync(httpRequestMessage, cancellationToken);
-        var body = await response.Content.ReadAsStringAsync(cancellationToken);
-        
-        return new HttpResponse
-        {
-            StatusCode = (int)response.StatusCode,
-            Body = body,
-            Headers = response.Headers.ToDictionary(h => h.Key, h => string.Join(",", h.Value))
-        };
     }
-    
-    public override async Task<bool> PingAsync(string url, CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            var response = await GetAsync(url, cancellationToken: cancellationToken);
-            return response.IsSuccess;
-        }
-        catch
-        {
-            return false;
-        }
-    }
-      private static System.Net.Http.HttpMethod GetHttpMethod(Coyote.Infra.Http.HttpMethod method)
-    {
-        return method switch
-        {
-            Coyote.Infra.Http.HttpMethod.Get => System.Net.Http.HttpMethod.Get,
-            Coyote.Infra.Http.HttpMethod.Post => System.Net.Http.HttpMethod.Post,
-            Coyote.Infra.Http.HttpMethod.Put => System.Net.Http.HttpMethod.Put,
-            Coyote.Infra.Http.HttpMethod.Delete => System.Net.Http.HttpMethod.Delete,
-            Coyote.Infra.Http.HttpMethod.Patch => System.Net.Http.HttpMethod.Patch,
-            Coyote.Infra.Http.HttpMethod.Head => System.Net.Http.HttpMethod.Head,
-            Coyote.Infra.Http.HttpMethod.Options => System.Net.Http.HttpMethod.Options,
-            _ => System.Net.Http.HttpMethod.Get
-        };
-    }
+
+    #endregion
 }
 
 /// <summary>

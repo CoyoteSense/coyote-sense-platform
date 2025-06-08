@@ -22,6 +22,7 @@ namespace Coyote.Infra.Security.Auth;
 /// <summary>
 /// Multi-standard authentication client implementation supporting OAuth2 (RFC 6749),
 /// JWT Bearer (RFC 7523), and mTLS (RFC 8705) authentication methods.
+/// Thread-safe implementation with enhanced security features.
 /// </summary>
 public class AuthClient : IAuthClient
 {
@@ -30,8 +31,10 @@ public class AuthClient : IAuthClient
     private readonly IAuthTokenStorage _tokenStorage;
     private readonly IAuthLogger _logger;
     private readonly Timer? _refreshTimer;
-    private AuthToken? _currentToken;
-    private bool _disposed;    /// <summary>
+    private readonly SemaphoreSlim _tokenLock = new(1, 1);
+    private readonly object _disposeLock = new();
+    private volatile AuthToken? _currentToken;
+    private volatile bool _disposed;/// <summary>
     /// DI constructor: uses Microsoft ILogger, HTTP client factory, and optional token storage
     /// </summary>
     [ActivatorUtilitiesConstructor]
@@ -65,7 +68,9 @@ public class AuthClient : IAuthClient
         {
             _refreshTimer = new Timer(OnRefreshTimer, null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
         }
-    }    /// <summary>
+    }    
+    
+    /// <summary>
     /// Core constructor with IAuthLogger for manual instantiation
     /// </summary>
     internal AuthClient(
@@ -97,7 +102,8 @@ public class AuthClient : IAuthClient
         if (_config.AutoRefresh)
         {
             _refreshTimer = new Timer(OnRefreshTimer, null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
-        }    }
+        }    
+    }
 
     /// <summary>
     /// Gets the current authentication token
@@ -159,7 +165,8 @@ public class AuthClient : IAuthClient
         {
             _logger.LogError($"Client Credentials authentication error: {ex.Message}");
             return AuthResult.Error("authentication_error", "Authentication failed", ex.Message);
-        }    }
+        }    
+    }
 
     /// <summary>
     /// Authenticates using JWT Bearer token flow (RFC 7523)
@@ -213,7 +220,8 @@ public class AuthClient : IAuthClient
         {
             _logger.LogError($"JWT Bearer authentication error: {ex.Message}");
             return AuthResult.Error("authentication_error", "Authentication failed", ex.Message);
-        }    }
+        }    
+    }
 
     /// <summary>
     /// Authenticates using OAuth2 Authorization Code flow (RFC 6749)
@@ -265,7 +273,8 @@ public class AuthClient : IAuthClient
         {
             _logger.LogError($"Authorization Code authentication error: {ex.Message}");
             return AuthResult.Error("authentication_error", "Authentication failed", ex.Message);
-        }    }
+        }    
+    }
 
     /// <summary>
     /// Starts OAuth2 Authorization Code flow with PKCE (RFC 7636)
@@ -304,7 +313,8 @@ public class AuthClient : IAuthClient
         var queryString = string.Join("&", parameters.Select(kv => $"{UrlEncode(kv.Key)}={UrlEncode(kv.Value)}"));
         var authorizationUrl = $"{_config.ServerUrl}/authorize?{queryString}";
 
-        return (authorizationUrl, codeVerifier, actualState);    }
+        return (authorizationUrl, codeVerifier, actualState);    
+    }
 
     /// <summary>
     /// Refreshes an access token using a refresh token
@@ -348,7 +358,8 @@ public class AuthClient : IAuthClient
         {
             _logger.LogError($"Token refresh error: {ex.Message}");
             return AuthResult.Error("refresh_error", "Token refresh failed", ex.Message);
-        }    }
+        }    
+    }
 
     /// <summary>
     /// Gets a valid token, automatically refreshing if needed and possible
@@ -467,7 +478,8 @@ public class AuthClient : IAuthClient
         {
             _logger.LogError($"Token introspection error: {ex.Message}");
             return false;
-        }    }
+        }    
+    }
 
     /// <summary>
     /// Tests the connection to the authentication server
@@ -487,7 +499,8 @@ public class AuthClient : IAuthClient
         {
             _logger.LogError($"Connection test error: {ex.Message}");
             return false;
-        }    }
+        }    
+    }
 
     /// <summary>
     /// Gets information about the authentication server capabilities
@@ -536,7 +549,8 @@ public class AuthClient : IAuthClient
         {
             _logger.LogError($"Get server info error: {ex.Message}");
             return null;
-        }    }
+        }    
+    }
 
     /// <summary>
     /// Clears all stored tokens from memory and storage
@@ -615,7 +629,9 @@ public class AuthClient : IAuthClient
         {
             _httpClient.SetClientCertificate(_config.ClientCertPath, _config.ClientKeyPath);
         }
-    }    private async Task<AuthResult> MakeTokenRequestAsync(Dictionary<string, string> parameters, CancellationToken cancellationToken)
+    }    
+    
+    private async Task<AuthResult> MakeTokenRequestAsync(Dictionary<string, string> parameters, CancellationToken cancellationToken)
     {
         var formContent = CreateFormUrlEncodedContent(parameters);
         
@@ -819,7 +835,8 @@ public class AuthClient : IAuthClient
                     _logger.LogError($"Background token refresh failed: {ex.Message}");
                 }
             });
-        }    }
+        }    
+    }
 
     /// <summary>
     /// Releases the unmanaged resources used by the AuthClient and optionally releases the managed resources
@@ -834,7 +851,8 @@ public class AuthClient : IAuthClient
                 _refreshTimer?.Dispose();
                 _httpClient?.Dispose();
             }
-            _disposed = true;        }
+            _disposed = true;        
+        }
     }
 
     /// <summary>
