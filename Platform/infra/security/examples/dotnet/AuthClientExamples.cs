@@ -1,345 +1,256 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Options;
 using Coyote.Infra.Security.Auth;
+using Coyote.Infra.Security.Auth.Options;
+using Coyote.Infra.Security.Auth.Security;
 
 namespace Coyote.Infra.Security.Auth.Examples;
 
 /// <summary>
-/// Examples demonstrating multi-standard authentication client usage
+/// Comprehensive examples showing authentication client patterns
+/// Demonstrates the modern options-based approaches
 /// </summary>
 public class AuthClientExamples
 {
-    private const string ServerUrl = "https://auth-service.coyotesense.local";
-    private const string ClientId = "coyote-unit-service";
+    private const string ServerUrl = "https://auth.coyotesense.io";
+    private const string ClientId = "my-service-client";
 
     /// <summary>
-    /// Example: Client Credentials authentication
+    /// Example: New Options Pattern for mTLS (RECOMMENDED)
+    /// Clean, validated, and maintainable approach
     /// </summary>
-    public static async Task ClientCredentialsExample()
+    public static async Task MtlsOptionsPatternExample()
     {
-        Console.WriteLine("=== Client Credentials Flow Example ===");
+        Console.WriteLine("\n=== Enhanced mTLS Options Pattern Example ===");
 
-        // Create client using factory
-        using var client = AuthClientFactory.CreateClientCredentialsClient(
-            serverUrl: ServerUrl,
-            clientId: ClientId,
-            clientSecret: "your-client-secret",
-            defaultScopes: new List<string> { "read", "write" },
-            logger: new ConsoleAuthLogger("ClientCredentials")
-        );
-
-        // Test connection
-        var connected = await client.TestConnectionAsync();
-        if (!connected)
+        // Define configuration using options pattern
+        var mtlsOptions = new MtlsOptions
         {
-            Console.WriteLine("Failed to connect to Auth server");
-            return;
-        }
+            ServerUrl = ServerUrl,
+            ClientId = ClientId,
+            ClientCertPath = "/opt/coyote/certs/client.crt",
+            ClientKeyPath = "/opt/coyote/certs/client.key",
+            CaCertPath = "/opt/coyote/certs/ca.crt",
+            DefaultScopes = new List<string> { "keyvault.read", "keyvault.write" },
+            AutoRefresh = true,
+            RefreshBufferSeconds = 300,
+            TimeoutMs = 30000,
+            MaxRetryAttempts = 3,
+            VerifySsl = true
+        };
+
+        // Create client using options (automatic validation)
+        using var client = AuthClientFactory.CreateFromOptions(
+            mtlsOptions,
+            tokenStorage: new ConsoleTokenStorage(),
+            logger: new ConsoleAuthLogger("mTLS-Options")
+        );
 
         // Authenticate
         var result = await client.AuthenticateClientCredentialsAsync();
         
         if (result.IsSuccess)
         {
-            Console.WriteLine($"Authentication successful!");
-            Console.WriteLine($"Access Token: {result.Token!.AccessToken[..20]}...");
-            Console.WriteLine($"Token Type: {result.Token.TokenType}");
-            Console.WriteLine($"Expires At: {result.Token.ExpiresAt}");
+            Console.WriteLine($"✅ mTLS authentication successful!");
+            Console.WriteLine($"Token: {result.Token!.AccessToken[..20]}...");
+            Console.WriteLine($"Expires: {result.Token.ExpiresAt}");
             Console.WriteLine($"Scopes: {string.Join(", ", result.Token.Scopes)}");
-
-            // Use token for API calls
-            await UseTokenForApiCall(result.Token);
         }
         else
         {
-            Console.WriteLine($"Authentication failed: {result.ErrorCode} - {result.ErrorDescription}");
+            Console.WriteLine($"❌ mTLS authentication failed: {result.ErrorCode} - {result.ErrorDescription}");
         }
     }
 
     /// <summary>
-    /// Example: mTLS authentication
-    /// </summary>
-    public static async Task MtlsExample()
+    /// Example: Legacy Factory Method (LEGACY - Consider migrating)
+    /// Shows the old approach for comparison
+    /// </summary>    public static async Task MtlsLegacyFactoryExample()
     {
-        Console.WriteLine("\n=== mTLS Flow Example ===");
+        Console.WriteLine("\n=== Modern mTLS Options Example ===");
 
-        // Create client using factory
-        using var client = AuthClientFactory.CreateMtlsClient(
-            serverUrl: ServerUrl,
-            clientId: ClientId,
-            clientCertPath: "/opt/coyote/certs/client.crt",
-            clientKeyPath: "/opt/coyote/certs/client.key",
-            defaultScopes: new List<string> { "read", "write" },
-            logger: new ConsoleAuthLogger("mTLS")
+        // Modern approach with options pattern
+        var options = new MtlsOptions
+        {
+            ServerUrl = ServerUrl,
+            ClientId = ClientId,
+            ClientCertPath = "/opt/coyote/certs/client.crt",
+            ClientKeyPath = "/opt/coyote/certs/client.key",
+            DefaultScopes = new List<string> { "keyvault.read", "keyvault.write" }
+        };
+        
+        using var client = AuthClientFactory.CreateFromOptions(
+            options,
+            logger: new ConsoleAuthLogger("mTLS-Modern")
         );
 
-        // Authenticate using Client Credentials with mTLS
+        var result = await client.AuthenticateClientCredentialsAsync();
+          if (result.IsSuccess)
+        {
+            Console.WriteLine($"✅ Modern mTLS authentication successful!");
+        }
+        else
+        {
+            Console.WriteLine($"❌ Legacy mTLS authentication failed: {result.ErrorCode}");
+        }
+    }
+
+    /// <summary>
+    /// Example: Secure Credential Provider
+    /// Enhanced security for handling sensitive credentials
+    /// </summary>
+    public static async Task SecureCredentialExample()
+    {
+        Console.WriteLine("\n=== Secure Credential Provider Example ===");
+
+        // Create secure credential provider
+        using var credentialProvider = new SecureCredentialProvider();
+        
+        // Load secret from environment or secure store
+        var clientSecret = Environment.GetEnvironmentVariable("CLIENT_SECRET") ?? "my-secret-key";
+        credentialProvider.SetClientSecret(clientSecret);
+
+        // Create base configuration
+        var config = new AuthClientConfig
+        {
+            AuthMode = AuthMode.ClientCredentials,
+            ServerUrl = ServerUrl,
+            ClientId = ClientId,
+            DefaultScopes = new List<string> { "api.read" }
+        };
+
+        // Create client with secure credentials
+        using var client = AuthClientFactory.CreateWithSecureCredentials(
+            config,
+            credentialProvider,
+            logger: new ConsoleAuthLogger("Secure")
+        );
+
         var result = await client.AuthenticateClientCredentialsAsync();
         
         if (result.IsSuccess)
         {
-            Console.WriteLine($"mTLS authentication successful!");
-            Console.WriteLine($"Access Token: {result.Token!.AccessToken[..20]}...");
+            Console.WriteLine($"✅ Secure credential authentication successful!");
         }
         else
         {
-            Console.WriteLine($"mTLS authentication failed: {result.ErrorCode} - {result.ErrorDescription}");
+            Console.WriteLine($"❌ Secure credential authentication failed: {result.ErrorCode}");
         }
     }
 
     /// <summary>
-    /// Example: JWT Bearer authentication
+    /// Example: Microsoft Options Pattern Integration
+    /// For dependency injection scenarios
     /// </summary>
-    public static async Task JwtBearerExample()
+    public static async Task OptionsPatternDIExample()
     {
-        Console.WriteLine("\n=== JWT Bearer Flow Example ===");
+        Console.WriteLine("\n=== Options Pattern DI Example ===");
 
-        // Create client using factory
-        using var client = AuthClientFactory.CreateJwtBearerClient(
-            serverUrl: ServerUrl,
-            clientId: ClientId,
-            jwtSigningKeyPath: "/opt/coyote/keys/jwt-signing.key",
-            jwtIssuer: "coyote-unit-service",
-            jwtAudience: ServerUrl,
-            defaultScopes: new List<string> { "read", "write" },
-            logger: new ConsoleAuthLogger("JwtBearer")
+        // Simulate IOptions<T> from dependency injection
+        var jwtOptions = new JwtBearerOptions
+        {
+            ServerUrl = ServerUrl,
+            ClientId = ClientId,
+            JwtSigningKeyPath = "/opt/coyote/keys/private.pem",
+            JwtIssuer = "coyote-service",
+            JwtAudience = "auth.coyotesense.io",
+            JwtAlgorithm = "RS256",
+            DefaultScopes = new List<string> { "jwt.bearer" },
+            AutoRefresh = true
+        };
+
+        var options = Options.Create(jwtOptions);
+
+        // Create client using IOptions pattern
+        using var client = AuthClientFactory.CreateFromOptions(
+            options,
+            logger: new ConsoleAuthLogger("JWT-DI")
         );
 
-        // Authenticate using JWT Bearer
-        var result = await client.AuthenticateJwtBearerAsync(subject: "service-account");
+        var result = await client.AuthenticateJwtBearerAsync();
         
         if (result.IsSuccess)
         {
-            Console.WriteLine($"JWT Bearer authentication successful!");
-            Console.WriteLine($"Access Token: {result.Token!.AccessToken[..20]}...");
+            Console.WriteLine($"✅ JWT Bearer DI authentication successful!");
         }
         else
         {
-            Console.WriteLine($"JWT Bearer authentication failed: {result.ErrorCode} - {result.ErrorDescription}");
+            Console.WriteLine($"❌ JWT Bearer DI authentication failed: {result.ErrorCode}");
         }
     }
 
     /// <summary>
-    /// Example: Authorization Code + PKCE flow
+    /// Example: Builder Pattern (Fluent API)
+    /// For complex configurations
     /// </summary>
-    public static async Task AuthorizationCodeExample()
+    public static async Task BuilderPatternExample()
     {
-        Console.WriteLine("\n=== Authorization Code + PKCE Flow Example ===");
+        Console.WriteLine("\n=== Builder Pattern Example ===");
 
-        // Create client using factory
-        using var client = AuthClientFactory.CreateAuthorizationCodeClient(
-            serverUrl: ServerUrl,
-            clientId: ClientId,
-            defaultScopes: new List<string> { "read", "write", "profile" },
-            logger: new ConsoleAuthLogger("AuthCode")
-        );
-
-        var redirectUri = "http://localhost:8080/callback";
-
-        // Start authorization flow
-        var (authUrl, codeVerifier, state) = await client.StartAuthorizationCodeFlowAsync(
-            redirectUri: redirectUri,
-            scopes: new List<string> { "read", "write", "profile" }
-        );
-
-        Console.WriteLine($"Please visit this URL to authorize the application:");
-        Console.WriteLine(authUrl);
-        Console.WriteLine();
-        Console.WriteLine("After authorization, copy the 'code' parameter from the callback URL:");
-        
-        // In a real application, you would:
-        // 1. Open a browser to the authorization URL
-        // 2. User logs in and authorizes the application
-        // 3. Browser redirects to your callback URL with an authorization code
-        // 4. Extract the code from the callback URL
-        
-        Console.Write("Enter the authorization code: ");
-        var authorizationCode = Console.ReadLine();
-        
-        if (!string.IsNullOrEmpty(authorizationCode))
-        {
-            // Exchange authorization code for tokens
-            var result = await client.AuthenticateAuthorizationCodeAsync(
-                authorizationCode: authorizationCode,
-                redirectUri: redirectUri,
-                codeVerifier: codeVerifier
-            );
-            
-            if (result.IsSuccess)
-            {
-                Console.WriteLine($"Authorization Code authentication successful!");
-                Console.WriteLine($"Access Token: {result.Token!.AccessToken[..20]}...");
-                Console.WriteLine($"Refresh Token: {result.Token.RefreshToken?[..20]}...");
-                
-                // Test token refresh
-                if (!string.IsNullOrEmpty(result.Token.RefreshToken))
-                {
-                    await TestTokenRefresh(client, result.Token.RefreshToken);
-                }
-            }
-            else
-            {
-                Console.WriteLine($"Authorization Code authentication failed: {result.ErrorCode} - {result.ErrorDescription}");
-            }
-        }
-    }
-
-    /// <summary>
-    /// Example: Using the fluent builder API
-    /// </summary>
-    public static async Task FluentBuilderExample()
-    {
-        Console.WriteLine("\n=== Fluent Builder API Example ===");
-
-        // Create client using fluent builder
+        // Use fluent builder API
         using var client = AuthClientFactory.CreateBuilder(ServerUrl, ClientId)
-            .WithClientSecret("your-client-secret")
-            .WithDefaultScopes("read", "write", "admin")
-            .WithAutoRefresh(enabled: true, bufferSeconds: 300)
-            .WithTimeout(30000)
+            .WithClientSecret("my-client-secret")
+            .WithDefaultScopes("api.read", "api.write")
+            .WithAutoRefresh(enabled: true, bufferSeconds: 600)
+            .WithTimeout(45000)
             .WithSslVerification(true)
+            .WithMaxRetryAttempts(5)
             .WithLogger(new ConsoleAuthLogger("Builder"))
-            .WithTokenStorage(new InMemoryTokenStorage())
             .Build();
 
-        // Authenticate
         var result = await client.AuthenticateClientCredentialsAsync();
         
         if (result.IsSuccess)
         {
-            Console.WriteLine($"Fluent builder authentication successful!");
-            Console.WriteLine($"Access Token: {result.Token!.AccessToken[..20]}...");
-            
-            // Test automatic token refresh
-            await TestAutomaticRefresh(client);
+            Console.WriteLine($"✅ Builder pattern authentication successful!");
         }
         else
         {
-            Console.WriteLine($"Fluent builder authentication failed: {result.ErrorCode} - {result.ErrorDescription}");
+            Console.WriteLine($"❌ Builder pattern authentication failed: {result.ErrorCode}");
         }
     }
 
     /// <summary>
-    /// Example: Token management operations
+    /// Example: Multiple Authentication Flows
+    /// Showing different authentication patterns
     /// </summary>
-    public static async Task TokenManagementExample()
+    public static async Task MultipleFlowsExample()
     {
-        Console.WriteLine("\n=== Token Management Example ===");
+        Console.WriteLine("\n=== Multiple Authentication Flows Example ===");
 
-        using var client = AuthClientFactory.CreateClientCredentialsClient(
-            serverUrl: ServerUrl,
-            clientId: ClientId,
-            clientSecret: "your-client-secret",
-            logger: new ConsoleAuthLogger("TokenMgmt")
+        // Client Credentials Flow
+        var clientCredOptions = new ClientCredentialsOptions
+        {
+            ServerUrl = ServerUrl,
+            ClientId = ClientId,
+            ClientSecret = "my-secret",
+            DefaultScopes = new List<string> { "basic.read" }
+        };
+
+        using var clientCredClient = AuthClientFactory.CreateFromOptions(clientCredOptions);
+        var clientCredResult = await clientCredClient.AuthenticateClientCredentialsAsync();
+        Console.WriteLine($"Client Credentials: {(clientCredResult.IsSuccess ? "✅ Success" : "❌ Failed")}");
+
+        // Authorization Code Flow (for web applications)
+        var authCodeOptions = new AuthorizationCodeOptions
+        {
+            ServerUrl = ServerUrl,
+            ClientId = ClientId,
+            RedirectUri = "https://myapp.example.com/callback",
+            UsePkce = true,
+            DefaultScopes = new List<string> { "openid", "profile" }
+        };
+
+        using var authCodeClient = AuthClientFactory.CreateFromOptions(authCodeOptions);
+        
+        // For Authorization Code, you'd typically redirect user to authorization URL
+        var authUrl = await authCodeClient.GetAuthorizationUrlAsync(
+            scopes: new List<string> { "openid", "profile" },
+            state: "random-state-value"
         );
-
-        // Authenticate
-        var result = await client.AuthenticateClientCredentialsAsync();
-        
-        if (result.IsSuccess)
-        {
-            var token = result.Token!;
-            Console.WriteLine($"Token acquired: {token.AccessToken[..20]}...");
-
-            // Test token introspection
-            var isActive = await client.IntrospectTokenAsync(token.AccessToken);
-            Console.WriteLine($"Token introspection result: {(isActive ? "Active" : "Inactive")}");
-
-            // Test getting valid token (should return current token)
-            var validToken = await client.GetValidTokenAsync();
-            Console.WriteLine($"Valid token check: {(validToken != null ? "Valid" : "Invalid")}");
-
-            // Test token revocation
-            var revoked = await client.RevokeTokenAsync(token.AccessToken);
-            Console.WriteLine($"Token revocation result: {(revoked ? "Success" : "Failed")}");
-
-            // Clear tokens
-            client.ClearTokens();
-            Console.WriteLine("Tokens cleared");
-        }
-    }
-
-    /// <summary>
-    /// Example: Server discovery
-    /// </summary>
-    public static async Task ServerDiscoveryExample()
-    {
-        Console.WriteLine("\n=== Server Discovery Example ===");
-
-        using var client = AuthClientFactory.CreateClientCredentialsClient(
-            serverUrl: ServerUrl,
-            clientId: ClientId,
-            clientSecret: "your-client-secret",
-            logger: new ConsoleAuthLogger("Discovery")
-        );
-
-        // Get server information
-        var serverInfo = await client.GetServerInfoAsync();
-        
-        if (serverInfo != null)
-        {
-            Console.WriteLine("Auth Server Information:");
-            Console.WriteLine($"  Authorization Endpoint: {serverInfo.AuthorizationEndpoint}");
-            Console.WriteLine($"  Token Endpoint: {serverInfo.TokenEndpoint}");
-            Console.WriteLine($"  Introspection Endpoint: {serverInfo.IntrospectionEndpoint}");
-            Console.WriteLine($"  Revocation Endpoint: {serverInfo.RevocationEndpoint}");
-            Console.WriteLine($"  Supported Grant Types: {string.Join(", ", serverInfo.GrantTypesSupported)}");
-            Console.WriteLine($"  Supported Scopes: {string.Join(", ", serverInfo.ScopesSupported)}");
-        }
-        else
-        {
-            Console.WriteLine("Failed to retrieve server information");
-        }
-    }
-
-    private static async Task UseTokenForApiCall(AuthToken token)
-    {
-        // Simulate using the token for API calls
-        Console.WriteLine($"Using token for API call: Authorization: {token.GetAuthorizationHeader()}");
-        
-        // In a real application, you would add the Authorization header to your HTTP requests:
-        // httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token.AccessToken);
-        
-        await Task.Delay(100); // Simulate API call
-        Console.WriteLine("API call completed successfully");
-    }
-
-    private static async Task TestTokenRefresh(IAuthAuthClient client, string refreshToken)
-    {
-        Console.WriteLine("\nTesting token refresh...");
-        
-        var refreshResult = await client.RefreshTokenAsync(refreshToken);
-        
-        if (refreshResult.IsSuccess)
-        {
-            Console.WriteLine($"Token refresh successful!");
-            Console.WriteLine($"New Access Token: {refreshResult.Token!.AccessToken[..20]}...");
-        }
-        else
-        {
-            Console.WriteLine($"Token refresh failed: {refreshResult.ErrorCode} - {refreshResult.ErrorDescription}");
-        }
-    }
-
-    private static async Task TestAutomaticRefresh(IAuthAuthClient client)
-    {
-        Console.WriteLine("\nTesting automatic token refresh...");
-        
-        // Wait a bit to simulate token aging
-        await Task.Delay(1000);
-        
-        // Get valid token (should trigger automatic refresh if needed)
-        var validToken = await client.GetValidTokenAsync();
-        
-        if (validToken != null)
-        {
-            Console.WriteLine($"Automatic refresh check passed: {validToken.AccessToken[..20]}...");
-        }
-        else
-        {
-            Console.WriteLine("Automatic refresh check failed");
-        }
+        Console.WriteLine($"Authorization URL: {authUrl}");
     }
 
     /// <summary>
@@ -347,19 +258,65 @@ public class AuthClientExamples
     /// </summary>
     public static async Task RunAllExamples()
     {
+        Console.WriteLine("🚀 Running Enhanced AuthClient Examples");
+        Console.WriteLine("==========================================");
+
         try
         {
-            await ClientCredentialsExample();
-            await MtlsExample();
-            await JwtBearerExample();
-            await AuthorizationCodeExample();
-            await FluentBuilderExample();
-            await TokenManagementExample();
-            await ServerDiscoveryExample();
+            await MtlsOptionsPatternExample();
+            await MtlsLegacyFactoryExample();
+            await SecureCredentialExample();
+            await OptionsPatternDIExample();
+            await BuilderPatternExample();
+            await MultipleFlowsExample();
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Example error: {ex.Message}");
+            Console.WriteLine($"❌ Example failed: {ex.Message}");
         }
+
+        Console.WriteLine("\n✅ Examples completed!");
     }
+}
+
+/// <summary>
+/// Simple console-based token storage for examples
+/// </summary>
+public class ConsoleTokenStorage : IAuthTokenStorage
+{
+    public Task<AuthToken?> LoadTokenAsync(string key)
+    {
+        Console.WriteLine($"📥 Loading token for key: {key}");
+        return Task.FromResult<AuthToken?>(null);
+    }
+
+    public Task SaveTokenAsync(string key, AuthToken token)
+    {
+        Console.WriteLine($"💾 Saving token for key: {key} (expires: {token.ExpiresAt})");
+        return Task.CompletedTask;
+    }
+
+    public Task DeleteTokenAsync(string key)
+    {
+        Console.WriteLine($"🗑️ Deleting token for key: {key}");
+        return Task.CompletedTask;
+    }
+}
+
+/// <summary>
+/// Simple console-based logger for examples
+/// </summary>
+public class ConsoleAuthLogger : IAuthLogger
+{
+    private readonly string _prefix;
+
+    public ConsoleAuthLogger(string prefix)
+    {
+        _prefix = prefix;
+    }
+
+    public void LogInfo(string message) => Console.WriteLine($"[{_prefix}] ℹ️ {message}");
+    public void LogWarning(string message) => Console.WriteLine($"[{_prefix}] ⚠️ {message}");
+    public void LogError(string message) => Console.WriteLine($"[{_prefix}] ❌ {message}");
+    public void LogDebug(string message) => Console.WriteLine($"[{_prefix}] 🔍 {message}");
 }

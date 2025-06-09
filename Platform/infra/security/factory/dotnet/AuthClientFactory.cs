@@ -191,9 +191,11 @@ public static class AuthClientFactory
             var errors = string.Join(", ", results.Select(r => r.ErrorMessage));
             throw new ArgumentException($"Invalid options: {errors}");
         }
-    }    /// <summary>
-         /// Thread-safe HTTP client retrieval
-         /// </summary>
+    }    
+    
+    /// <summary>
+    /// Thread-safe HTTP client retrieval
+    /// </summary>
     internal static ICoyoteHttpClient GetDefaultHttpClient()
     {
         lock (_lock)

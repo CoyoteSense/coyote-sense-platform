@@ -50,9 +50,8 @@
     <PackageReference Include="System.Linq.Dynamic.Core" Version="1.4.7" />
     <PackageReference Include="System.Net.Http" Version="4.3.4" />
   </ItemGroup>
-
   <ItemGroup>
-    <ProjectReference Include="..\..\clients\csharp\AuthClient.csproj" />
+    <ProjectReference Include="..\..\clients\dotnet\AuthClient.csproj" />
     <ProjectReference Include="..\..\..\http\interfaces\dotnet\Coyote.Infra.Http.csproj" />
   </ItemGroup>
 

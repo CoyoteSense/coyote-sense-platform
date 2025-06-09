@@ -16,7 +16,7 @@ namespace Coyote.Infra.Security.Auth;
 /// - Mutual TLS (RFC 8705)
 /// </summary>
 public interface IAuthClient : IDisposable
-{   
+{
     /// <summary>
     /// Authenticate using Client Credentials flow (OAuth2 RFC 6749)
     /// </summary>
@@ -30,13 +30,12 @@ public interface IAuthClient : IDisposable
     /// <summary>
     /// Authenticate using Authorization Code flow (OAuth2 RFC 6749)
     /// </summary>
-    Task<AuthResult> AuthenticateAuthorizationCodeAsync(string authorizationCode, string redirectUri, string? codeVerifier = null, CancellationToken cancellationToken = default);    
-    
+    Task<AuthResult> AuthenticateAuthorizationCodeAsync(string authorizationCode, string redirectUri, string? codeVerifier = null, CancellationToken cancellationToken = default);
     /// <summary>
     /// Start Authorization Code + PKCE flow (OAuth2 RFC 7636)
-    // </summary>
+    /// </summary>
     (string authorizationUrl, string codeVerifier, string state) StartAuthorizationCodeFlow(string redirectUri, List<string>? scopes = null, string? state = null);
-    
+
     /// <summary>
     /// Refresh access token using refresh token
     /// </summary>
@@ -50,8 +49,8 @@ public interface IAuthClient : IDisposable
     /// <summary>
     /// Revoke a token
     /// </summary>
-    Task<bool> RevokeTokenAsync(string token, string? tokenTypeHint = null, CancellationToken cancellationToken = default);    
-    
+    Task<bool> RevokeTokenAsync(string token, string? tokenTypeHint = null, CancellationToken cancellationToken = default);
+
     /// <summary>
     /// Introspect a token
     /// </summary>
@@ -70,13 +69,13 @@ public interface IAuthClient : IDisposable
     /// <summary>
     /// Clear stored tokens
     /// </summary>
-    void ClearTokens();    
-    
+    void ClearTokens();
+
     /// <summary>
     /// Current token (if any)
     /// </summary>
-    AuthToken? CurrentToken { get; }    
-    
+    AuthToken? CurrentToken { get; }
+
     /// <summary>
     /// Whether client has valid authentication
     /// </summary>
