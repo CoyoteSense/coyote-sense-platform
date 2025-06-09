@@ -5,6 +5,7 @@ using Microsoft.Extensions.Options;
 using Coyote.Infra.Security.Auth;
 using Coyote.Infra.Security.Auth.Options;
 using Coyote.Infra.Security.Auth.Security;
+using Coyote.Infra.Security.Auth.Factory;
 
 namespace Coyote.Infra.Security.Auth.Examples;
 
@@ -254,6 +255,85 @@ public class AuthClientExamples
     }
 
     /// <summary>
+    /// Example: SecureStoreClient Integration
+    /// Demonstrates how IAuthClient and ISecureStoreClient work together
+    /// </summary>
+    public static async Task SecureStoreIntegrationExample()
+    {
+        Console.WriteLine("\n=== SecureStore Integration Example ===");
+
+        // Create auth client first
+        var authClient = AuthClientFactory.CreateBuilder(ServerUrl, ClientId)
+            .WithClientCredentialsFlow("my-client-secret")
+            .WithDefaultScopes("keyvault.read", "keyvault.write")
+            .WithAutoRefresh(enabled: true, bufferSeconds: 300)
+            .WithLogger(new ConsoleAuthLogger("Auth"))
+            .Build();
+
+        // Create secure store client using the auth client
+        var storeOptions = new SecureStoreOptions
+        {
+            ServerUrl = "https://keyvault.coyotesense.io",
+            DefaultNamespace = "production",
+            AutoRefreshToken = true,
+            TimeoutMs = 30000
+        };
+
+        using var storeClient = SecureStoreClientFactory.CreateWithAuthClient(storeOptions, authClient);
+
+        try
+        {
+            // Test the integration
+            Console.WriteLine("🔐 Testing SecureStore integration...");
+
+            // First, the auth client authenticates and gets a token
+            var authResult = await authClient.AuthenticateClientCredentialsAsync();
+            if (authResult.IsSuccess)
+            {
+                Console.WriteLine($"✅ Authentication successful! Token expires: {authResult.Token!.ExpiresAt}");
+                
+                // Now the secure store client can use that token automatically
+                var testConnection = await storeClient.TestConnectionAsync();
+                if (testConnection)
+                {
+                    Console.WriteLine("✅ SecureStore connection successful!");
+                    
+                    // Retrieve some secrets
+                    var secrets = await storeClient.GetSecretsAsync(new[]
+                    {
+                        "database/password",
+                        "api/stripe_key",
+                        "certificates/tls_cert"
+                    });
+
+                    Console.WriteLine($"🔑 Retrieved {secrets.Count} secrets from KeyVault");
+                    foreach (var secret in secrets)
+                    {
+                        Console.WriteLine($"   - {secret.Key} (version: {secret.Value.Version})");
+                        secret.Value.Clear(); // Secure cleanup
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("❌ SecureStore connection failed");
+                }
+            }
+            else
+            {
+                Console.WriteLine($"❌ Authentication failed: {authResult.ErrorCode}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ SecureStore integration failed: {ex.Message}");
+        }
+        finally
+        {
+            authClient?.Dispose();
+        }
+    }
+
+    /// <summary>
     /// Run all examples
     /// </summary>
     public static async Task RunAllExamples()
@@ -269,6 +349,7 @@ public class AuthClientExamples
             await OptionsPatternDIExample();
             await BuilderPatternExample();
             await MultipleFlowsExample();
+            await SecureStoreIntegrationExample();
         }
         catch (Exception ex)
         {
