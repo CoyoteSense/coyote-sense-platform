@@ -23,9 +23,8 @@ public class SecureStoreClient : ISecureStoreClient
     private readonly IAuthClient? _authClient;
     private readonly ILogger<SecureStoreClient>? _logger;
     private readonly SemaphoreSlim _tokenLock = new(1, 1);
-    
-    private volatile string? _currentToken;
-    private volatile DateTime _tokenExpiry = DateTime.MinValue;
+      private volatile string? _currentToken;
+    private DateTime _tokenExpiry = DateTime.MinValue;
     private bool _disposed;
 
     /// <summary>

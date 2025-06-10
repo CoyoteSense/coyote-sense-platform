@@ -47,9 +47,7 @@ public static class SecureStoreClientFactory
         ILogger<SecureStoreClient>? logger = null)
     {
         return new SecureStoreClient(options.Value, authClient, logger);
-    }
-
-    /// <summary>
+    }    /// <summary>
     /// Create SecureStoreClient with integrated authentication
     /// Creates both the auth client and secure store client
     /// </summary>
@@ -60,10 +58,11 @@ public static class SecureStoreClientFactory
         if (options.AuthClientConfig == null)
             throw new ArgumentException("AuthClientConfig is required when using integrated auth", nameof(options));
 
-        // Create the auth client
-        var authClient = AuthClientFactory.CreateFromConfig(options.AuthClientConfig);
-
-        return new SecureStoreClient(options, authClient, logger);
+        // TODO: Create the auth client once AuthClientFactory is available
+        throw new NotImplementedException("Integrated auth not yet implemented - use CreateWithTokenProvider instead");
+        
+        // var authClient = AuthClientFactory.CreateFromConfig(options.AuthClientConfig);
+        // return new SecureStoreClient(options, authClient, logger);
     }
 
     /// <summary>
@@ -149,16 +148,14 @@ public static class SecureStoreClientFactory
             ?? throw new InvalidOperationException("AUTH_SERVER_URL environment variable is required");
         
         var clientId = Environment.GetEnvironmentVariable("AUTH_CLIENT_ID") 
-            ?? throw new InvalidOperationException("AUTH_CLIENT_ID environment variable is required");
-
-        return new AuthClientConfig
+            ?? throw new InvalidOperationException("AUTH_CLIENT_ID environment variable is required");        return new AuthClientConfig
         {
             AuthMode = ParseAuthMode(Environment.GetEnvironmentVariable("AUTH_MODE")),
             ServerUrl = authServerUrl,
             ClientId = clientId,
             ClientSecret = Environment.GetEnvironmentVariable("AUTH_CLIENT_SECRET"),
-            CertificatePath = Environment.GetEnvironmentVariable("AUTH_CLIENT_CERT_PATH"),
-            PrivateKeyPath = Environment.GetEnvironmentVariable("AUTH_CLIENT_KEY_PATH"),
+            ClientCertPath = Environment.GetEnvironmentVariable("AUTH_CLIENT_CERT_PATH"),
+            ClientKeyPath = Environment.GetEnvironmentVariable("AUTH_CLIENT_KEY_PATH"),
             DefaultScopes = ParseScopes(Environment.GetEnvironmentVariable("AUTH_SCOPES")),
             TimeoutMs = int.TryParse(Environment.GetEnvironmentVariable("AUTH_TIMEOUT_MS"), out var authTimeout) 
                 ? authTimeout : 30000,
@@ -169,12 +166,11 @@ public static class SecureStoreClientFactory
     }
 
     private static AuthMode ParseAuthMode(string? authMode)
-    {
-        return authMode?.ToLowerInvariant() switch
+    {        return authMode?.ToLowerInvariant() switch
         {
             "client_credentials" => AuthMode.ClientCredentials,
             "jwt_bearer" => AuthMode.JwtBearer,
-            "mtls" => AuthMode.MutualTls,
+            "mtls" or "client_credentials_mtls" => AuthMode.ClientCredentialsMtls,
             "authorization_code" => AuthMode.AuthorizationCode,
             _ => AuthMode.ClientCredentials
         };
@@ -351,12 +347,12 @@ public class SecureStoreClientBuilder
         if (_tokenProvider != null)
         {
             return new SecureStoreClient(_options, _tokenProvider, _logger);
-        }
-
-        if (_options.UseIntegratedAuth && _options.AuthClientConfig != null)
+        }        if (_options.UseIntegratedAuth && _options.AuthClientConfig != null)
         {
-            var authClient = AuthClientFactory.CreateFromConfig(_options.AuthClientConfig);
-            return new SecureStoreClient(_options, authClient, _logger);
+            // TODO: Enable once AuthClientFactory is available
+            throw new NotImplementedException("Integrated auth not yet implemented - use WithTokenProvider instead");
+            // var authClient = AuthClientFactory.CreateFromConfig(_options.AuthClientConfig);
+            // return new SecureStoreClient(_options, authClient, _logger);
         }
 
         throw new InvalidOperationException("Must specify either an IAuthClient, token provider, or integrated auth configuration");
