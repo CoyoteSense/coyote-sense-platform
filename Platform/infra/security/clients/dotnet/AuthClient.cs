@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
+using System.Net.Http;
 using System.Runtime.CompilerServices;
 using System.Security.Claims;
 using System.Security.Cryptography;
@@ -10,10 +11,9 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.IdentityModel.Tokens;
-using Coyote.Infra.Http;
-using HttpFactory = Coyote.Infra.Http.Factory;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Coyote.Infra.Http;
 
 [assembly: InternalsVisibleTo("AuthClient.Tests")]
 
@@ -36,12 +36,11 @@ public class AuthClient : IAuthClient
     private volatile AuthToken? _currentToken;
     private volatile bool _disposed;/// <summary>
                                     /// DI constructor: uses Microsoft ILogger, HTTP client factory, and optional token storage
-                                    /// </summary>
-    [ActivatorUtilitiesConstructor]
+                                    /// </summary>    [ActivatorUtilitiesConstructor]
     public AuthClient(
         AuthClientConfig config,
         ILogger<AuthClient> msLogger,
-        HttpFactory.IHttpClientFactory httpClientFactory,
+        ICoyoteHttpClient httpClient,
         IAuthTokenStorage? tokenStorage = null)
     {
         _config = config ?? throw new ArgumentNullException(nameof(config));
@@ -50,10 +49,8 @@ public class AuthClient : IAuthClient
         if (!_config.IsValid())
         {
             throw new ArgumentException("Invalid authentication configuration. Please check required fields for the selected authentication mode.", nameof(config));
-        }
-
-        // Use provided or default HTTP client
-        _httpClient = httpClientFactory.CreateHttpClient();
+        }        // Use provided HTTP client
+        _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
         _tokenStorage = tokenStorage ?? new InMemoryTokenStorage();
         _logger = new MicrosoftAuthLogger(msLogger);
 
@@ -68,9 +65,7 @@ public class AuthClient : IAuthClient
         {
             _refreshTimer = new Timer(OnRefreshTimer, null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
         }
-    }
-
-    /// <summary>
+    }    /// <summary>
     /// Core constructor with IAuthLogger for manual instantiation
     /// </summary>
     internal AuthClient(
@@ -85,10 +80,8 @@ public class AuthClient : IAuthClient
         if (!_config.IsValid())
         {
             throw new ArgumentException("Invalid authentication configuration. Please check required fields for the selected authentication mode.", nameof(config));
-        }
-
-        // Use provided or default HTTP client
-        _httpClient = httpClient ?? AuthClientFactory.GetDefaultHttpClient();
+        }        // Use provided or create a mock HTTP client
+        _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
         _tokenStorage = tokenStorage ?? new InMemoryTokenStorage();
         _logger = logger ?? new NullAuthLogger();
 
@@ -560,36 +553,30 @@ public class AuthClient : IAuthClient
     {
         _logger.LogInfo("Clearing stored tokens"); _currentToken = null;
         _tokenStorage.ClearToken(_config.ClientId);
-    }
-
-    private void ConfigureHttpClient()
+    }    private void ConfigureHttpClient()
     {
         _httpClient.SetDefaultTimeout(_config.TimeoutMs);
-        _httpClient.SetVerifyPeer(_config.VerifySsl);
 
         var headers = new Dictionary<string, string>
         {
             ["Accept"] = "application/json",
             ["User-Agent"] = "CoyoteSense-Auth-Client/1.0"
         };
-
         _httpClient.SetDefaultHeaders(headers);
 
+        // Configure client certificate for mTLS if provided
         if (!string.IsNullOrEmpty(_config.ClientCertPath) && !string.IsNullOrEmpty(_config.ClientKeyPath))
         {
             _httpClient.SetClientCertificate(_config.ClientCertPath, _config.ClientKeyPath);
         }
-    }
-
-    private async Task<AuthResult> MakeTokenRequestAsync(Dictionary<string, string> parameters, CancellationToken cancellationToken)
+    }    private async Task<AuthResult> MakeTokenRequestAsync(Dictionary<string, string> parameters, CancellationToken cancellationToken)
     {
         var formContent = CreateFormUrlEncodedContent(parameters);
-
         var headers = new Dictionary<string, string>
         {
             ["Content-Type"] = "application/x-www-form-urlencoded"
         };
-
+        
         var response = await _httpClient.PostAsync($"{_config.ServerUrl}/token", formContent, headers, cancellationToken);
 
         if (!response.IsSuccess)
@@ -813,9 +800,7 @@ public class AuthClient : IAuthClient
     {
         Dispose(true);
         GC.SuppressFinalize(this);
-    }
-
-    /// <summary>
+    }    /// <summary>
     /// Validate JWT signature and expiration using JWKS from the auth server
     /// </summary>
     private async Task<bool> ValidateJwtAsync(string token, CancellationToken cancellationToken)
