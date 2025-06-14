@@ -24,7 +24,7 @@ class HttpClientIntegrationTest : public ::testing::Test {
     WaitForTestServer();
     
     // Create HTTP client
-    client_ = HttpClientFactory::CreateHttpClient();
+    client_ = HttpClientFactory::CreateClient();
     ASSERT_NE(client_, nullptr);
   }
 
@@ -33,7 +33,7 @@ class HttpClientIntegrationTest : public ::testing::Test {
   }
 
   void WaitForTestServer() {
-    auto temp_client = HttpClientFactory::CreateHttpClient();
+    auto temp_client = HttpClientFactory::CreateClient();
     const int max_attempts = 30;
     const auto delay = std::chrono::seconds(2);
     

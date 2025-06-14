@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "coyote-infra-msg"
+version = "0.1.0"
+description = "CoyoteSense Msg Infrastructure Component"
+authors = [
+    {name = "CoyoteSense Team", email = "dev@coyotesense.io"}
+]
+dependencies = [
+    "redis",
+    "pydantic",
+    "httpx"
+]
+
+[project.optional-dependencies]
+test = ["pytest", "pytest-asyncio", "pytest-cov"]
+dev = ["black", "isort", "mypy"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["coyote_infra_msg*"]
+
+[tool.setuptools.package-dir]
+"coyote_infra_msg" = "coyote_infra_msg"
+
+[tool.pytest.ini_options]
+testpaths = ["../../tests/python"]
+asyncio_mode = "auto"
+
+[tool.black]
+line-length = 88
+target-version = ['py38']
+
+[tool.isort]
+profile = "black"

@@ -42,7 +42,7 @@ public class AuthHttpClientIntegrationTests : IDisposable
         // Register HTTP client infrastructure
         services.AddSingleton<Coyote.Infra.Http.Factory.IHttpClientFactory, Coyote.Infra.Security.Tests.TestHelpers.TestHttpClientFactory>();
         services.AddTransient<ICoyoteHttpClient>(provider => 
-            provider.GetRequiredService<Coyote.Infra.Http.Factory.IHttpClientFactory>().CreateHttpClient());
+            provider.GetRequiredService<Coyote.Infra.Http.Factory.IHttpClientFactory>().CreateClient());
         
         // Register auth infrastructure
         services.AddTransient<IAuthTokenStorage, InMemoryTokenStorage>();

@@ -1,0 +1,69 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <WarningsAsErrors />
+    <WarningsNotAsErrors>CS1591</WarningsNotAsErrors>
+      <!-- Package Information -->
+    <PackageId>Coyote.Infra.Security</PackageId>
+    <PackageVersion>1.0.0</PackageVersion>
+    <Title>CoyoteSense Security Infrastructure</Title>
+    <Authors>CoyoteSense Platform Team</Authors>
+    <Description>Security infrastructure for CoyoteSense platform providing multi-standard authentication (OAuth2, JWT Bearer, mTLS, Authorization Code) and secure KeyVault access with runtime mode support</Description>
+    <PackageTags>security;auth;authentication;oauth2;jwt;mtls;keyvault;secrets;authorization;coyotesense</PackageTags>
+    <RepositoryUrl>https://github.com/coyotesense/coyote-sense-platform</RepositoryUrl>
+    <AssemblyName>Coyote.Infra.Security</AssemblyName>
+    <RootNamespace>Coyote.Infra.Security</RootNamespace>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)'=='Debug'">
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)'=='Release'">
+    <Optimize>true</Optimize>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Core .NET Extensions -->
+    <PackageReference Include="Microsoft.Extensions.Http" Version="8.0.1" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.2" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="8.0.2" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.0.2" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="8.0.1" />    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.Abstractions" Version="8.0.11" />
+    
+    <!-- JSON and HTTP -->
+    <PackageReference Include="System.Text.Json" Version="8.0.5" />
+    
+    <!-- JWT and Identity (for AuthClient functionality) -->
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.2.1" />
+    <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" Version="8.2.1" />
+    <PackageReference Include="Microsoft.IdentityModel.Tokens" Version="8.2.1" />
+    <PackageReference Include="System.Security.Cryptography.X509Certificates" Version="4.3.2" />
+    
+    <!-- Security overrides for vulnerable transitive dependencies -->
+    <PackageReference Include="System.Text.Encodings.Web" Version="8.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- HTTP Client Interface -->
+    <ProjectReference Include="..\..\..\http\interfaces\dotnet\Coyote.Infra.Http.csproj" />
+  </ItemGroup>  <ItemGroup>
+    <!-- Factory and mode implementations -->
+    <Compile Include="../../factory/dotnet/*.cs" />
+    <Compile Include="../../modes/**/*.cs" />
+    <Compile Include="../../options/dotnet/*.cs" />
+    <Compile Include="../../security/dotnet/*.cs" />
+    <Compile Include="../../extensions/dotnet/*.cs" />
+  </ItemGroup>  <ItemGroup>
+    <!-- Documentation -->
+    <None Include="../../README.md" Pack="true" PackagePath="\" Condition="Exists('../../README.md')" />
+  </ItemGroup>
+
+</Project>

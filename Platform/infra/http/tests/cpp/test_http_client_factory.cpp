@@ -31,7 +31,7 @@ class HttpClientFactoryTest : public ::testing::Test {
 TEST_F(HttpClientFactoryTest, CreateMockClientExplicitly) {
   SetEnvironmentVariable("COYOTE_RUNTIME_MODE", "mock");
   
-  auto client = HttpClientFactory::CreateHttpClient();
+  auto client = HttpClientFactory::CreateClient();
   ASSERT_NE(client, nullptr);
   
   // Test that it behaves like a mock client
@@ -43,7 +43,7 @@ TEST_F(HttpClientFactoryTest, CreateMockClientExplicitly) {
 TEST_F(HttpClientFactoryTest, CreateTestClient) {
   SetEnvironmentVariable("COYOTE_RUNTIME_MODE", "testing");
   
-  auto client = HttpClientFactory::CreateHttpClient();
+  auto client = HttpClientFactory::CreateClient();
   ASSERT_NE(client, nullptr);
   
   // Testing mode should also return mock client
@@ -54,7 +54,7 @@ TEST_F(HttpClientFactoryTest, CreateTestClient) {
 TEST_F(HttpClientFactoryTest, CreateDebugClient) {
   SetEnvironmentVariable("COYOTE_RUNTIME_MODE", "debug");
   
-  auto client = HttpClientFactory::CreateHttpClient();
+  auto client = HttpClientFactory::CreateClient();
   ASSERT_NE(client, nullptr);
   
   // Debug mode should return mock client
@@ -65,7 +65,7 @@ TEST_F(HttpClientFactoryTest, CreateDebugClient) {
 TEST_F(HttpClientFactoryTest, CreateSimulationClient) {
   SetEnvironmentVariable("COYOTE_RUNTIME_MODE", "simulation");
   
-  auto client = HttpClientFactory::CreateHttpClient();
+  auto client = HttpClientFactory::CreateClient();
   ASSERT_NE(client, nullptr);
   
   // Simulation mode should return mock client
@@ -76,7 +76,7 @@ TEST_F(HttpClientFactoryTest, CreateSimulationClient) {
 TEST_F(HttpClientFactoryTest, AlternateModeVariable) {
   SetEnvironmentVariable("MODE", "mock");
   
-  auto client = HttpClientFactory::CreateHttpClient();
+  auto client = HttpClientFactory::CreateClient();
   ASSERT_NE(client, nullptr);
   
   // Should work with MODE variable too
@@ -88,7 +88,7 @@ TEST_F(HttpClientFactoryTest, CoyoteRuntimeModeHasPriority) {
   SetEnvironmentVariable("COYOTE_RUNTIME_MODE", "mock");
   SetEnvironmentVariable("MODE", "production");
   
-  auto client = HttpClientFactory::CreateHttpClient();
+  auto client = HttpClientFactory::CreateClient();
   ASSERT_NE(client, nullptr);
   
   // COYOTE_RUNTIME_MODE should take precedence
@@ -100,26 +100,26 @@ TEST_F(HttpClientFactoryTest, CoyoteRuntimeModeHasPriority) {
 TEST_F(HttpClientFactoryTest, ProductionModeWithoutCurlThrows) {
   SetEnvironmentVariable("COYOTE_RUNTIME_MODE", "production");
   
-  EXPECT_THROW(HttpClientFactory::CreateHttpClient(), std::runtime_error);
+  EXPECT_THROW(HttpClientFactory::CreateClient(), std::runtime_error);
 }
 
 TEST_F(HttpClientFactoryTest, RecordingModeWithoutCurlThrows) {
   SetEnvironmentVariable("COYOTE_RUNTIME_MODE", "recording");
   
-  EXPECT_THROW(HttpClientFactory::CreateHttpClient(), std::runtime_error);
+  EXPECT_THROW(HttpClientFactory::CreateClient(), std::runtime_error);
 }
 
 TEST_F(HttpClientFactoryTest, ReplayModeWithoutCurlThrows) {
   SetEnvironmentVariable("COYOTE_RUNTIME_MODE", "replay");
   
-  EXPECT_THROW(HttpClientFactory::CreateHttpClient(), std::runtime_error);
+  EXPECT_THROW(HttpClientFactory::CreateClient(), std::runtime_error);
 }
 #endif
 
 TEST_F(HttpClientFactoryTest, DefaultModeWhenNoEnvironmentSet) {
   // Don't set any environment variables
   
-  auto client = HttpClientFactory::CreateHttpClient();
+  auto client = HttpClientFactory::CreateClient();
   ASSERT_NE(client, nullptr);
   
   // Should default to mock client when no mode is set
@@ -130,7 +130,7 @@ TEST_F(HttpClientFactoryTest, DefaultModeWhenNoEnvironmentSet) {
 TEST_F(HttpClientFactoryTest, CaseInsensitiveModeDetection) {
   SetEnvironmentVariable("COYOTE_RUNTIME_MODE", "MOCK");
   
-  auto client = HttpClientFactory::CreateHttpClient();
+  auto client = HttpClientFactory::CreateClient();
   ASSERT_NE(client, nullptr);
   
   // Should handle uppercase mode
@@ -141,7 +141,7 @@ TEST_F(HttpClientFactoryTest, CaseInsensitiveModeDetection) {
 TEST_F(HttpClientFactoryTest, UnknownModeDefaultsToMock) {
   SetEnvironmentVariable("COYOTE_RUNTIME_MODE", "unknown_mode");
   
-  auto client = HttpClientFactory::CreateHttpClient();
+  auto client = HttpClientFactory::CreateClient();
   ASSERT_NE(client, nullptr);
   
   // Unknown mode should default to mock
@@ -152,8 +152,8 @@ TEST_F(HttpClientFactoryTest, UnknownModeDefaultsToMock) {
 TEST_F(HttpClientFactoryTest, MultipleClientCreation) {
   SetEnvironmentVariable("COYOTE_RUNTIME_MODE", "mock");
   
-  auto client1 = HttpClientFactory::CreateHttpClient();
-  auto client2 = HttpClientFactory::CreateHttpClient();
+  auto client1 = HttpClientFactory::CreateClient();
+  auto client2 = HttpClientFactory::CreateClient();
   
   ASSERT_NE(client1, nullptr);
   ASSERT_NE(client2, nullptr);

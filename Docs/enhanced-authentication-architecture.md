@@ -351,7 +351,7 @@ internal static ICoyoteHttpClient GetDefaultHttpClient()
         // Use the injected HTTP client factory if available
         if (_httpClientFactory != null)
         {
-            return _httpClientFactory.CreateHttpClient();
+            return _httpClientFactory.CreateClient();
         }
 
         // Create a proper HTTP client using the platform's factory infrastructure
@@ -375,7 +375,7 @@ internal static ICoyoteHttpClient GetDefaultHttpClient()
             logger: Microsoft.Extensions.Logging.Abstractions.NullLogger<HttpFactory.HttpClientFactory>.Instance
         );
         
-        return factory.CreateHttpClient();
+        return factory.CreateClient();
     }
 }
 ```

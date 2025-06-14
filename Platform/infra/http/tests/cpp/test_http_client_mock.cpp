@@ -283,7 +283,7 @@ TEST_F(HttpClientMockTest, FactoryCreatesCorrectType) {
   setenv("COYOTE_RUNTIME_MODE", "mock", 1);
   #endif
   
-  auto factory_client = HttpClientFactory::CreateHttpClient();
+  auto factory_client = HttpClientFactory::CreateClient();
   ASSERT_NE(factory_client, nullptr);
   
   // Try to use it - should work like mock client

@@ -10,7 +10,7 @@ void TestRealHttpClient() {
   
   try {
     // Create real HTTP client
-    auto client = HttpClientFactory::CreateHttpClient(RuntimeMode::kProduction);
+    auto client = HttpClientFactory::CreateClient(RuntimeMode::kProduction);
     
     // Configure client
     client->SetDefaultTimeout(5000);
@@ -93,8 +93,8 @@ void TestFactoryModeSelection() {
   
   try {
     // Test different modes
-    auto prod_client = HttpClientFactory::CreateHttpClient(RuntimeMode::kProduction);
-    auto test_client = HttpClientFactory::CreateHttpClient(RuntimeMode::kTesting);
+    auto prod_client = HttpClientFactory::CreateClient(RuntimeMode::kProduction);
+    auto test_client = HttpClientFactory::CreateClient(RuntimeMode::kTesting);
     
     // In real usage, these would be different types, but for demo we just check they're not null
     assert(prod_client != nullptr);

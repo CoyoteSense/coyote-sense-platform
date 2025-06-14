@@ -79,7 +79,7 @@ public class AdvancedHttpClientExamples
         // Record some HTTP interactions (using mock for demo purposes)
         Environment.SetEnvironmentVariable("COYOTE_RUNTIME_MODE", "mock"); // Use mock for demo
         
-        using var client = clientFactory.CreateHttpClient();
+        using var client = clientFactory.CreateClient();
 
         var requests = new[]
         {
@@ -141,7 +141,7 @@ public class AdvancedHttpClientExamples
         var serviceProvider = services.BuildServiceProvider();
         var clientFactory = serviceProvider.GetRequiredService<IHttpClientFactory>();
 
-        using var client = clientFactory.CreateHttpClient();
+        using var client = clientFactory.CreateClient();
         
         // Make requests that should match recorded interactions
         var testRequests = new[]
@@ -307,7 +307,7 @@ public class AdvancedHttpClientExamples
         var serviceProvider = services.BuildServiceProvider();
         var clientFactory = serviceProvider.GetRequiredService<IHttpClientFactory>();
 
-        using var client = clientFactory.CreateHttpClient();
+        using var client = clientFactory.CreateClient();
 
         // Test different scenarios
         var testCases = new[]
@@ -426,7 +426,7 @@ public class AdvancedHttpClientExamples
             var serviceProvider = services.BuildServiceProvider();
             var clientFactory = serviceProvider.GetRequiredService<IHttpClientFactory>();
 
-            using var client = clientFactory.CreateHttpClient();
+            using var client = clientFactory.CreateClient();
 
             var request = new HttpRequest
             {
@@ -493,7 +493,7 @@ public class AdvancedHttpClientExamples
         var serviceProvider = services.BuildServiceProvider();
         var clientFactory = serviceProvider.GetRequiredService<IHttpClientFactory>();
 
-        using var client = clientFactory.CreateHttpClient();
+        using var client = clientFactory.CreateClient();
 
         // Test various scenarios quickly
         var scenarios = new[]
@@ -557,7 +557,7 @@ public class AdvancedHttpClientExamples
         var serviceProvider = services.BuildServiceProvider();
         var clientFactory = serviceProvider.GetRequiredService<IHttpClientFactory>();
 
-        using var client = clientFactory.CreateHttpClient();
+        using var client = clientFactory.CreateClient();
 
         // Test with recorded interactions
         var testUrls = new[]
@@ -590,7 +590,7 @@ public class AdvancedHttpClientExamples
         var serviceProvider = services.BuildServiceProvider();
         var clientFactory = serviceProvider.GetRequiredService<IHttpClientFactory>();
 
-        using var client = clientFactory.CreateHttpClient();
+        using var client = clientFactory.CreateClient();
 
         // Simulate load testing scenarios
         var tasks = new List<Task>();

@@ -166,7 +166,7 @@ public class HttpClientFactoryTests
         try
         {
             // Act
-            var client = factory.CreateHttpClient();
+            var client = factory.CreateClient();
 
             // Assert
             client.Should().NotBeNull();

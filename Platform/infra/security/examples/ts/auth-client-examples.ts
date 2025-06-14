@@ -23,11 +23,11 @@ import {
 import { CoyoteHttpClient } from '../../../http/ts';
 
 // Example HTTP client creation (replace with actual HTTP client factory)
-async function createHttpClient(): Promise<CoyoteHttpClient> {
+async function createClient(): Promise<CoyoteHttpClient> {
   // This would use the actual HTTP client factory from the CoyoteSense platform
   // For demonstration purposes, we'll assume it's available
-  const { createHttpClient } = await import('../../../http/ts');
-  return createHttpClient();
+  const { createClient } = await import('../../../http/ts');
+  return createClient();
 }
 
 /**
@@ -38,7 +38,7 @@ export async function clientCredentialsExample(): Promise<void> {
   console.log('=== Client Credentials Flow Example ===');
   
   try {
-    const httpClient = await createHttpClient();
+    const httpClient = await createClient();
     
     // Create Auth client using factory
     const client = AuthClientFactory.createClientCredentials(
@@ -74,7 +74,7 @@ export async function jwtBearerExample(): Promise<void> {
   console.log('=== JWT Bearer Assertion Flow Example ===');
   
   try {
-    const httpClient = await createHttpClient();
+    const httpClient = await createClient();
     
     // Create Auth client with JWT Bearer configuration
     const client = AuthClientFactory.create()
@@ -115,7 +115,7 @@ export async function authorizationCodeWithPKCEExample(): Promise<void> {
   console.log('=== Authorization Code + PKCE Flow Example ===');
   
   try {
-    const httpClient = await createHttpClient();
+    const httpClient = await createClient();
     
     // Create Auth client for public client (no client secret)
     const client = AuthClientFactory.createAuthorizationCode(
@@ -179,7 +179,7 @@ export async function tokenManagementExample(): Promise<void> {
   console.log('=== Token Management and Auto-Refresh Example ===');
   
   try {
-    const httpClient = await createHttpClient();
+    const httpClient = await createClient();
     
     // Create custom token storage for demonstration
     const tokenStorage = new MemoryOAuth2TokenStorage();
@@ -253,7 +253,7 @@ export async function tokenIntrospectionExample(): Promise<void> {
   console.log('=== Token Introspection and Revocation Example ===');
   
   try {
-    const httpClient = await createHttpClient();
+    const httpClient = await createClient();
     
     const client = AuthClientFactory.createClientCredentials(
       'https://auth.coyotesense.io',
@@ -308,7 +308,7 @@ export async function serverDiscoveryExample(): Promise<void> {
   console.log('=== Server Discovery Example ===');
   
   try {
-    const httpClient = await createHttpClient();
+    const httpClient = await createClient();
     
     const client = AuthClientFactory.create()
       .withEndpoint('https://auth.coyotesense.io')
@@ -340,7 +340,7 @@ export async function advancedConfigurationExample(): Promise<void> {
   console.log('=== Advanced Configuration Example ===');
   
   try {
-    const httpClient = await createHttpClient();
+    const httpClient = await createClient();
     
     // Create client with advanced configuration
     const client = AuthClientFactory.create()
@@ -391,7 +391,7 @@ export async function webApplicationExample(): Promise<void> {
   console.log('=== Web Application Integration Example ===');
   
   try {
-    const httpClient = await createHttpClient();
+    const httpClient = await createClient();
     
     // Configuration for a web application
     const client = AuthClientFactory.create()
@@ -458,7 +458,7 @@ async function makeAuthenticatedRequest(accessToken: string): Promise<void> {
   console.log('🌐 Making authenticated API call...');
   
   try {
-    const httpClient = await createHttpClient();
+    const httpClient = await createClient();
     const response = await httpClient.getAsync('/api/user/profile', {
       'Authorization': `Bearer ${accessToken}`
     });
