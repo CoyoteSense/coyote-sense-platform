@@ -1,6 +1,6 @@
 #pragma once
 
-#include "http_client.h"
+#include "../../interfaces/http_client.h"
 
 #ifndef CURL_NOT_AVAILABLE
 #include <curl/curl.h>

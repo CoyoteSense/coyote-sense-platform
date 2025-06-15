@@ -3,10 +3,11 @@ cmake_minimum_required(VERSION 3.16)
 
 # Include parent directories
 include_directories(
-    "${CMAKE_CURRENT_SOURCE_DIR}/../../interfaces/cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../../factory/cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../../modes/real/cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../../modes/mock/cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../src/cpp/interfaces"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../src/cpp/factory"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../src/cpp/impl/real"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../src/cpp/impl/mock"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../src/cpp/impl/debug"
 )
 
 # Set up GTest
@@ -28,10 +29,11 @@ add_executable(http_client_unit_tests ${UNIT_TEST_SOURCES})
 
 # Add include directories to target
 target_include_directories(http_client_unit_tests PRIVATE
-    "${CMAKE_CURRENT_SOURCE_DIR}/../../interfaces/cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../../factory/cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../../modes/real/cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../../modes/mock/cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../src/cpp/interfaces"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../src/cpp/factory"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../src/cpp/impl/real"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../src/cpp/impl/mock"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../src/cpp/impl/debug"
 )
 
 # Link libraries

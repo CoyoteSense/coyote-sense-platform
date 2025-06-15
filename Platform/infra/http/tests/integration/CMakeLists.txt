@@ -128,17 +128,19 @@ message(STATUS "Real source: ${CMAKE_CURRENT_SOURCE_DIR}/../../modes/real/cpp/ht
 message(STATUS "Mock source: ${CMAKE_CURRENT_SOURCE_DIR}/../../modes/mock/cpp/http_client_mock.cpp")
 
 # Set HTTP client sources - use absolute paths
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../../factory/cpp/http_client_factory.cpp")
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../../src/cpp/factory/http_client_factory.cpp")
     # We're building in the regular project structure
     set(HTTP_CLIENT_SOURCES
-        "${CMAKE_CURRENT_SOURCE_DIR}/../../factory/cpp/http_client_factory.cpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/../../modes/real/cpp/http_client_real.cpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/../../modes/mock/cpp/http_client_mock.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../../src/cpp/factory/http_client_factory.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../../src/cpp/impl/real/http_client_real.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../../src/cpp/impl/mock/http_client_mock.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../../src/cpp/impl/debug/http_client_debug.cpp"
     )
-    set(INTERFACES_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../interfaces/cpp")
-    set(FACTORY_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../factory/cpp")
-    set(REAL_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../modes/real/cpp")
-    set(MOCK_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../modes/mock/cpp")
+    set(INTERFACES_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../src/cpp/interfaces")
+    set(FACTORY_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../src/cpp/factory")
+    set(REAL_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../src/cpp/impl/real")
+    set(MOCK_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../src/cpp/impl/mock")
+    set(DEBUG_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../src/cpp/impl/debug")
 elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/factory/cpp/http_client_factory.cpp")
     # We're building in Docker where files are copied to /workspace
     set(HTTP_CLIENT_SOURCES
@@ -163,6 +165,7 @@ target_include_directories(coyote_http_client_for_tests PUBLIC
     ${FACTORY_DIR}
     ${REAL_DIR}
     ${MOCK_DIR}
+    ${DEBUG_DIR}
 )
 
 # Add CURL include directories if available

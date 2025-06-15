@@ -1,7 +1,7 @@
 // Unit tests for HTTP Client Factory
 #include <gtest/gtest.h>
-#include "../../factory/cpp/http_client_factory.h"
-#include "../../modes/mock/cpp/http_client_mock.h"
+#include "../../src/cpp/factory/http_client_factory.h"
+#include "../../src/cpp/impl/mock/http_client_mock.h"
 #include <cstdlib>
 
 using namespace coyote::infra;
