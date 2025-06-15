@@ -21,11 +21,10 @@ public class MockHttpClientTests : IDisposable
     public MockHttpClientTests()
     {
         _loggerMock = new Mock<ILogger<MockHttpClient>>();
-        
-        _httpOptions = new HttpClientOptions();
+          _httpOptions = new HttpClientOptions();
         _modeOptions = new HttpClientModeOptions
         {
-            Mock = new MockResponseOptions
+            Mock = new MockModeOptions
             {
                 DefaultStatusCode = 200,
                 DefaultBody = "{\"test\": \"value\"}",

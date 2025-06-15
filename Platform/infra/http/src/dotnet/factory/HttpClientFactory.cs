@@ -4,9 +4,6 @@ using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Logging;
 using Coyote.Infra.Http.Modes.Real;
 using Coyote.Infra.Http.Modes.Mock;
-using Coyote.Infra.Http.Modes.Record;
-using Coyote.Infra.Http.Modes.Replay;
-using Coyote.Infra.Http.Modes.Simulation;
 using Coyote.Infra.Http.Modes.Debug;
 
 namespace Coyote.Infra.Http.Factory;
@@ -62,15 +59,15 @@ public class HttpClientFactory : IHttpClientFactory
     public ICoyoteHttpClient CreateHttpClientForMode(RuntimeMode mode)
     {
         _logger.LogDebug("Creating HTTP client for mode: {Mode}", mode);
-        
-        return mode switch
+          return mode switch
         {
             RuntimeMode.Testing => _serviceProvider.GetRequiredService<MockHttpClient>(),
             RuntimeMode.Production => _serviceProvider.GetRequiredService<RealHttpClient>(),
-            RuntimeMode.Recording => _serviceProvider.GetRequiredService<RecordingHttpClient>(),
-            RuntimeMode.Replay => _serviceProvider.GetRequiredService<ReplayHttpClient>(),
-            RuntimeMode.Simulation => _serviceProvider.GetRequiredService<SimulationHttpClient>(),
             RuntimeMode.Debug => _serviceProvider.GetRequiredService<DebugHttpClient>(),
+            // For unimplemented modes, fall back to real implementation
+            RuntimeMode.Recording => _serviceProvider.GetRequiredService<RealHttpClient>(),
+            RuntimeMode.Replay => _serviceProvider.GetRequiredService<RealHttpClient>(),
+            RuntimeMode.Simulation => _serviceProvider.GetRequiredService<RealHttpClient>(),
             _ => _serviceProvider.GetRequiredService<RealHttpClient>()
         };
     }
@@ -116,9 +113,6 @@ public static class ServiceCollectionExtensions
         // Register all mode implementations
         services.AddTransient<RealHttpClient>();
         services.AddTransient<MockHttpClient>();
-        services.AddTransient<RecordingHttpClient>();
-        services.AddTransient<ReplayHttpClient>();
-        services.AddTransient<SimulationHttpClient>();
         services.AddTransient<DebugHttpClient>();
 
         // Register the main service
@@ -156,9 +150,6 @@ public static class ServiceCollectionExtensions
         // Register all mode implementations
         services.AddTransient<RealHttpClient>();
         services.AddTransient<MockHttpClient>();
-        services.AddTransient<RecordingHttpClient>();
-        services.AddTransient<ReplayHttpClient>();
-        services.AddTransient<SimulationHttpClient>();
         services.AddTransient<DebugHttpClient>();
 
         // Register the main service

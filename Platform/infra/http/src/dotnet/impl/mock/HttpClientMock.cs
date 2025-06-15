@@ -9,7 +9,7 @@ namespace Coyote.Infra.Http.Modes.Mock;
 /// </summary>
 public class MockHttpClient : BaseHttpClient
 {
-    private readonly MockResponseOptions _mockOptions;
+    private readonly MockModeOptions _mockOptions;
     private readonly ILogger<MockHttpClient> _logger;
 
     public MockHttpClient(IOptions<HttpClientOptions> options, IOptions<HttpClientModeOptions> modeOptions, ILogger<MockHttpClient> logger)

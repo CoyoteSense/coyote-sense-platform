@@ -1,15 +1,12 @@
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Coyote.Infra.Http;
 using Coyote.Infra.Http.Factory;
 using Coyote.Infra.Http.Modes.Mock;
 using Coyote.Infra.Http.Modes.Real;
-using Coyote.Infra.Http.Modes.Record;
-using Coyote.Infra.Http.Modes.Replay;
-using Coyote.Infra.Http.Modes.Simulation;
 using Coyote.Infra.Http.Modes.Debug;
 using FluentAssertions;
+using Moq;
 using Xunit;
 
 namespace Coyote.Infra.Http.Tests;
@@ -19,40 +16,55 @@ namespace Coyote.Infra.Http.Tests;
 /// </summary>
 public class HttpClientFactoryTests
 {
-    private readonly ServiceCollection _services;
-    private readonly IServiceProvider _serviceProvider;
-
-    public HttpClientFactoryTests()
+    private readonly Mock<IServiceProvider> _mockServiceProvider;
+    private readonly Mock<IOptions<HttpClientOptions>> _mockHttpOptions;
+    private readonly Mock<IOptions<HttpClientModeOptions>> _mockModeOptions;
+    private readonly Mock<ILogger<HttpClientFactory>> _mockLogger;
+    private readonly HttpClientFactory _factory;    public HttpClientFactoryTests()
     {
-        _services = new ServiceCollection();
-        _services.AddLogging();
-        
-        // Configure options
-        _services.Configure<HttpClientOptions>(options => { });
-        _services.Configure<HttpClientModeOptions>(options => { });
-        
-        // Register implementations
-        _services.AddTransient<RealHttpClient>();
-        _services.AddTransient<MockHttpClient>();
-        _services.AddTransient<RecordingHttpClient>();
-        _services.AddTransient<ReplayHttpClient>();
-        _services.AddTransient<SimulationHttpClient>();
-        _services.AddTransient<DebugHttpClient>();
-        
-        // Register factory
-        _services.AddSingleton<IHttpClientFactory, HttpClientFactory>();
-        
-        _serviceProvider = _services.BuildServiceProvider();
-    }
+        _mockServiceProvider = new Mock<IServiceProvider>();
+        _mockHttpOptions = new Mock<IOptions<HttpClientOptions>>();
+        _mockModeOptions = new Mock<IOptions<HttpClientModeOptions>>();
+        _mockLogger = new Mock<ILogger<HttpClientFactory>>();        // Setup default options
+        _mockHttpOptions.Setup(x => x.Value).Returns(new HttpClientOptions());        _mockModeOptions.Setup(x => x.Value).Returns(new HttpClientModeOptions { 
+            Mode = RuntimeMode.Production,
+            Mock = new MockModeOptions(),
+            Debug = new DebugModeOptions()
+        });
 
-    [Fact]
+        // Create real instances instead of mocking them since they have dependencies
+        var httpOptions = Options.Create(new HttpClientOptions());        var modeOptions = Options.Create(new HttpClientModeOptions 
+        { 
+            Mode = RuntimeMode.Production,
+            Mock = new MockModeOptions(),
+            Debug = new DebugModeOptions()
+        });
+
+        var mockLogger = new Mock<ILogger<MockHttpClient>>();
+        var realLogger = new Mock<ILogger<RealHttpClient>>();
+        var debugLogger = new Mock<ILogger<DebugHttpClient>>();
+        
+        var mockHttpClient = new MockHttpClient(httpOptions, modeOptions, mockLogger.Object);
+        var realHttpClient = new RealHttpClient(httpOptions, realLogger.Object);
+        var debugHttpClient = new DebugHttpClient(httpOptions, modeOptions, debugLogger.Object, _mockServiceProvider.Object);
+
+        _mockServiceProvider.Setup(x => x.GetService(typeof(MockHttpClient)))
+            .Returns(mockHttpClient);
+        _mockServiceProvider.Setup(x => x.GetService(typeof(RealHttpClient)))
+            .Returns(realHttpClient);
+        _mockServiceProvider.Setup(x => x.GetService(typeof(DebugHttpClient)))
+            .Returns(debugHttpClient);
+
+        _factory = new HttpClientFactory(
+            _mockServiceProvider.Object,
+            _mockModeOptions.Object,
+            _mockHttpOptions.Object,
+            _mockLogger.Object);
+    }[Fact]
     public void CreateHttpClientForMode_Testing_ShouldReturnMockClient()
     {
-        // Arrange
-        var factory = _serviceProvider.GetRequiredService<IHttpClientFactory>();
-
         // Act
-        var client = factory.CreateHttpClientForMode(RuntimeMode.Testing);
+        var client = _factory.CreateHttpClientForMode(RuntimeMode.Testing);
 
         // Assert
         client.Should().NotBeNull();
@@ -62,18 +74,13 @@ public class HttpClientFactoryTests
     [Fact]
     public void CreateHttpClientForMode_Production_ShouldReturnRealClient()
     {
-        // Arrange
-        var factory = _serviceProvider.GetRequiredService<IHttpClientFactory>();
-
         // Act
-        var client = factory.CreateHttpClientForMode(RuntimeMode.Production);
+        var client = _factory.CreateHttpClientForMode(RuntimeMode.Production);
 
         // Assert
         client.Should().NotBeNull();
         client.Should().BeOfType<RealHttpClient>();
-    }
-
-    [Theory]
+    }    [Theory]
     [InlineData("testing", RuntimeMode.Testing)]
     [InlineData("TESTING", RuntimeMode.Testing)]
     [InlineData("Testing", RuntimeMode.Testing)]
@@ -84,12 +91,11 @@ public class HttpClientFactoryTests
     {
         // Arrange
         Environment.SetEnvironmentVariable("COYOTE_RUNTIME_MODE", envValue);
-        var factory = _serviceProvider.GetRequiredService<IHttpClientFactory>();
 
         try
         {
             // Act
-            var mode = factory.GetCurrentMode();
+            var mode = _factory.GetCurrentMode();
 
             // Assert
             mode.Should().Be(expectedMode);
@@ -99,19 +105,16 @@ public class HttpClientFactoryTests
             // Cleanup
             Environment.SetEnvironmentVariable("COYOTE_RUNTIME_MODE", null);
         }
-    }
-
-    [Fact]
+    }    [Fact]
     public void GetCurrentMode_WithModeEnvironmentVariable_ShouldReturnCorrectMode()
     {
         // Arrange
         Environment.SetEnvironmentVariable("MODE", "testing");
-        var factory = _serviceProvider.GetRequiredService<IHttpClientFactory>();
 
         try
         {
             // Act
-            var mode = factory.GetCurrentMode();
+            var mode = _factory.GetCurrentMode();
 
             // Assert
             mode.Should().Be(RuntimeMode.Testing);
@@ -121,52 +124,36 @@ public class HttpClientFactoryTests
             // Cleanup
             Environment.SetEnvironmentVariable("MODE", null);
         }
-    }
-
-    [Fact]
+    }    [Fact]
     public void GetCurrentMode_WithNoEnvironmentVariable_ShouldReturnConfiguredMode()
     {
         // Arrange
         Environment.SetEnvironmentVariable("COYOTE_RUNTIME_MODE", null);
         Environment.SetEnvironmentVariable("MODE", null);
+          var mockModeOptions = new Mock<IOptions<HttpClientModeOptions>>();
+        mockModeOptions.Setup(x => x.Value).Returns(new HttpClientModeOptions { Mode = RuntimeMode.Debug });
         
-        var services = new ServiceCollection();
-        services.AddLogging();
-        services.Configure<HttpClientOptions>(options => { });
-        services.Configure<HttpClientModeOptions>(options => 
-        {
-            options.Mode = RuntimeMode.Debug;
-        });
-        
-        services.AddTransient<RealHttpClient>();
-        services.AddTransient<MockHttpClient>();
-        services.AddTransient<RecordingHttpClient>();
-        services.AddTransient<ReplayHttpClient>();
-        services.AddTransient<SimulationHttpClient>();
-        services.AddTransient<DebugHttpClient>();
-        services.AddSingleton<IHttpClientFactory, HttpClientFactory>();
-        
-        var serviceProvider = services.BuildServiceProvider();
-        var factory = serviceProvider.GetRequiredService<IHttpClientFactory>();
+        var factory = new HttpClientFactory(
+            _mockServiceProvider.Object,
+            mockModeOptions.Object,
+            _mockHttpOptions.Object,
+            _mockLogger.Object);
 
         // Act
         var mode = factory.GetCurrentMode();
 
         // Assert
         mode.Should().Be(RuntimeMode.Debug);
-    }
-
-    [Fact]
+    }    [Fact]
     public void CreateHttpClient_ShouldReturnClientBasedOnCurrentMode()
     {
         // Arrange
         Environment.SetEnvironmentVariable("COYOTE_RUNTIME_MODE", "testing");
-        var factory = _serviceProvider.GetRequiredService<IHttpClientFactory>();
 
         try
         {
             // Act
-            var client = factory.CreateClient();
+            var client = _factory.CreateClient();
 
             // Assert
             client.Should().NotBeNull();
@@ -177,19 +164,16 @@ public class HttpClientFactoryTests
             // Cleanup
             Environment.SetEnvironmentVariable("COYOTE_RUNTIME_MODE", null);
         }
-    }
-
-    [Fact]
+    }    [Fact]
     public void GetCurrentMode_WithInvalidEnvironmentVariable_ShouldReturnConfiguredMode()
     {
         // Arrange
         Environment.SetEnvironmentVariable("COYOTE_RUNTIME_MODE", "invalid_mode");
-        var factory = _serviceProvider.GetRequiredService<IHttpClientFactory>();
 
         try
         {
             // Act
-            var mode = factory.GetCurrentMode();
+            var mode = _factory.GetCurrentMode();
 
             // Assert
             mode.Should().Be(RuntimeMode.Production); // Default from configuration
