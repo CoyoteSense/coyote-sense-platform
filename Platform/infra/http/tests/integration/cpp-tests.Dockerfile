@@ -30,15 +30,15 @@ RUN cd /tmp && \
 WORKDIR /workspace
 
 # Copy the project files needed for tests
-COPY tests/integration/CMakeLists.txt ./
-COPY tests/integration/cpp/ ./cpp/
-COPY factory/ ./factory/
-COPY modes/ ./modes/
-COPY interfaces/ ./interfaces/
+COPY tests/integration/CMakeLists.txt ./tests/integration/
+COPY tests/integration/cpp/ ./tests/integration/cpp/
+COPY src/cpp/factory/ ./src/cpp/factory/
+COPY src/cpp/impl/ ./src/cpp/impl/
+COPY src/cpp/interfaces/ ./src/cpp/interfaces/
 
 # Build integration tests
 RUN mkdir -p build && cd build && \
-    cmake .. \
+    cmake ../tests/integration \
         -DCMAKE_BUILD_TYPE=Release && \
     make -j$(nproc) && \
     echo "Files in build directory:" && \

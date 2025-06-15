@@ -107,9 +107,8 @@ function Invoke-BuildImages {
         if ($LASTEXITCODE -ne 0) {
             throw "Failed to build test server image"
         }
-        
-        Write-Info "Building C++ integration test image..."
-        docker build -f cpp-tests.Dockerfile -t cpp-integration-tests ../../../..
+          Write-Info "Building C++ integration test image..."
+        docker build -f cpp-tests.Dockerfile -t cpp-integration-tests ../..
         if ($LASTEXITCODE -ne 0) {
             throw "Failed to build C++ integration test image"
         }
