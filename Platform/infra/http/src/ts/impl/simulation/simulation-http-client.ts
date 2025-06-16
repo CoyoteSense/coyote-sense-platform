@@ -6,9 +6,9 @@
  */
 
 import * as fs from 'fs/promises';
-import { HttpRequest, HttpResponse } from '../interfaces/http-client.js';
-import { HttpClientOptions, SimulationModeOptions } from '../interfaces/configuration.js';
-import { BaseHttpClient, HttpResponseImpl } from '../interfaces/base-http-client.js';
+import { HttpRequest, HttpResponse } from '../../interfaces/http-client.js';
+import { HttpClientOptions, SimulationModeOptions } from '../../interfaces/configuration.js';
+import { BaseHttpClient, HttpResponseImpl } from '../../interfaces/base-http-client.js';
 
 /** Quick config overload for simple usage */
 export interface SimulationHttpConfig {

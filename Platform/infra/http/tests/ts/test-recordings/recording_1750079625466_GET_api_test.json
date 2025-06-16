@@ -1,0 +1,15 @@
+{
+  "request": {
+    "url": "/api/test",
+    "method": "GET"
+  },
+  "response": {
+    "statusCode": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": "{\"success\": true}"
+  },
+  "timestamp": "2025-06-16T13:13:45.465Z",
+  "duration": 0
+}

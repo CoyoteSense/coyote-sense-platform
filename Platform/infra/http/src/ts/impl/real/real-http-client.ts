@@ -4,9 +4,9 @@
  * This module provides the production HTTP client implementation using the native fetch API.
  */
 
-import { HttpRequest, HttpResponse } from '../interfaces/http-client.js';
-import { HttpClientOptions } from '../interfaces/configuration.js';
-import { BaseHttpClient, HttpResponseImpl } from '../interfaces/base-http-client.js';
+import { HttpRequest, HttpResponse } from '../../interfaces/http-client.js';
+import { HttpClientOptions } from '../../interfaces/configuration.js';
+import { BaseHttpClient, HttpResponseImpl } from '../../interfaces/base-http-client.js';
 
 /**
  * Real HTTP client implementation using native fetch

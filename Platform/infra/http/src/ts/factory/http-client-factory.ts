@@ -19,12 +19,12 @@ import {
   DEFAULT_DEBUG_OPTIONS
 } from '../interfaces/configuration.js';
 
-import { RealHttpClient } from '../modes/real/real-http-client.js';
-import { MockHttpClient } from '../modes/mock/mock-http-client.js';
-import { DebugHttpClient } from '../modes/debug/debug-http-client.js';
-import { RecordHttpClient } from '../modes/record/record-http-client.js';
-import { ReplayHttpClient } from '../modes/replay/replay-http-client.js';
-import { SimulationHttpClient } from '../modes/simulation/simulation-http-client.js';
+import { RealHttpClient } from '../impl/real/real-http-client.js';
+import { MockHttpClient } from '../impl/mock/mock-http-client.js';
+import { DebugHttpClient } from '../impl/debug/debug-http-client.js';
+import { RecordHttpClient } from '../impl/record/record-http-client.js';
+import { ReplayHttpClient } from '../impl/replay/replay-http-client.js';
+import { SimulationHttpClient } from '../impl/simulation/simulation-http-client.js';
 
 /**
  * Factory interface for creating HTTP clients

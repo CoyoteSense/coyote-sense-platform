@@ -185,9 +185,16 @@ export function createHttpClientContainer(config?: Partial<HttpClientConfig>, lo
  */
 export function createClient(mode: RuntimeMode = RuntimeMode.REAL, logger?: Console): CoyoteHttpClient {
   const config: Partial<HttpClientConfig> = {
-    mode: { mode } as HttpClientModeOptions
+    mode: { 
+      mode,
+      mock: DEFAULT_MOCK_OPTIONS,
+      debug: DEFAULT_DEBUG_OPTIONS,
+      record: DEFAULT_RECORD_OPTIONS,
+      replay: DEFAULT_REPLAY_OPTIONS,
+      simulation: DEFAULT_SIMULATION_OPTIONS
+    } as HttpClientModeOptions
   };
   
   const container = createHttpClientContainer(config, logger);
-  return container.getHttpClient();
+  return container.getHttpClientForMode(mode);
 }

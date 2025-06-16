@@ -13,7 +13,7 @@ from unittest.mock import patch
 http_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 sys.path.insert(0, http_root)
 
-from factory.http_client_factory import HttpClientFactory, RuntimeMode
+from src.python.factory.http_client_factory import HttpClientFactory, RuntimeMode
 from modes.mock.python.http_client_mock import HttpClientMock
 from modes.real.python.http_client_real import HttpClientReal
 

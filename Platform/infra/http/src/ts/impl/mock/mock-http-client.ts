@@ -4,9 +4,9 @@
  * This module provides a mock HTTP client for testing purposes with configurable responses.
  */
 
-import { HttpRequest, HttpResponse } from '../interfaces/http-client.js';
-import { HttpClientOptions, MockModeOptions } from '../interfaces/configuration.js';
-import { BaseHttpClient, HttpResponseImpl } from '../interfaces/base-http-client.js';
+import { HttpRequest, HttpResponse } from '../../interfaces/http-client.js';
+import { HttpClientOptions, MockModeOptions } from '../../interfaces/configuration.js';
+import { BaseHttpClient, HttpResponseImpl } from '../../interfaces/base-http-client.js';
 
 interface MockResponse {
   statusCode: number;

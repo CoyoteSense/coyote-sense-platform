@@ -23,6 +23,7 @@ class RuntimeMode(Enum):
     REAL = auto()  # Alias for PRODUCTION
     MOCK = auto()
     TEST = auto()  # Alias for MOCK
+    TESTING = auto()  # Alias for MOCK/TEST
     DEBUG = auto()
     SIMULATION = auto()
 
@@ -43,11 +44,11 @@ class HttpClientFactory:
             
         Raises:
             ValueError: If the mode is not supported
-        """
+        """        
         if mode in (RuntimeMode.PRODUCTION, RuntimeMode.REAL):
             from modes.real.python.http_client_real import HttpClientReal
             return HttpClientReal()
-        elif mode in (RuntimeMode.MOCK, RuntimeMode.TEST):
+        elif mode in (RuntimeMode.MOCK, RuntimeMode.TEST, RuntimeMode.TESTING):
             from modes.mock.python.http_client_mock import HttpClientMock
             return HttpClientMock()
         elif mode == RuntimeMode.DEBUG:
@@ -60,6 +61,40 @@ class HttpClientFactory:
             return HttpClientMock()
         else:
             raise ValueError(f"Unsupported runtime mode: {mode}")
+    
+    @staticmethod
+    def create_http_client_for_mode(mode: RuntimeMode) -> HttpClient:
+        """
+        Create an HTTP client for the specified mode.
+        This is an alias for create_client() to match test expectations.
+        """
+        return HttpClientFactory.create_client(mode)
+    
+    @staticmethod
+    def create_http_client() -> HttpClient:
+        """
+        Create an HTTP client using environment variables to determine mode.
+        This is an alias for make_http_client() to match test expectations.
+        """
+        return make_http_client()
+    
+    @staticmethod
+    def get_current_mode() -> RuntimeMode:
+        """
+        Get the current runtime mode from environment variables.
+        """
+        env_mode = os.getenv('COYOTE_RUNTIME_MODE') or os.getenv('MODE')
+        if env_mode:
+            mode_str = env_mode.upper()
+            if mode_str in ('PRODUCTION', 'REAL'):
+                return RuntimeMode.PRODUCTION
+            elif mode_str in ('MOCK', 'TEST', 'TESTING'):
+                return RuntimeMode.TESTING
+            elif mode_str == 'DEBUG':
+                return RuntimeMode.DEBUG
+            elif mode_str == 'SIMULATION':
+                return RuntimeMode.SIMULATION
+        return RuntimeMode.PRODUCTION  # Default fallback
 
 
 def make_http_client(mode: Optional[RuntimeMode] = None) -> HttpClient:
@@ -84,7 +119,7 @@ def make_http_client(mode: Optional[RuntimeMode] = None) -> HttpClient:
             if mode_str in ('PRODUCTION', 'REAL'):
                 mode = RuntimeMode.REAL
             elif mode_str in ('MOCK', 'TEST', 'TESTING'):  # added 'TESTING'
-                mode = RuntimeMode.MOCK
+                mode = RuntimeMode.TESTING
             elif mode_str == 'DEBUG':
                 mode = RuntimeMode.DEBUG
             elif mode_str == 'SIMULATION':

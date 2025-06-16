@@ -7,9 +7,9 @@
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { HttpRequest, HttpResponse } from '../interfaces/http-client.js';
-import { HttpClientOptions, RecordModeOptions } from '../interfaces/configuration.js';
-import { BaseHttpClient } from '../interfaces/base-http-client.js';
+import { HttpRequest, HttpResponse } from '../../interfaces/http-client.js';
+import { HttpClientOptions, RecordModeOptions } from '../../interfaces/configuration.js';
+import { BaseHttpClient } from '../../interfaces/base-http-client.js';
 import { RealHttpClient } from '../real/real-http-client.js';
 
 interface RecordedInteraction {
