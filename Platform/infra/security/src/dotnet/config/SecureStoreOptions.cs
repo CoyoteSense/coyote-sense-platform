@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace Coyote.Infra.Security.Auth.Options;
+namespace Coyote.Infra.Security.Auth;
 
 /// <summary>
 /// Configuration options for the Secure Store Client
@@ -59,92 +59,75 @@ public class SecureStoreOptions
     public string? ClientKeyPath { get; set; }
 
     /// <summary>
-    /// Default namespace/prefix for secrets (optional)
+    /// Authentication options for accessing the secure store
     /// </summary>
-    public string? DefaultNamespace { get; set; }
+    public AuthClientOptions? AuthOptions { get; set; }
 
     /// <summary>
-    /// Whether to enable automatic token refresh
+    /// Default headers to include with requests
     /// </summary>
-    public bool AutoRefreshToken { get; set; } = true;
+    public Dictionary<string, string> DefaultHeaders { get; set; } = new();
 
     /// <summary>
-    /// Buffer time in seconds before token expiry to trigger refresh
+    /// Whether to enable debug logging
     /// </summary>
-    public int TokenRefreshBufferSeconds { get; set; } = 300; // 5 minutes
+    public bool EnableDebugLogging { get; set; } = false;
 
     /// <summary>
-    /// Custom headers to include in all requests
+    /// Cache settings for secrets
     /// </summary>
-    public Dictionary<string, string> CustomHeaders { get; set; } = new();
+    public SecretCacheOptions Cache { get; set; } = new();
 
     /// <summary>
-    /// Whether to enable request/response logging
-    /// </summary>
-    public bool EnableLogging { get; set; } = true;
-
-    /// <summary>
-    /// Whether to enable performance metrics collection
-    /// </summary>
-    public bool EnableMetrics { get; set; } = true;
-
-    /// <summary>
-    /// Validate the configuration options
+    /// Validate the secure store configuration
     /// </summary>
     public void Validate()
     {
         if (string.IsNullOrWhiteSpace(ServerUrl))
             throw new ArgumentException("ServerUrl is required", nameof(ServerUrl));
 
-        if (!Uri.TryCreate(ServerUrl, UriKind.Absolute, out var uri) || 
-            (uri.Scheme != "https" && uri.Scheme != "http"))
-            throw new ArgumentException("ServerUrl must be a valid HTTP or HTTPS URL", nameof(ServerUrl));
-
-        if (TimeoutMs <= 0)
-            throw new ArgumentException("TimeoutMs must be positive", nameof(TimeoutMs));
-
-        if (MaxRetryAttempts < 0)
-            throw new ArgumentException("MaxRetryAttempts cannot be negative", nameof(MaxRetryAttempts));
-
-        if (RetryBackoffMs < 0)
-            throw new ArgumentException("RetryBackoffMs cannot be negative", nameof(RetryBackoffMs));
-
-        if (TokenRefreshBufferSeconds < 0)
-            throw new ArgumentException("TokenRefreshBufferSeconds cannot be negative", nameof(TokenRefreshBufferSeconds));
+        if (string.IsNullOrWhiteSpace(ApiVersion))
+            throw new ArgumentException("ApiVersion is required", nameof(ApiVersion));
 
         if (UseMutualTls)
         {
             if (string.IsNullOrWhiteSpace(ClientCertPath))
                 throw new ArgumentException("ClientCertPath is required when UseMutualTls is true", nameof(ClientCertPath));
-            
             if (string.IsNullOrWhiteSpace(ClientKeyPath))
                 throw new ArgumentException("ClientKeyPath is required when UseMutualTls is true", nameof(ClientKeyPath));
         }
+
+        AuthOptions?.Validate();
     }
 }
 
 /// <summary>
-/// Authentication integration options for Secure Store Client
+/// Cache options for secrets
 /// </summary>
-public class SecureStoreAuthOptions : SecureStoreOptions
+public class SecretCacheOptions
 {
     /// <summary>
-    /// Whether to use integrated authentication with IAuthClient
+    /// Whether to enable caching
     /// </summary>
-    public bool UseIntegratedAuth { get; set; } = true;
+    public bool Enabled { get; set; } = true;
 
     /// <summary>
-    /// Required scopes for KeyVault access
+    /// Cache expiration time in minutes
     /// </summary>
-    public List<string> RequiredScopes { get; set; } = new() { "keyvault.read" };
+    public int ExpirationMinutes { get; set; } = 60;
 
     /// <summary>
-    /// Whether to automatically refresh authentication tokens
+    /// Maximum number of cached secrets
     /// </summary>
-    public bool AutoRefreshAuth { get; set; } = true;
+    public int MaxSize { get; set; } = 1000;
 
     /// <summary>
-    /// Authentication client configuration (when not providing existing IAuthClient)
+    /// Whether to refresh cache entries before expiration
     /// </summary>
-    public AuthClientConfig? AuthClientConfig { get; set; }
+    public bool RefreshBeforeExpiry { get; set; } = true;
+
+    /// <summary>
+    /// How many minutes before expiry to refresh
+    /// </summary>
+    public int RefreshBufferMinutes { get; set; } = 5;
 }

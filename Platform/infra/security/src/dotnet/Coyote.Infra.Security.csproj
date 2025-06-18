@@ -29,13 +29,15 @@
     <Optimize>true</Optimize>
   </PropertyGroup>
 
-  <ItemGroup>
-    <!-- Core .NET Extensions -->
+  <ItemGroup>    <!-- Core .NET Extensions -->
     <PackageReference Include="Microsoft.Extensions.Http" Version="8.0.1" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.2" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="8.0.1" />
     <PackageReference Include="Microsoft.Extensions.Options" Version="8.0.2" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.0.2" />
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="8.0.1" />    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.1" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="8.0.0" />
     <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.Abstractions" Version="8.0.11" />
     
     <!-- JSON and HTTP -->
@@ -48,22 +50,14 @@
     <PackageReference Include="System.Security.Cryptography.X509Certificates" Version="4.3.2" />
     
     <!-- Security overrides for vulnerable transitive dependencies -->
-    <PackageReference Include="System.Text.Encodings.Web" Version="8.0.0" />
-  </ItemGroup>
+    <PackageReference Include="System.Text.Encodings.Web" Version="8.0.0" />  </ItemGroup>
 
   <ItemGroup>
     <!-- HTTP Client Interface -->
-    <ProjectReference Include="..\..\..\http\interfaces\dotnet\Coyote.Infra.Http.csproj" />
-  </ItemGroup>  <ItemGroup>
-    <!-- Factory and mode implementations -->
-    <Compile Include="../../factory/dotnet/*.cs" />
-    <Compile Include="../../modes/**/*.cs" />
-    <Compile Include="../../options/dotnet/*.cs" />
-    <Compile Include="../../security/dotnet/*.cs" />
-    <Compile Include="../../extensions/dotnet/*.cs" />
-  </ItemGroup>  <ItemGroup>
+    <ProjectReference Include="..\..\..\http\src\dotnet\Coyote.Infra.Http.csproj" />
+  </ItemGroup><ItemGroup>
     <!-- Documentation -->
-    <None Include="../../README.md" Pack="true" PackagePath="\" Condition="Exists('../../README.md')" />
+    <None Include="README.md" Pack="true" PackagePath="\" Condition="Exists('README.md')" />
   </ItemGroup>
 
 </Project>
