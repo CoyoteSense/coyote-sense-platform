@@ -15,18 +15,15 @@ from dataclasses import asdict
 # Import the OAuth2 client implementation
 import sys
 import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'src'))
 
-from python.oauth2_auth_client import (
-    OAuth2AuthClient,
-    OAuth2ClientConfig,
-    OAuth2Token,
-    OAuth2AuthResult,
-    OAuth2IntrospectionResult,
-    OAuth2ServerInfo,
-    OAuth2ServerDiscoveryResult,
-    OAuth2TokenStorage,
-    OAuth2Logger
+from python.interfaces.auth_client import (
+    AuthClient,
+    AuthConfig,
+    AuthToken,
+    AuthResult,
+    TokenStorage,
+    Logger
 )
 
 

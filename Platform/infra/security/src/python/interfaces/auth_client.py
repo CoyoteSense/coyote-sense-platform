@@ -4,421 +4,424 @@ Authentication Interfaces and Types for Python
 This module contains all the interface definitions and types for authentication
 in the CoyoteSense platform. Supports multiple authentication standards:
 - OAuth2 Client Credentials (RFC 6749)
-- OAuth2 Authorization Code (RFC 6749) 
-- OAuth2 + PKCE (RFC 7636)
-- JWT Bearer (RFC 7523)
-- mTLS Client Credentials (RFC 8705)
+- OAuth2 Authorization Code (RFC 6749)
+- SAML 2.0 (planned)
+- Custom authentication schemes
+
+All authentication clients must implement the AuthClient interface.
 """
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from datetime import datetime, timezone
 from enum import Enum
-from typing import Dict, List, Optional, Union
-from datetime import datetime
-import asyncio
+from typing import Dict, Optional, Any, List
 
 
 class AuthMode(Enum):
-    """Authentication modes supported by the platform"""
-    
-    CLIENT_CREDENTIALS = "client_credentials"
-    """Standard OAuth2 client credentials flow"""
-    
-    CLIENT_CREDENTIALS_MTLS = "client_credentials_mtls"
-    """Client credentials with mutual TLS authentication"""
-    
-    JWT_BEARER = "jwt_bearer"
-    """JWT Bearer assertion flow"""
-    
-    AUTHORIZATION_CODE = "authorization_code"
-    """Authorization code flow"""
-    
-    AUTHORIZATION_CODE_PKCE = "authorization_code_pkce"
-    """Authorization code flow with PKCE"""
+    """Authentication client operating modes"""
+    MOCK = "mock"
+    DEBUG = "debug"
+    REAL = "real"
 
 
 @dataclass
-class AuthClientConfig:
-    """Authentication client configuration"""
-    
-    # Required fields
-    server_url: str
+class AuthConfig:
+    """Base configuration for authentication clients"""
     client_id: str
-    
-    # Authentication mode
-    auth_mode: AuthMode = AuthMode.CLIENT_CREDENTIALS
-    
-    # Basic OAuth2 settings
-    client_secret: Optional[str] = None
-    default_scopes: List[str] = field(default_factory=list)
-    
-    # mTLS settings
-    client_cert_path: Optional[str] = None
-    client_key_path: Optional[str] = None
-    ca_cert_path: Optional[str] = None
-    
-    # JWT Bearer settings
-    jwt_signing_key_path: Optional[str] = None
-    jwt_algorithm: str = "RS256"
-    jwt_issuer: Optional[str] = None
-    jwt_audience: Optional[str] = None
-    
-    # Authorization Code settings
+    client_secret: str
+    auth_url: str
+    token_url: str
+    mode: AuthMode = AuthMode.REAL
     redirect_uri: Optional[str] = None
-    use_pkce: bool = True
+    scope: Optional[str] = None
+    timeout: float = 30.0
+    max_retries: int = 3
+    
+    # OAuth2 specific settings
+    grant_type: str = "client_credentials"
+    
+    # Additional OAuth2 settings
+    audience: Optional[str] = None
+    resource: Optional[str] = None
+    
+    # PKCE settings for OAuth2 Authorization Code flow
+    use_pkce: bool = False
+    code_challenge_method: str = "S256"
     
     # Token management
-    refresh_buffer_seconds: int = 300  # 5 minutes
+    token_refresh_threshold: float = 300  # Refresh token 5 minutes before expiry
     auto_refresh: bool = True
-    max_retry_attempts: int = 3
-    retry_delay_ms: int = 1000
     
-    # HTTP settings
-    timeout_ms: int = 30000
-    verify_ssl: bool = True
-    custom_headers: Dict[str, str] = field(default_factory=dict)
-    
-    def is_client_credentials_mode(self) -> bool:
-        """Check if using client credentials mode"""
-        return self.auth_mode == AuthMode.CLIENT_CREDENTIALS
-    
-    def is_mtls_mode(self) -> bool:
-        """Check if using mTLS mode"""
-        return self.auth_mode == AuthMode.CLIENT_CREDENTIALS_MTLS
-    
-    def is_jwt_bearer_mode(self) -> bool:
-        """Check if using JWT Bearer mode"""
-        return self.auth_mode == AuthMode.JWT_BEARER
-    
-    def is_authorization_code_mode(self) -> bool:
-        """Check if using any authorization code mode"""
-        return self.auth_mode in (AuthMode.AUTHORIZATION_CODE, AuthMode.AUTHORIZATION_CODE_PKCE)
-    
-    def requires_certificates(self) -> bool:
-        """Check if certificates are required for this mode"""
-        return self.is_mtls_mode()
-    
-    def requires_client_secret(self) -> bool:
-        """Check if client secret is required for this mode"""
-        return self.is_client_credentials_mode() or self.is_mtls_mode()
-    
-    def requires_jwt_key(self) -> bool:
-        """Check if JWT key is required for this mode"""
-        return self.is_jwt_bearer_mode()
-    
-    def requires_redirect_uri(self) -> bool:
-        """Check if redirect URI is required for this mode"""
-        return self.is_authorization_code_mode()
-    
-    def is_valid(self) -> bool:
-        """Validate configuration for the selected authentication mode"""
-        if not self.client_id or not self.server_url:
-            return False
-        
-        if self.auth_mode == AuthMode.CLIENT_CREDENTIALS:
-            return bool(self.client_secret)
-        elif self.auth_mode == AuthMode.CLIENT_CREDENTIALS_MTLS:
-            return bool(self.client_secret and self.client_cert_path and self.client_key_path)
-        elif self.auth_mode == AuthMode.JWT_BEARER:
-            return bool(self.jwt_signing_key_path)
-        elif self.auth_mode in (AuthMode.AUTHORIZATION_CODE, AuthMode.AUTHORIZATION_CODE_PKCE):
-            return bool(self.redirect_uri)
-        else:
-            return False
+    # Logging and debugging
+    debug_mode: bool = False
+    log_requests: bool = False
+    log_responses: bool = False
 
 
 @dataclass
 class AuthToken:
-    """Authentication token information"""
-    
+    """Authentication token with metadata"""
     access_token: str
     token_type: str = "Bearer"
     expires_at: Optional[datetime] = None
     refresh_token: Optional[str] = None
-    scopes: List[str] = field(default_factory=list)
-    id_token: Optional[str] = None
+    scope: Optional[str] = None
     
-    @property
+    # Additional token metadata
+    id_token: Optional[str] = None  # For OpenID Connect
+    token_info: Optional[Dict[str, Any]] = None
+    
     def is_expired(self) -> bool:
-        """Check if token is expired"""
+        """Check if the token is expired"""
         if self.expires_at is None:
             return False
-        return datetime.utcnow() >= self.expires_at
+        return datetime.now(timezone.utc) >= self.expires_at
     
-    def needs_refresh(self, buffer_seconds: int = 300) -> bool:
-        """Check if token needs refresh (within buffer time)"""
+    def expires_in(self) -> Optional[int]:
+        """Get seconds until token expires"""
         if self.expires_at is None:
-            return False
-        return datetime.utcnow().timestamp() + buffer_seconds >= self.expires_at.timestamp()
+            return None
+        delta = self.expires_at - datetime.now(timezone.utc)
+        return max(0, int(delta.total_seconds()))
     
-    def get_authorization_header(self) -> str:
-        """Get authorization header value"""
-        return f"{self.token_type} {self.access_token}"
-
-
-@dataclass
-class AuthResult:
-    """Authentication result"""
-    
-    success: bool
-    token: Optional[AuthToken] = None
-    error_code: Optional[str] = None
-    error_description: Optional[str] = None
-    error_details: Optional[str] = None
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert token to dictionary for storage"""
+        return {
+            'access_token': self.access_token,
+            'token_type': self.token_type,
+            'expires_at': self.expires_at.isoformat() if self.expires_at else None,
+            'refresh_token': self.refresh_token,
+            'scope': self.scope,
+            'id_token': self.id_token,
+            'token_info': self.token_info
+        }
     
     @classmethod
-    def success_result(cls, token: AuthToken) -> 'AuthResult':
-        """Create success result"""
-        return cls(success=True, token=token)
-    
-    @classmethod
-    def error_result(cls, error_code: str, error_description: Optional[str] = None, 
-                    error_details: Optional[str] = None) -> 'AuthResult':
-        """Create error result"""
+    def from_dict(cls, data: Dict[str, Any]) -> 'AuthToken':
+        """Create token from dictionary"""
+        expires_at = None
+        if data.get('expires_at'):
+            expires_at = datetime.fromisoformat(data['expires_at'])
+        
         return cls(
-            success=False,
-            error_code=error_code,
-            error_description=error_description,
-            error_details=error_details
+            access_token=data['access_token'],
+            token_type=data.get('token_type', 'Bearer'),
+            expires_at=expires_at,
+            refresh_token=data.get('refresh_token'),
+            scope=data.get('scope'),
+            id_token=data.get('id_token'),
+            token_info=data.get('token_info')
         )
 
 
 @dataclass
-class AuthServerInfo:
-    """Authentication server information"""
+class AuthResult:
+    """Result of an authentication attempt"""
+    success: bool
+    token: Optional[AuthToken] = None
+    error: Optional[str] = None
+    error_description: Optional[str] = None
+    error_code: Optional[str] = None
     
-    authorization_endpoint: str
-    token_endpoint: str
-    introspection_endpoint: Optional[str] = None
-    revocation_endpoint: Optional[str] = None
-    grant_types_supported: List[str] = field(default_factory=list)
-    scopes_supported: List[str] = field(default_factory=list)
+    # Additional result metadata
+    state: Optional[str] = None  # For OAuth2 state parameter
+    code: Optional[str] = None   # For OAuth2 authorization code
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert result to dictionary"""
+        return {
+            'success': self.success,
+            'token': self.token.to_dict() if self.token else None,
+            'error': self.error,
+            'error_description': self.error_description,
+            'error_code': self.error_code,
+            'state': self.state,
+            'code': self.code
+        }
 
 
-class IAuthTokenStorage(ABC):
-    """Authentication token storage interface"""
+class TokenStorage(ABC):
+    """Abstract base class for token storage implementations"""
     
     @abstractmethod
-    async def store_token_async(self, client_id: str, token: AuthToken) -> None:
-        """Store a token for a client"""
+    def store_token(self, key: str, token: AuthToken) -> bool:
+        """Store a token synchronously"""
         pass
     
     @abstractmethod
-    def get_token(self, client_id: str) -> Optional[AuthToken]:
-        """Retrieve a token for a client"""
+    def get_token(self, key: str) -> Optional[AuthToken]:
+        """Retrieve a token synchronously"""
         pass
     
     @abstractmethod
-    def clear_token(self, client_id: str) -> None:
-        """Clear stored token for a client"""
+    async def store_token_async(self, key: str, token: AuthToken) -> bool:
+        """Store a token asynchronously"""
         pass
     
     @abstractmethod
-    def clear_all_tokens(self) -> None:
-        """Clear all stored tokens"""
+    async def get_token_async(self, key: str) -> Optional[AuthToken]:
+        """Retrieve a token asynchronously"""
+        pass
+    
+    @abstractmethod
+    def delete_token(self, key: str) -> bool:
+        """Delete a token"""
+        pass
+    
+    @abstractmethod
+    def list_keys(self) -> List[str]:
+        """List all stored token keys"""
         pass
 
 
-class IAuthLogger(ABC):
-    """Authentication logger interface"""
+class Logger(ABC):
+    """Abstract base class for authentication logging"""
     
     @abstractmethod
-    def log_info(self, message: str) -> None:
-        """Log information message"""
-        pass
-    
-    @abstractmethod
-    def log_error(self, message: str) -> None:
-        """Log error message"""
-        pass
-    
-    @abstractmethod
-    def log_debug(self, message: str) -> None:
+    def debug(self, message: str, **kwargs) -> None:
         """Log debug message"""
         pass
-
-
-class IAuthClient(ABC):
-    """Authentication client interface
     
-    Supports multiple authentication standards:
-    - OAuth2 Client Credentials (RFC 6749)
-    - OAuth2 Authorization Code (RFC 6749) 
-    - OAuth2 + PKCE (RFC 7636)
-    - JWT Bearer (RFC 7523)
-    - mTLS Client Credentials (RFC 8705)
+    @abstractmethod
+    def info(self, message: str, **kwargs) -> None:
+        """Log info message"""
+        pass
+    
+    @abstractmethod
+    def warning(self, message: str, **kwargs) -> None:
+        """Log warning message"""
+        pass
+    
+    @abstractmethod
+    def error(self, message: str, **kwargs) -> None:
+        """Log error message"""
+        pass
+
+
+class AuthClient(ABC):
+    """
+    Abstract base class for all authentication clients.
+    
+    This interface defines the core authentication operations that all
+    authentication clients must implement. It supports both synchronous
+    and asynchronous operations.
     """
     
+    def __init__(self, config: AuthConfig, 
+                 token_storage: Optional[TokenStorage] = None,
+                 logger: Optional[Logger] = None):
+        """Initialize the authentication client"""
+        self.config = config
+        self.token_storage = token_storage
+        self.logger = logger
+    
+    # Core authentication methods
     @abstractmethod
-    async def authenticate_client_credentials_async(
-        self, scopes: Optional[List[str]] = None
-    ) -> AuthResult:
-        """Authenticate using Client Credentials flow"""
+    async def authenticate_async(self, **kwargs) -> AuthResult:
+        """
+        Perform authentication asynchronously.
+        
+        Returns:
+            AuthResult: Result of the authentication attempt
+        """
         pass
     
     @abstractmethod
-    async def authenticate_jwt_bearer_async(
-        self, subject: Optional[str] = None, scopes: Optional[List[str]] = None
-    ) -> AuthResult:
-        """Authenticate using JWT Bearer flow"""
+    def authenticate(self, **kwargs) -> AuthResult:
+        """
+        Perform authentication synchronously.
+        
+        Returns:
+            AuthResult: Result of the authentication attempt
+        """
         pass
     
-    @abstractmethod
-    async def authenticate_authorization_code_async(
-        self, authorization_code: str, redirect_uri: str, code_verifier: Optional[str] = None
-    ) -> AuthResult:
-        """Authenticate using Authorization Code flow"""
-        pass
-    
-    @abstractmethod
-    async def start_authorization_code_flow_async(
-        self, redirect_uri: str, scopes: Optional[List[str]] = None, state: Optional[str] = None
-    ) -> tuple[str, str, str]:
-        """Start Authorization Code + PKCE flow (returns authorization URL, code verifier, state)"""
-        pass
-    
+    # Token management methods
     @abstractmethod
     async def refresh_token_async(self, refresh_token: str) -> AuthResult:
-        """Refresh access token using refresh token"""
+        """
+        Refresh an access token asynchronously.
+        
+        Args:
+            refresh_token: The refresh token to use
+            
+        Returns:
+            AuthResult: Result containing the new token
+        """
         pass
     
     @abstractmethod
-    async def get_valid_token_async(self) -> Optional[AuthToken]:
-        """Get current valid token (automatically refreshes if needed)"""
-        pass
-    
-    @abstractmethod
-    async def revoke_token_async(self, token: str, token_type_hint: Optional[str] = None) -> bool:
-        """Revoke a token"""
-        pass
-    
-    @abstractmethod
-    async def introspect_token_async(self, token: str) -> bool:
-        """Introspect a token"""
-        pass
-    
-    @abstractmethod
-    async def test_connection_async(self) -> bool:
-        """Test connection to authentication server"""
-        pass
-    
-    @abstractmethod
-    async def get_server_info_async(self) -> Optional[AuthServerInfo]:
-        """Get authentication server information"""
-        pass
-    
-    @abstractmethod
-    def clear_tokens(self) -> None:
-        """Clear stored tokens"""
-        pass
-    
-    @property
-    @abstractmethod
-    def current_token(self) -> Optional[AuthToken]:
-        """Current token (if any)"""
-        pass
-    
-    @property
-    @abstractmethod
-    def is_authenticated(self) -> bool:
-        """Whether client has valid authentication"""
-        pass
-    
-    # Synchronous versions for compatibility
-    def authenticate_client_credentials(self, scopes: Optional[List[str]] = None) -> AuthResult:
-        """Authenticate using Client Credentials flow (sync)"""
-        return asyncio.run(self.authenticate_client_credentials_async(scopes))
-    
-    def authenticate_jwt_bearer(self, subject: Optional[str] = None, scopes: Optional[List[str]] = None) -> AuthResult:
-        """Authenticate using JWT Bearer flow (sync)"""
-        return asyncio.run(self.authenticate_jwt_bearer_async(subject, scopes))
-    
-    def authenticate_authorization_code(self, authorization_code: str, redirect_uri: str, code_verifier: Optional[str] = None) -> AuthResult:
-        """Authenticate using Authorization Code flow (sync)"""
-        return asyncio.run(self.authenticate_authorization_code_async(authorization_code, redirect_uri, code_verifier))
-    
     def refresh_token(self, refresh_token: str) -> AuthResult:
-        """Refresh access token using refresh token (sync)"""
-        return asyncio.run(self.refresh_token_async(refresh_token))
-    
-    def get_valid_token(self) -> Optional[AuthToken]:
-        """Get current valid token (sync)"""
-        return asyncio.run(self.get_valid_token_async())
-    
-    def revoke_token(self, token: str, token_type_hint: Optional[str] = None) -> bool:
-        """Revoke a token (sync)"""
-        return asyncio.run(self.revoke_token_async(token, token_type_hint))
-    
-    def introspect_token(self, token: str) -> bool:
-        """Introspect a token (sync)"""
-        return asyncio.run(self.introspect_token_async(token))
-    
-    def test_connection(self) -> bool:
-        """Test connection to authentication server (sync)"""
-        return asyncio.run(self.test_connection_async())
-    
-    def get_server_info(self) -> Optional[AuthServerInfo]:
-        """Get authentication server information (sync)"""
-        return asyncio.run(self.get_server_info_async())
-
-
-# Concrete implementations
-
-class InMemoryTokenStorage(IAuthTokenStorage):
-    """In-memory token storage implementation"""
-    
-    def __init__(self):
-        self._tokens: Dict[str, AuthToken] = {}
-    
-    async def store_token_async(self, client_id: str, token: AuthToken) -> None:
-        self._tokens[client_id] = token
-    
-    def get_token(self, client_id: str) -> Optional[AuthToken]:
-        return self._tokens.get(client_id)
-    
-    def clear_token(self, client_id: str) -> None:
-        self._tokens.pop(client_id, None)
-    
-    def clear_all_tokens(self) -> None:
-        self._tokens.clear()
-
-
-class ConsoleAuthLogger(IAuthLogger):
-    """Console logger implementation"""
-    
-    def __init__(self, prefix: str = "Auth"):
-        self.prefix = prefix
-    
-    def log_info(self, message: str) -> None:
-        print(f"[{datetime.utcnow().isoformat()}] [{self.prefix}] INFO: {message}")
-    
-    def log_error(self, message: str) -> None:
-        print(f"[{datetime.utcnow().isoformat()}] [{self.prefix}] ERROR: {message}")
-    
-    def log_debug(self, message: str) -> None:
-        print(f"[{datetime.utcnow().isoformat()}] [{self.prefix}] DEBUG: {message}")
-
-
-class NullAuthLogger(IAuthLogger):
-    """Null logger implementation (no logging)"""
-    
-    def log_info(self, message: str) -> None:
+        """
+        Refresh an access token synchronously.
+        
+        Args:
+            refresh_token: The refresh token to use
+            
+        Returns:
+            AuthResult: Result containing the new token
+        """
         pass
     
-    def log_error(self, message: str) -> None:
+    # Token validation and introspection
+    @abstractmethod
+    async def validate_token_async(self, token: str) -> Dict[str, Any]:
+        """
+        Validate and introspect a token asynchronously.
+        
+        Args:
+            token: The token to validate
+            
+        Returns:
+            Dict containing token information
+        """
         pass
     
-    def log_debug(self, message: str) -> None:
+    @abstractmethod
+    def validate_token(self, token: str) -> Dict[str, Any]:
+        """
+        Validate and introspect a token synchronously.
+        
+        Args:
+            token: The token to validate
+            
+        Returns:
+            Dict containing token information
+        """
         pass
+    
+    # OAuth2 Authorization Code flow methods
+    @abstractmethod
+    def get_authorization_url(self, state: Optional[str] = None, **kwargs) -> str:
+        """
+        Get the authorization URL for OAuth2 Authorization Code flow.
+        
+        Args:
+            state: Optional state parameter for security
+            **kwargs: Additional parameters for the authorization URL
+            
+        Returns:
+            str: The authorization URL
+        """
+        pass
+    
+    @abstractmethod
+    async def exchange_code_async(self, code: str, state: Optional[str] = None) -> AuthResult:
+        """
+        Exchange authorization code for tokens asynchronously.
+        
+        Args:
+            code: The authorization code received from the authorization server
+            state: Optional state parameter for validation
+            
+        Returns:
+            AuthResult: Result containing the tokens
+        """
+        pass
+    
+    @abstractmethod
+    def exchange_code(self, code: str, state: Optional[str] = None) -> AuthResult:
+        """
+        Exchange authorization code for tokens synchronously.
+        
+        Args:
+            code: The authorization code received from the authorization server
+            state: Optional state parameter for validation
+            
+        Returns:
+            AuthResult: Result containing the tokens
+        """
+        pass
+    
+    # Server discovery methods (for OAuth2/OpenID Connect)
+    @abstractmethod
+    async def discover_server_async(self) -> Dict[str, Any]:
+        """
+        Discover OAuth2/OpenID Connect server configuration asynchronously.
+        
+        Returns:
+            Dict containing server configuration
+        """
+        pass
+    
+    @abstractmethod
+    def discover_server(self) -> Dict[str, Any]:
+        """
+        Discover OAuth2/OpenID Connect server configuration synchronously.
+        
+        Returns:
+            Dict containing server configuration
+        """
+        pass
+    
+    # Utility methods
+    @abstractmethod
+    async def revoke_token_async(self, token: str) -> bool:
+        """
+        Revoke a token asynchronously.
+        
+        Args:
+            token: The token to revoke
+            
+        Returns:
+            bool: True if revocation was successful
+        """
+        pass
+    
+    @abstractmethod
+    def revoke_token(self, token: str) -> bool:
+        """
+        Revoke a token synchronously.
+        
+        Args:
+            token: The token to revoke
+            
+        Returns:
+            bool: True if revocation was successful
+        """
+        pass
+    
+    def get_stored_token(self, key: str) -> Optional[AuthToken]:
+        """Get a stored token"""
+        if self.token_storage:
+            return self.token_storage.get_token(key)
+        return None
+    
+    def store_token(self, key: str, token: AuthToken) -> bool:
+        """Store a token"""
+        if self.token_storage:
+            return self.token_storage.store_token(key, token)
+        return False
+    
+    def log_debug(self, message: str, **kwargs) -> None:
+        """Log a debug message"""
+        if self.logger:
+            self.logger.debug(message, **kwargs)
+    
+    def log_info(self, message: str, **kwargs) -> None:
+        """Log an info message"""
+        if self.logger:
+            self.logger.info(message, **kwargs)
+    
+    def log_warning(self, message: str, **kwargs) -> None:
+        """Log a warning message"""
+        if self.logger:
+            self.logger.warning(message, **kwargs)
+    
+    def log_error(self, message: str, **kwargs) -> None:
+        """Log an error message"""
+        if self.logger:
+            self.logger.error(message, **kwargs)
 
 
-# Legacy aliases for backward compatibility
-OAuth2ClientConfig = AuthClientConfig
-OAuth2Token = AuthToken  
-OAuth2AuthResult = AuthResult
-OAuth2ServerInfo = AuthServerInfo
-IOAuth2TokenStorage = IAuthTokenStorage
-IOAuth2Logger = IAuthLogger
-IOAuth2AuthClient = IAuthClient
-ConsoleOAuth2Logger = ConsoleAuthLogger
-NullOAuth2Logger = NullAuthLogger
+# Export all public interfaces and types
+__all__ = [
+    'AuthMode',
+    'AuthConfig', 
+    'AuthToken',
+    'AuthResult',
+    'TokenStorage',
+    'Logger',
+    'AuthClient'
+]

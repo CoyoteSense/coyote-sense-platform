@@ -8,14 +8,18 @@ import pytest
 import httpx
 from typing import Dict, Any, Optional
 from unittest.mock import Mock
+import sys
 
-from oauth2_auth_client import (
-    OAuth2AuthClient,
-    OAuth2ClientConfiguration,
-    OAuth2RetryPolicy,
-    OAuth2TokenStorage,
-    OAuth2Logger
+# Add src directory to path for imports
+sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'src'))
+
+from python.interfaces.auth_client import (
+    AuthClient,
+    AuthConfig,
+    TokenStorage,
+    Logger
 )
+from python.factory.auth_client_factory import create_auth_client
 
 
 class TestOAuth2TokenStorage(OAuth2TokenStorage):
