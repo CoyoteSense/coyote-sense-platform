@@ -4,9 +4,7 @@ using System.Threading.Tasks;
 using Xunit;
 using Microsoft.Extensions.Logging;
 using Coyote.Infra.Security.Auth;
-using Coyote.Infra.Security.Auth.Clients;
 using Coyote.Infra.Security.Auth.Options;
-using Coyote.Infra.Security.Auth.Factory;
 using Coyote.Infra.Security.Tests.Mocks;
 
 namespace Coyote.Infra.Security.Tests.Integration;
@@ -19,12 +17,12 @@ namespace Coyote.Infra.Security.Tests.Integration;
 public class SecureStoreClientIntegrationTests : IDisposable
 {
     private readonly MockKeyVaultServer _mockServer;
-    private readonly ILogger<SecureStoreClient> _logger;
+    private readonly ILogger<Coyote.Infra.Security.Auth.SecureStoreClient> _logger;
 
     public SecureStoreClientIntegrationTests()
     {
         _mockServer = new MockKeyVaultServer();
-        _logger = LoggerFactory.Create(builder => builder.AddConsole()).CreateLogger<SecureStoreClient>();
+        _logger = LoggerFactory.Create(builder => builder.AddConsole()).CreateLogger<Coyote.Infra.Security.Auth.SecureStoreClient>();
     }
 
     [Fact]

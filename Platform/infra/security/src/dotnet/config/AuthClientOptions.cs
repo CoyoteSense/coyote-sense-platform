@@ -99,7 +99,18 @@ public class AuthClientOptions
     /// <summary>
     /// Maximum number of retry attempts
     /// </summary>
-    public int MaxRetries { get; set; } = 3;
+    public int MaxRetryAttempts { get; set; } = 3;
+
+    /// <summary>
+    /// Whether to enable automatic token refresh
+    /// </summary>
+    public bool AutoRefresh { get; set; } = true;
+
+    /// <summary>
+    /// Token refresh threshold percentage (0.0 to 1.0)
+    /// When the token has less than this percentage of time remaining, it will be refreshed
+    /// </summary>
+    public double RefreshThresholdPercentage { get; set; } = 0.1; // Refresh when 10% time remaining
 
     /// <summary>
     /// Whether to verify SSL/TLS peer certificates

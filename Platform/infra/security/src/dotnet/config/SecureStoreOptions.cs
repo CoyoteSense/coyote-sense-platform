@@ -14,9 +14,23 @@ public class SecureStoreOptions
     public string ServerUrl { get; set; } = string.Empty;
 
     /// <summary>
+    /// KeyVault server base URL (alias for ServerUrl)
+    /// </summary>
+    public string BaseUrl 
+    { 
+        get => ServerUrl; 
+        set => ServerUrl = value; 
+    }
+
+    /// <summary>
     /// API version to use (defaults to "v1")
     /// </summary>
     public string ApiVersion { get; set; } = "v1";
+
+    /// <summary>
+    /// Token refresh buffer time in seconds
+    /// </summary>
+    public int TokenRefreshBufferSeconds { get; set; } = 300; // 5 minutes default
 
     /// <summary>
     /// Timeout for HTTP requests in milliseconds

@@ -35,10 +35,10 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
-    
-    <!-- Mocking and Testing -->
+      <!-- Mocking and Testing -->
     <PackageReference Include="Moq" Version="4.20.70" />
     <PackageReference Include="FluentAssertions" Version="6.12.1" />
+    <PackageReference Include="WireMock.Net" Version="1.5.62" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.1" />
     <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.1" />
     <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="8.0.1" />
@@ -62,13 +62,12 @@
     
     <!-- Security overrides -->
     <PackageReference Include="System.Text.Encodings.Web" Version="8.0.0" />
-  </ItemGroup>
-  <ItemGroup>
-    <!-- Reference to the main project -->
-    <ProjectReference Include="..\..\..\clients\dotnet\CoyoteSense.Security.Client.csproj" />
+  </ItemGroup>  <ItemGroup>
+    <!-- Reference to the main security project -->
+    <ProjectReference Include="..\..\src\dotnet\Coyote.Infra.Security.csproj" />
     
     <!-- Reference to HTTP interfaces for testing -->
-    <ProjectReference Include="..\..\..\http\interfaces\dotnet\Coyote.Infra.Http.csproj" />
+    <ProjectReference Include="..\..\..\http\src\dotnet\Coyote.Infra.Http.csproj" />
   </ItemGroup>
 
   <ItemGroup>
