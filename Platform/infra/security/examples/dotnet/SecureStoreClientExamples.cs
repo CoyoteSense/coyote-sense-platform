@@ -99,7 +99,7 @@ public class SecureStoreClientExamples
         };
 
         // Use external auth client (loose coupling)
-        var authClient = AuthClientFactory.CreateBuilder(AuthServerUrl, ClientId)
+        var authClient = AuthClientBuilder.CreateBuilder(AuthServerUrl, ClientId)
             .WithClientCredentialsFlow(Environment.GetEnvironmentVariable("CLIENT_SECRET") ?? "demo-secret")
             .WithDefaultScopes("keyvault.read")
             .Build();
@@ -170,7 +170,7 @@ public class SecureStoreClientExamples
             ClientKeyPath = "/opt/coyote/certs/client.key"
         };
 
-        var authClient = AuthClientFactory.CreateBuilder(AuthServerUrl, ClientId)
+        var authClient = AuthClientBuilder.CreateBuilder(AuthServerUrl, ClientId)
             .WithJwtBearerFlow("/opt/coyote/keys/jwt_private.pem", "key-id-123")
             .Build();
 
@@ -393,7 +393,7 @@ public class SecureStoreClientExamples
             EnableMetrics = true
         };
 
-        var authClient = AuthClientFactory.CreateBuilder(AuthServerUrl, ClientId)
+        var authClient = AuthClientBuilder.CreateBuilder(AuthServerUrl, ClientId)
             .WithClientCredentialsFlow(Environment.GetEnvironmentVariable("CLIENT_SECRET") ?? "demo-secret")
             .Build();
 

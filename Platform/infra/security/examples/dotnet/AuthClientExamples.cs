@@ -40,10 +40,8 @@ public class AuthClientExamples
             TimeoutMs = 30000,
             MaxRetryAttempts = 3,
             VerifySsl = true
-        };
-
-        // Create client using options (automatic validation)
-        using var client = AuthClientFactory.CreateFromOptions(
+        };        // Create client using options (automatic validation)
+        using var client = AuthClientBuilder.CreateFromOptions(
             mtlsOptions,
             tokenStorage: new ConsoleTokenStorage(),
             logger: new ConsoleAuthLogger("mTLS-Options")
@@ -63,12 +61,11 @@ public class AuthClientExamples
         {
             Console.WriteLine($"❌ mTLS authentication failed: {result.ErrorCode} - {result.ErrorDescription}");
         }
-    }
-
-    /// <summary>
+    }    /// <summary>
     /// Example: Legacy Factory Method (LEGACY - Consider migrating)
     /// Shows the old approach for comparison
-    /// </summary>    public static async Task MtlsLegacyFactoryExample()
+    /// </summary>
+    public static async Task MtlsLegacyFactoryExample()
     {
         Console.WriteLine("\n=== Modern mTLS Options Example ===");
 
@@ -80,9 +77,8 @@ public class AuthClientExamples
             ClientCertPath = "/opt/coyote/certs/client.crt",
             ClientKeyPath = "/opt/coyote/certs/client.key",
             DefaultScopes = new List<string> { "keyvault.read", "keyvault.write" }
-        };
-        
-        using var client = AuthClientFactory.CreateFromOptions(
+        };        
+        using var client = AuthClientBuilder.CreateFromOptions(
             options,
             logger: new ConsoleAuthLogger("mTLS-Modern")
         );
@@ -123,7 +119,7 @@ public class AuthClientExamples
         };
 
         // Create client with secure credentials
-        using var client = AuthClientFactory.CreateWithSecureCredentials(
+        using var client = AuthClientBuilder.CreateWithSecureCredentials(
             config,
             credentialProvider,
             logger: new ConsoleAuthLogger("Secure")
@@ -165,7 +161,7 @@ public class AuthClientExamples
         var options = Options.Create(jwtOptions);
 
         // Create client using IOptions pattern
-        using var client = AuthClientFactory.CreateFromOptions(
+        using var client = AuthClientBuilder.CreateFromOptions(
             options,
             logger: new ConsoleAuthLogger("JWT-DI")
         );
@@ -191,7 +187,7 @@ public class AuthClientExamples
         Console.WriteLine("\n=== Builder Pattern Example ===");
 
         // Use fluent builder API
-        using var client = AuthClientFactory.CreateBuilder(ServerUrl, ClientId)
+        using var client = AuthClientBuilder.CreateBuilder(ServerUrl, ClientId)
             .WithClientSecret("my-client-secret")
             .WithDefaultScopes("api.read", "api.write")
             .WithAutoRefresh(enabled: true, bufferSeconds: 600)
@@ -230,7 +226,7 @@ public class AuthClientExamples
             DefaultScopes = new List<string> { "basic.read" }
         };
 
-        using var clientCredClient = AuthClientFactory.CreateFromOptions(clientCredOptions);
+        using var clientCredClient = AuthClientBuilder.CreateFromOptions(clientCredOptions);
         var clientCredResult = await clientCredClient.AuthenticateClientCredentialsAsync();
         Console.WriteLine($"Client Credentials: {(clientCredResult.IsSuccess ? "✅ Success" : "❌ Failed")}");
 
@@ -244,7 +240,7 @@ public class AuthClientExamples
             DefaultScopes = new List<string> { "openid", "profile" }
         };
 
-        using var authCodeClient = AuthClientFactory.CreateFromOptions(authCodeOptions);
+        using var authCodeClient = AuthClientBuilder.CreateFromOptions(authCodeOptions);
         
         // For Authorization Code, you'd typically redirect user to authorization URL
         var authUrl = await authCodeClient.GetAuthorizationUrlAsync(
@@ -263,7 +259,7 @@ public class AuthClientExamples
         Console.WriteLine("\n=== SecureStore Integration Example ===");
 
         // Create auth client first
-        var authClient = AuthClientFactory.CreateBuilder(ServerUrl, ClientId)
+        var authClient = AuthClientBuilder.CreateBuilder(ServerUrl, ClientId)
             .WithClientCredentialsFlow("my-client-secret")
             .WithDefaultScopes("keyvault.read", "keyvault.write")
             .WithAutoRefresh(enabled: true, bufferSeconds: 300)

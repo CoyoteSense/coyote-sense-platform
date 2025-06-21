@@ -42,7 +42,7 @@ public class EnhancedAuthClientExamples
         };
 
         // Create client using options (automatic validation)
-        using var client = AuthClientFactory.CreateFromOptions(
+        using var client = AuthClientBuilder.CreateFromOptions(
             mtlsOptions,
             tokenStorage: new ConsoleTokenStorage(),
             logger: new ConsoleAuthLogger("mTLS-Options")
@@ -82,7 +82,7 @@ public class EnhancedAuthClientExamples
             DefaultScopes = new List<string> { "keyvault.read", "keyvault.write" }
         };
         
-        using var client = AuthClientFactory.CreateFromOptions(
+        using var client = AuthClientBuilder.CreateFromOptions(
             options,
             logger: new ConsoleAuthLogger("mTLS-Modern")
         );
@@ -123,7 +123,7 @@ public class EnhancedAuthClientExamples
         };
 
         // Create client with secure credentials
-        using var client = AuthClientFactory.CreateWithSecureCredentials(
+        using var client = AuthClientBuilder.CreateWithSecureCredentials(
             config,
             credentialProvider,
             logger: new ConsoleAuthLogger("Secure")
@@ -165,7 +165,7 @@ public class EnhancedAuthClientExamples
         var options = Options.Create(jwtOptions);
 
         // Create client using IOptions pattern
-        using var client = AuthClientFactory.CreateFromOptions(
+        using var client = AuthClientBuilder.CreateFromOptions(
             options,
             logger: new ConsoleAuthLogger("JWT-DI")
         );
@@ -191,7 +191,7 @@ public class EnhancedAuthClientExamples
         Console.WriteLine("\n=== Builder Pattern Example ===");
 
         // Use fluent builder API
-        using var client = AuthClientFactory.CreateBuilder(ServerUrl, ClientId)
+        using var client = AuthClientBuilder.CreateBuilder(ServerUrl, ClientId)
             .WithClientSecret("my-client-secret")
             .WithDefaultScopes("api.read", "api.write")
             .WithAutoRefresh(enabled: true, bufferSeconds: 600)
@@ -230,7 +230,7 @@ public class EnhancedAuthClientExamples
             DefaultScopes = new List<string> { "basic.read" }
         };
 
-        using var clientCredClient = AuthClientFactory.CreateFromOptions(clientCredOptions);
+        using var clientCredClient = AuthClientBuilder.CreateFromOptions(clientCredOptions);
         var clientCredResult = await clientCredClient.AuthenticateClientCredentialsAsync();
         Console.WriteLine($"Client Credentials: {(clientCredResult.IsSuccess ? "✅ Success" : "❌ Failed")}");
 
@@ -244,7 +244,7 @@ public class EnhancedAuthClientExamples
             DefaultScopes = new List<string> { "openid", "profile" }
         };
 
-        using var authCodeClient = AuthClientFactory.CreateFromOptions(authCodeOptions);
+        using var authCodeClient = AuthClientBuilder.CreateFromOptions(authCodeOptions);
         
         // For Authorization Code, you'd typically redirect user to authorization URL
         var authUrl = await authCodeClient.GetAuthorizationUrlAsync(
