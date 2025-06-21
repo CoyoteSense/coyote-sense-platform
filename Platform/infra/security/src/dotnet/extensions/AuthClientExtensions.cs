@@ -13,14 +13,17 @@ namespace Coyote.Infra.Security.Auth.Extensions;
 /// Extensions for auth client configuration
 /// </summary>
 public static class AuthClientExtensions
-{    public static IAuthClient CreateFromOptions(this ICoyoteAuthClientFactory factory, MtlsOptions options)
+{    /// <summary>
+    /// Create auth client from MtlsOptions
+    /// </summary>
+    public static IAuthClient CreateFromMtlsOptions(MtlsOptions options)
     {
         if (options == null)
             throw new ArgumentNullException(nameof(options));
 
         var config = options.ToAuthClientConfig();
         var authOptions = config.ToAuthClientOptions();
-          // Create the client directly since static factory is causing issues
+        // Create the client directly
         using var loggerFactory = LoggerFactory.Create(builder => builder.AddConsole());
         var logger = loggerFactory.CreateLogger<RealAuthClient>();
         

@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -70,17 +71,16 @@ public class MockKeyVaultServer : IDisposable
     {
         app.UseRouting();
         app.UseEndpoints(endpoints =>
-        {
-            // Health endpoint
+        {            // Health endpoint
             endpoints.MapGet("/v1/health", HandleHealthAsync);
+            
+            // Secret metadata (must come before general secret operations)
+            endpoints.MapGet("/v1/secret/{path}/metadata", HandleGetSecretMetadataAsync);
             
             // Secret operations
             endpoints.MapGet("/v1/secret/{*path}", HandleGetSecretAsync);
             endpoints.MapPost("/v1/secret/{*path}", HandleSetSecretAsync);
             endpoints.MapDelete("/v1/secret/{*path}", HandleDeleteSecretAsync);
-            
-            // Secret metadata
-            endpoints.MapGet("/v1/secret/{*path}/metadata", HandleGetSecretMetadataAsync);
             
             // List secrets
             endpoints.MapGet("/v1/secrets", HandleListSecretsAsync);

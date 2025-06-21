@@ -109,7 +109,7 @@ public class MockOAuth2ServerIntegrationTests : IDisposable
     {
         // Arrange
         var jwtKeyPath = await _mockServer.ExportRSAPrivateKeyAsync();
-        var jwtClient = AuthClientFactory.CreateJwtBearerClient(
+        var jwtClient = TestAuthClientFactory.CreateJwtBearerClient(
             serverUrl: _mockServer.BaseUrl,
             clientId: "test-client",
             jwtSigningKeyPath: jwtKeyPath,

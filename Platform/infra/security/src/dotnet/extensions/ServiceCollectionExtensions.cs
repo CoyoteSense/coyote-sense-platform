@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Coyote.Infra.Security.Auth;
 using Coyote.Infra.Security.Auth.Options;
+using Coyote.Infra.Security.Auth.Modes.Real;
 
 namespace Coyote.Infra.Security.Extensions;
 
@@ -76,24 +77,8 @@ public static class ServiceCollectionExtensions
     /// <param name="services">Service collection</param>
     /// <returns>Service collection for chaining</returns>
     public static IServiceCollection AddAuthenticationServices(this IServiceCollection services)
-    {
-        // Add logging if not already added
+    {        // Add logging if not already added
         services.AddLogging();
-
-        // Add auth client pool
-        services.AddSingleton<AuthClientPool>(provider =>
-        {
-            var options = new AuthClientOptions
-            {
-                ServerUrl = "https://auth.coyotesense.io",
-                ClientId = "default-client",
-                DefaultScopes = new List<string> { "read", "write" },
-                TimeoutMs = 30000,
-                AutoRefresh = true
-            };
-            var logger = provider.GetRequiredService<ILogger<AuthClientPool>>();
-            return new AuthClientPool(options, provider, logger);
-        });
 
         // Add secure store client
         services.AddSingleton<ISecureStoreClient>(provider =>
@@ -106,8 +91,18 @@ public static class ServiceCollectionExtensions
                 MaxRetryAttempts = 3,
                 VerifySsl = true
             };
-            var authPool = provider.GetRequiredService<AuthClientPool>();
-            var authClient = authPool.GetClientCredentialsClient();
+            
+            // Create auth client directly
+            var authOptions = new AuthClientOptions
+            {
+                ServerUrl = "https://auth.coyotesense.io",
+                ClientId = "default-client",
+                DefaultScopes = new List<string> { "read", "write" },
+                TimeoutMs = 30000,
+                AutoRefresh = true
+            };
+            var authLogger = provider.GetRequiredService<ILogger<RealAuthClient>>();
+            var authClient = new RealAuthClient(authOptions, authLogger);
             var logger = provider.GetService<ILogger<SecureStoreClient>>();
             
             return SecureStoreClientFactory.CreateWithAuthClient(options, authClient, logger);

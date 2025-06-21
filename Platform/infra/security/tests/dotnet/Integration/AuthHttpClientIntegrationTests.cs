@@ -51,10 +51,9 @@ public class AuthHttpClientIntegrationTests : IDisposable
         _serviceProvider = services.BuildServiceProvider();
         
         // Create HTTP client
-        _httpClient = _serviceProvider.GetRequiredService<ICoyoteHttpClient>();
-          // Setup auth client factory
+        _httpClient = _serviceProvider.GetRequiredService<ICoyoteHttpClient>();          // Setup auth client factory
         var httpClientFactory = _serviceProvider.GetRequiredService<Coyote.Infra.Http.Factory.IHttpClientFactory>();
-        AuthClientFactory.SetHttpClientFactory(httpClientFactory);
+        TestAuthClientFactory.SetHttpClientFactory(httpClientFactory);
         
         // Create auth client configuration using mock endpoints
         var config = new AuthClientConfig
@@ -91,8 +90,8 @@ public class AuthHttpClientIntegrationTests : IDisposable
     [Trait("Category", "Integration")]
     public async Task AuthClientFactory_WithHttpClientFactory_ShouldCreateWorkingClient()
     {
-        // Act
-        var factoryClient = AuthClientFactory.CreateClientCredentialsClient(
+        // Act        // Create factory client using test helper
+        var factoryClient = TestAuthClientFactory.CreateClientCredentialsClient(
             serverUrl: "https://login.microsoftonline.com/test-tenant",
             clientId: "factory-test-client",
             clientSecret: "factory-test-secret",
@@ -114,7 +113,7 @@ public class AuthHttpClientIntegrationTests : IDisposable
     {
         // Arrange
         var jwtKeyPath = await CreateTestJwtKeyAsync();
-        var jwtClient = AuthClientFactory.CreateJwtBearerClient(
+        var jwtClient = TestAuthClientFactory.CreateJwtBearerClient(
             serverUrl: "https://login.microsoftonline.com/test-tenant",
             clientId: "jwt-test-client",
             jwtSigningKeyPath: jwtKeyPath,
@@ -172,7 +171,7 @@ public class AuthHttpClientIntegrationTests : IDisposable
     public async Task RefreshToken_WithHttpClientInfrastructure_ShouldWorkCorrectly()
     {
         // Arrange - Use authorization code flow to get refresh token
-        var codeClient = AuthClientFactory.CreateAuthorizationCodeClient(
+        var codeClient = TestAuthClientFactory.CreateAuthorizationCodeClient(
             serverUrl: "https://login.microsoftonline.com/test-tenant",
             clientId: "refresh-test-client",
             clientSecret: "refresh-test-secret");

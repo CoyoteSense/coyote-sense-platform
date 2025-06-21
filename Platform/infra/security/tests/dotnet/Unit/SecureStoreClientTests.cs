@@ -6,9 +6,7 @@ using Xunit;
 using Moq;
 using Microsoft.Extensions.Logging;
 using Coyote.Infra.Security.Auth;
-using Coyote.Infra.Security.Auth.Clients;
 using Coyote.Infra.Security.Auth.Options;
-using Coyote.Infra.Security.Auth.Factory;
 
 namespace Coyote.Infra.Security.Tests.Unit;
 
@@ -19,13 +17,13 @@ namespace Coyote.Infra.Security.Tests.Unit;
 public class SecureStoreClientTests : IDisposable
 {
     private readonly Mock<IAuthClient> _mockAuthClient;
-    private readonly Mock<ILogger<SecureStoreClient>> _mockLogger;
+    private readonly Mock<ILogger<Coyote.Infra.Security.Auth.SecureStoreClient>> _mockLogger;
     private readonly SecureStoreOptions _defaultOptions;
 
     public SecureStoreClientTests()
     {
         _mockAuthClient = new Mock<IAuthClient>();
-        _mockLogger = new Mock<ILogger<SecureStoreClient>>();
+        _mockLogger = new Mock<ILogger<Coyote.Infra.Security.Auth.SecureStoreClient>>();
         
         _defaultOptions = new SecureStoreOptions
         {
@@ -41,19 +39,17 @@ public class SecureStoreClientTests : IDisposable
     public void Constructor_WithValidOptions_ShouldInitializeSuccessfully()
     {
         // Act
-        using var client = new SecureStoreClient(_defaultOptions, _mockAuthClient.Object, _mockLogger.Object);
+        using var client = new Coyote.Infra.Security.Auth.SecureStoreClient(_defaultOptions, _mockAuthClient.Object, _mockLogger.Object);
 
         // Assert
         Assert.Equal(_defaultOptions.ServerUrl, client.ServerUrl);
         Assert.False(client.IsAuthenticated); // No token initially
-    }
-
-    [Fact]
+    }    [Fact]
     public void Constructor_WithNullOptions_ShouldThrowArgumentNullException()
     {
         // Act & Assert
         Assert.Throws<ArgumentNullException>(() => 
-            new SecureStoreClient(null!, _mockAuthClient.Object));
+            new Coyote.Infra.Security.Auth.SecureStoreClient(null!, _mockAuthClient.Object, _mockLogger.Object));
     }
 
     [Fact]
@@ -61,7 +57,7 @@ public class SecureStoreClientTests : IDisposable
     {
         // Act & Assert
         Assert.Throws<ArgumentNullException>(() => 
-            new SecureStoreClient(_defaultOptions, (IAuthClient)null!));
+            new Coyote.Infra.Security.Auth.SecureStoreClient(_defaultOptions, (IAuthClient)null!, _mockLogger.Object));
     }
 
     [Fact]
@@ -72,18 +68,16 @@ public class SecureStoreClientTests : IDisposable
         {
             ServerUrl = "", // Invalid
             TimeoutMs = -1  // Invalid
-        };
-
-        // Act & Assert
+        };        // Act & Assert
         Assert.Throws<ArgumentException>(() => 
-            new SecureStoreClient(invalidOptions, _mockAuthClient.Object));
+            new Coyote.Infra.Security.Auth.SecureStoreClient(invalidOptions, _mockAuthClient.Object, _mockLogger.Object));
     }
 
     [Fact]
     public async Task GetSecretAsync_WithEmptyPath_ShouldThrowArgumentException()
     {
         // Arrange
-        using var client = new SecureStoreClient(_defaultOptions, _mockAuthClient.Object);
+        using var client = new Coyote.Infra.Security.Auth.SecureStoreClient(_defaultOptions, _mockAuthClient.Object, _mockLogger.Object);
 
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentException>(() => 
@@ -103,7 +97,7 @@ public class SecureStoreClientTests : IDisposable
         _mockAuthClient.Setup(x => x.GetValidTokenAsync(It.IsAny<CancellationToken>()))
                       .ReturnsAsync(mockToken);
 
-        using var client = new SecureStoreClient(_defaultOptions, _mockAuthClient.Object);
+        using var client = new Coyote.Infra.Security.Auth.SecureStoreClient(_defaultOptions, _mockAuthClient.Object, _mockLogger.Object);
 
         // Act & Assert
         // This will fail due to no actual HTTP server, but we can verify auth client was called
@@ -121,7 +115,7 @@ public class SecureStoreClientTests : IDisposable
         _mockAuthClient.Setup(x => x.GetValidTokenAsync(It.IsAny<CancellationToken>()))
                       .ReturnsAsync((AuthToken?)null);
 
-        using var client = new SecureStoreClient(_defaultOptions, _mockAuthClient.Object);
+        using var client = new Coyote.Infra.Security.Auth.SecureStoreClient(_defaultOptions, _mockAuthClient.Object, _mockLogger.Object);
 
         // Act & Assert
         var exception = await Assert.ThrowsAsync<SecureStoreException>(() => 
@@ -134,7 +128,7 @@ public class SecureStoreClientTests : IDisposable
     public async Task SetSecretAsync_WithEmptyPath_ShouldThrowArgumentException()
     {
         // Arrange
-        using var client = new SecureStoreClient(_defaultOptions, _mockAuthClient.Object);
+        using var client = new Coyote.Infra.Security.Auth.SecureStoreClient(_defaultOptions, _mockAuthClient.Object, _mockLogger.Object);
 
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentException>(() => 
@@ -145,7 +139,7 @@ public class SecureStoreClientTests : IDisposable
     public async Task SetSecretAsync_WithEmptyValue_ShouldThrowArgumentException()
     {
         // Arrange
-        using var client = new SecureStoreClient(_defaultOptions, _mockAuthClient.Object);
+        using var client = new Coyote.Infra.Security.Auth.SecureStoreClient(_defaultOptions, _mockAuthClient.Object, _mockLogger.Object);
 
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentException>(() => 
@@ -156,7 +150,7 @@ public class SecureStoreClientTests : IDisposable
     public async Task DeleteSecretAsync_WithEmptyPath_ShouldThrowArgumentException()
     {
         // Arrange
-        using var client = new SecureStoreClient(_defaultOptions, _mockAuthClient.Object);
+        using var client = new Coyote.Infra.Security.Auth.SecureStoreClient(_defaultOptions, _mockAuthClient.Object, _mockLogger.Object);
 
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentException>(() => 
@@ -167,7 +161,7 @@ public class SecureStoreClientTests : IDisposable
     public async Task GetSecretsAsync_WithEmptyList_ShouldReturnEmptyDictionary()
     {
         // Arrange
-        using var client = new SecureStoreClient(_defaultOptions, _mockAuthClient.Object);
+        using var client = new Coyote.Infra.Security.Auth.SecureStoreClient(_defaultOptions, _mockAuthClient.Object, _mockLogger.Object);
 
         // Act
         var result = await client.GetSecretsAsync(new List<string>());
@@ -180,7 +174,7 @@ public class SecureStoreClientTests : IDisposable
     public async Task GetSecretsAsync_WithNullList_ShouldThrowArgumentNullException()
     {
         // Arrange
-        using var client = new SecureStoreClient(_defaultOptions, _mockAuthClient.Object);
+        using var client = new Coyote.Infra.Security.Auth.SecureStoreClient(_defaultOptions, _mockAuthClient.Object, _mockLogger.Object);
 
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentNullException>(() => 
@@ -191,7 +185,7 @@ public class SecureStoreClientTests : IDisposable
     public void IsAuthenticated_WithoutToken_ShouldReturnFalse()
     {
         // Arrange
-        using var client = new SecureStoreClient(_defaultOptions, _mockAuthClient.Object);
+        using var client = new Coyote.Infra.Security.Auth.SecureStoreClient(_defaultOptions, _mockAuthClient.Object, _mockLogger.Object);
 
         // Act & Assert
         Assert.False(client.IsAuthenticated);
@@ -210,7 +204,7 @@ public class SecureStoreClientTests : IDisposable
         _mockAuthClient.Setup(x => x.GetValidTokenAsync(It.IsAny<CancellationToken>()))
                       .ReturnsAsync(mockToken);
 
-        using var client = new SecureStoreClient(_defaultOptions, _mockAuthClient.Object);
+        using var client = new Coyote.Infra.Security.Auth.SecureStoreClient(_defaultOptions, _mockAuthClient.Object, _mockLogger.Object);
 
         // Act
         var result = await client.TestConnectionAsync();
@@ -225,16 +219,14 @@ public class SecureStoreClientTests : IDisposable
     public void Dispose_ShouldNotThrow()
     {
         // Arrange
-        var client = new SecureStoreClient(_defaultOptions, _mockAuthClient.Object);
+        var client = new Coyote.Infra.Security.Auth.SecureStoreClient(_defaultOptions, _mockAuthClient.Object, _mockLogger.Object);
 
         // Act & Assert
         client.Dispose(); // Should not throw
         client.Dispose(); // Multiple dispose should be safe
-    }
-
-    public void Dispose()
+    }    public void Dispose()
     {
-        _mockAuthClient?.Dispose();
+        _mockAuthClient?.Object?.Dispose();
     }
 }
 

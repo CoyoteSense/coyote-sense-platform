@@ -9,9 +9,10 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Coyote.Infra.Security.Auth;
 using Coyote.Infra.Security.Auth.Options;
-using Coyote.Infra.Security.Auth.Extensions;
 using Coyote.Infra.Security.Auth.Security;
+using Coyote.Infra.Security.Extensions;
 using Coyote.Infra.Http;
+using Coyote.Infra.Security.Tests.TestHelpers;
 
 namespace Coyote.Infra.Security.Tests;
 
@@ -26,9 +27,7 @@ public class EnhancedAuthClientFactoryTests
     public EnhancedAuthClientFactoryTests(ITestOutputHelper output)
     {
         _output = output;
-    }
-
-    [Fact]
+    }    [Fact]
     public void CreateFromOptions_WithValidMtlsOptions_ShouldCreateClient()
     {        // Arrange
         var options = new MtlsOptions
@@ -39,10 +38,8 @@ public class EnhancedAuthClientFactoryTests
             ClientKeyPath = "/path/to/key.key",
             CaCertPath = "/path/to/ca.crt", // Add required CA cert path
             DefaultScopes = new List<string> { "test.scope" }
-        };
-
-        // Act
-        using var client = AuthClientFactory.CreateFromOptions(options);
+        };        // Act
+        using var client = TestAuthClientFactory.CreateFromOptions(options);
 
         // Assert
         Assert.NotNull(client);
@@ -64,7 +61,7 @@ public class EnhancedAuthClientFactoryTests
 
         // Act & Assert
         var exception = Assert.Throws<ArgumentException>(() =>
-            AuthClientFactory.CreateFromOptions(invalidOptions));
+            TestAuthClientFactory.CreateFromOptions(invalidOptions));
 
         Assert.Contains("ServerUrl", exception.Message);
         _output.WriteLine("✅ Validation correctly rejected invalid options");
@@ -85,7 +82,7 @@ public class EnhancedAuthClientFactoryTests
         };
 
         // Act
-        using var client = AuthClientFactory.CreateFromOptions(options);
+        using var client = TestAuthClientFactory.CreateFromOptions(options);
 
         // Assert
         Assert.NotNull(client);
@@ -107,7 +104,7 @@ public class EnhancedAuthClientFactoryTests
         };
 
         // Act
-        using var client = AuthClientFactory.CreateFromOptions(options);
+        using var client = TestAuthClientFactory.CreateFromOptions(options);
 
         // Assert
         Assert.NotNull(client);
@@ -130,7 +127,7 @@ public class EnhancedAuthClientFactoryTests
         credentialProvider.SetClientSecret("secure-secret");
 
         // Act
-        using var client = AuthClientFactory.CreateWithSecureCredentials(
+        using var client = TestAuthClientFactory.CreateWithSecureCredentials(
             config, credentialProvider);
 
         // Assert
@@ -186,17 +183,16 @@ public class EnhancedAuthClientFactoryTests
     }
     [Fact]
     public async Task ThreadSafeHttpClientFactory_ShouldBeThreadSafe()
-    {
-        // Arrange & Act
+    {        // Arrange & Act
         var tasks = new Task[10];
-        var clients = new ICoyoteHttpClient[10];
+        var clients = new HttpClient[10];
 
         for (int i = 0; i < 10; i++)
         {
             int index = i;
             tasks[i] = Task.Run(() =>
             {
-                clients[index] = AuthClientFactory.GetDefaultHttpClient();
+                clients[index] = TestAuthClientFactory.GetDefaultHttpClient();
             });
         }
 
@@ -234,57 +230,17 @@ public class EnhancedAuthClientFactoryTests
         });
         services.AddAuthenticationServices();
 
-        var serviceProvider = services.BuildServiceProvider();
-
-        // Assert
+        var serviceProvider = services.BuildServiceProvider();        // Assert
         var authClient = serviceProvider.GetService<IAuthClient>();
         var tokenStorage = serviceProvider.GetService<IAuthTokenStorage>();
         var authLogger = serviceProvider.GetService<IAuthLogger>();
-        var clientPool = serviceProvider.GetService<AuthClientPool>();
+        // Note: AuthClientPool was removed as per requirements
 
         Assert.NotNull(authClient);
         Assert.NotNull(tokenStorage);
         Assert.NotNull(authLogger);
-        Assert.NotNull(clientPool);
-        _output.WriteLine("✅ Dependency injection registration working correctly");
-    }
+        _output.WriteLine("✅ Dependency injection registration working correctly");    }
 
-    [Fact]
-    public void AuthClientPool_ShouldManageMultipleClients()
-    {
-        // Arrange
-        var services = new ServiceCollection();
-        services.AddLogging();
-        var serviceProvider = services.BuildServiceProvider();
-        using var pool = new AuthClientPool(serviceProvider,
-          serviceProvider.GetRequiredService<ILogger<AuthClientPool>>());
-
-        var clientCredOptions = new ClientCredentialsOptions
-        {
-            ServerUrl = "https://auth.example.com",
-            ClientId = "client1",
-            ClientSecret = "secret1"
-        }; var mtlsOptions = new MtlsOptions
-        {
-            ServerUrl = "https://auth.example.com",
-            ClientId = "client2",
-            ClientCertPath = "/cert.crt",
-            ClientKeyPath = "/key.key",
-            CaCertPath = "/ca.crt" // Add required CA cert path
-        };
-
-        // Act
-        var client1 = pool.GetClientCredentialsClient("test1", clientCredOptions);
-        var client2 = pool.GetMtlsClient("test2", mtlsOptions);
-        var client1Again = pool.GetClientCredentialsClient("test1", clientCredOptions);
-
-        // Assert
-        Assert.NotNull(client1);
-        Assert.NotNull(client2);
-        Assert.Same(client1, client1Again); // Should return same instance
-        Assert.Equal(2, pool.ActiveClientCount);
-        _output.WriteLine("✅ Client pool managing multiple clients correctly");
-    }
     [Fact]
     public void ModernFactoryMethods_ShouldWork()
     {
@@ -297,7 +253,7 @@ public class EnhancedAuthClientFactoryTests
             DefaultScopes = new List<string> { "modern.scope" }
         };
 
-        using var client = AuthClientFactory.CreateFromOptions(options);
+        using var client = TestAuthClientFactory.CreateFromOptions(options);
 
         // Assert
         Assert.NotNull(client);
@@ -330,7 +286,7 @@ public class AuthClientIntegrationTests
             DefaultScopes = new List<string> { "test.scope" }
         };
 
-        using var client = AuthClientFactory.CreateFromOptions(options);
+        using var client = TestAuthClientFactory.CreateFromOptions(options);
         var result = await client.AuthenticateClientCredentialsAsync();
 
         Assert.True(result.IsSuccess);
