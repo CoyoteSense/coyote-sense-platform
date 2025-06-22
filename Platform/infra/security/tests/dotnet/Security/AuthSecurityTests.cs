@@ -46,11 +46,16 @@ public class AuthSecurityTests : IDisposable
         {
             var httpClient = provider.GetRequiredService<ICoyoteHttpClient>();
             return new TestHttpClientFactory(httpClient);
-        });
-
-        services.AddSingleton(config);
+        });        services.AddSingleton(config);
+        services.AddSingleton(provider => config.ToAuthClientOptions());
         services.AddTransient<IAuthTokenStorage, InMemoryTokenStorage>();
-        services.AddTransient<IAuthClient, AuthClient>();
+        // Register AuthClient with proper constructor parameters
+        services.AddTransient<IAuthClient>(provider => 
+        {
+            var options = provider.GetRequiredService<AuthClientOptions>();
+            var logger = provider.GetRequiredService<ILogger<AuthClient>>();
+            return new AuthClient(options, logger);
+        });
 
         _serviceProvider = services.BuildServiceProvider();
         _client = _serviceProvider.GetRequiredService<IAuthClient>();
@@ -82,11 +87,16 @@ public class AuthSecurityTests : IDisposable
         {
             var httpClient = provider.GetRequiredService<ICoyoteHttpClient>();
             return new TestHttpClientFactory(httpClient);
-        });
-
-        services.AddSingleton(secureConfig);
+        });        services.AddSingleton(secureConfig);
+        services.AddSingleton(provider => secureConfig.ToAuthClientOptions());
         services.AddTransient<IAuthTokenStorage, InMemoryTokenStorage>();
-        services.AddTransient<IAuthClient, AuthClient>();
+        // Register AuthClient with proper constructor parameters
+        services.AddTransient<IAuthClient>(provider => 
+        {
+            var options = provider.GetRequiredService<AuthClientOptions>();
+            var logger = provider.GetRequiredService<ILogger<AuthClient>>();
+            return new AuthClient(options, logger);
+        });
 
         using var serviceProvider = services.BuildServiceProvider();
         var secureClient = serviceProvider.GetRequiredService<IAuthClient>();
@@ -116,17 +126,16 @@ public class AuthSecurityTests : IDisposable
         {
             var httpClient = provider.GetRequiredService<ICoyoteHttpClient>();
             return new TestHttpClientFactory(httpClient);
-        });
-
-        services.AddSingleton(new AuthClientConfig
+        });        services.AddSingleton(new AuthClientConfig
         {
             ServerUrl = _mockServer.BaseUrl,
             ClientId = "test-client",
             ClientSecret = "test-secret",
             DefaultScopes = new List<string> { "api.read" }
         });
+        services.AddSingleton(provider => provider.GetRequiredService<AuthClientConfig>().ToAuthClientOptions());
         services.AddSingleton<IAuthTokenStorage>(secureTokenStorage);
-        services.AddTransient<IAuthClient, AuthClient>();
+        services.AddTransient<IAuthClient>(provider => { var options = provider.GetRequiredService<AuthClientOptions>(); var logger = provider.GetRequiredService<ILogger<AuthClient>>(); return new AuthClient(options, logger); });
 
         using var serviceProvider = services.BuildServiceProvider();
         var secureClient = serviceProvider.GetRequiredService<IAuthClient>();
@@ -168,11 +177,10 @@ public class AuthSecurityTests : IDisposable
         {
             var httpClient = provider.GetRequiredService<ICoyoteHttpClient>();
             return new TestHttpClientFactory(httpClient);
-        });
-
-        services.AddSingleton(httpsConfig);
+        });        services.AddSingleton(httpsConfig);
+        services.AddSingleton(provider => httpsConfig.ToAuthClientOptions());
         services.AddTransient<IAuthTokenStorage, InMemoryTokenStorage>();
-        services.AddTransient<IAuthClient, AuthClient>();
+        services.AddTransient<IAuthClient>(provider => { var options = provider.GetRequiredService<AuthClientOptions>(); var logger = provider.GetRequiredService<ILogger<AuthClient>>(); return new AuthClient(options, logger); });
 
         using var serviceProvider = services.BuildServiceProvider();
         var httpsClient = serviceProvider.GetRequiredService<IAuthClient>();
@@ -286,17 +294,16 @@ public class AuthSecurityTests : IDisposable
         {
             var httpClient = provider.GetRequiredService<ICoyoteHttpClient>();
             return new TestHttpClientFactory(httpClient);
-        });
-
-        services.AddSingleton(new AuthClientConfig
+        });        services.AddSingleton(new AuthClientConfig
         {
             ServerUrl = _mockServer.BaseUrl,
             ClientId = "test-client",
             ClientSecret = "test-secret",
             DefaultScopes = new List<string> { "api.read" }
         });
+        services.AddSingleton(provider => provider.GetRequiredService<AuthClientConfig>().ToAuthClientOptions());
         services.AddSingleton<IAuthTokenStorage>(disposableStorage);
-        services.AddTransient<IAuthClient, AuthClient>();
+        services.AddTransient<IAuthClient>(provider => { var options = provider.GetRequiredService<AuthClientOptions>(); var logger = provider.GetRequiredService<ILogger<AuthClient>>(); return new AuthClient(options, logger); });
 
         using var serviceProvider = services.BuildServiceProvider();
         var testClient = serviceProvider.GetRequiredService<IAuthClient>();
@@ -337,11 +344,10 @@ public class AuthSecurityTests : IDisposable
         {
             var httpClient = provider.GetRequiredService<ICoyoteHttpClient>();
             return new TestHttpClientFactory(httpClient);
-        });
-
-        services.AddSingleton(invalidConfig);
+        });        services.AddSingleton(invalidConfig);
+        services.AddSingleton(provider => invalidConfig.ToAuthClientOptions());
         services.AddTransient<IAuthTokenStorage, InMemoryTokenStorage>();
-        services.AddTransient<IAuthClient, AuthClient>();
+        services.AddTransient<IAuthClient>(provider => { var options = provider.GetRequiredService<AuthClientOptions>(); var logger = provider.GetRequiredService<ILogger<AuthClient>>(); return new AuthClient(options, logger); });
 
         using var serviceProvider = services.BuildServiceProvider();
         var invalidClient = serviceProvider.GetRequiredService<IAuthClient>();        // Act - Make multiple failed authentication attempts

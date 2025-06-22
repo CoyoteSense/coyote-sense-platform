@@ -46,9 +46,16 @@ public class AuthIntegrationTests : IDisposable
             return new TestHttpClientFactory(httpClient, RuntimeMode.Testing);
         });
         
-        services.AddSingleton(_config);
+        services.AddSingleton(_config);        services.AddSingleton(provider => _config.ToAuthClientOptions());
         services.AddTransient<IAuthTokenStorage, InMemoryTokenStorage>();
-        services.AddTransient<IAuthClient, AuthClient>();        _serviceProvider = services.BuildServiceProvider();
+        
+        // Register AuthClient with proper constructor parameters
+        services.AddTransient<IAuthClient>(provider => 
+        {
+            var options = provider.GetRequiredService<AuthClientOptions>();
+            var logger = provider.GetRequiredService<ILogger<AuthClient>>();
+            return new AuthClient(options, logger);
+        });_serviceProvider = services.BuildServiceProvider();
         _client = _serviceProvider.GetRequiredService<IAuthClient>();
         _httpClient = _serviceProvider.GetRequiredService<ICoyoteHttpClient>();
           // The MockOAuth2HttpClient automatically provides proper OAuth2 responses
@@ -260,7 +267,13 @@ public class AuthIntegrationTests : IDisposable
         services.AddCoyoteHttpClient(configureMode: options => options.Mode = RuntimeMode.Testing);
         services.AddTransient<IAuthTokenStorage, InMemoryTokenStorage>();
         services.AddSingleton(invalidConfig);
-        services.AddTransient<IAuthClient, AuthClient>();
+        services.AddSingleton(provider => invalidConfig.ToAuthClientOptions());
+        services.AddTransient<IAuthClient>(provider => 
+        {
+            var options = provider.GetRequiredService<AuthClientOptions>();
+            var logger = provider.GetRequiredService<ILogger<AuthClient>>();
+            return new AuthClient(options, logger);
+        });
         
         using var serviceProvider = services.BuildServiceProvider();
         var invalidClient = serviceProvider.GetRequiredService<IAuthClient>();// Act

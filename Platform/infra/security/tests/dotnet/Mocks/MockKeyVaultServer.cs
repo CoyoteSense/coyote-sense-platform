@@ -40,7 +40,7 @@ public class MockKeyVaultServer : IDisposable
         var builder = Host.CreateDefaultBuilder()
             .ConfigureWebHostDefaults(webBuilder =>
             {
-                webBuilder.UseUrls($"http://localhost:{(port == 0 ? "0" : port.ToString())}")
+                webBuilder.UseUrls($"http://127.0.0.1:{(port == 0 ? "0" : port.ToString())}")
                          .Configure(ConfigureApp)
                          .ConfigureLogging(logging => logging.SetMinimumLevel(LogLevel.Warning));
             });
@@ -52,16 +52,15 @@ public class MockKeyVaultServer : IDisposable
         var server = _host.Services.GetService(typeof(IServer)) as Microsoft.AspNetCore.Hosting.Server.IServer;
         var addressFeature = server?.Features.Get<Microsoft.AspNetCore.Hosting.Server.Features.IServerAddressesFeature>();
         var address = addressFeature?.Addresses.FirstOrDefault();
-        
-        if (address != null && Uri.TryCreate(address, UriKind.Absolute, out var uri))
+          if (address != null && Uri.TryCreate(address, UriKind.Absolute, out var uri))
         {
             Port = uri.Port;
-            BaseUrl = $"http://localhost:{Port}";
+            BaseUrl = $"http://127.0.0.1:{Port}";
         }
         else
         {
             Port = port;
-            BaseUrl = $"http://localhost:{Port}";
+            BaseUrl = $"http://127.0.0.1:{Port}";
         }
 
         _logger.LogInformation("Mock KeyVault server started on {BaseUrl}", BaseUrl);

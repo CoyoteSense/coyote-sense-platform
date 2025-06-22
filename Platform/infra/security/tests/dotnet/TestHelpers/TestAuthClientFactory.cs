@@ -120,6 +120,9 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
                 Mode = AuthMode.JwtBearer,
                 ServerUrl = options.ServerUrl,
                 ClientId = options.ClientId,
+                JwtSigningKeyPath = options.JwtSigningKeyPath,
+                JwtIssuer = options.JwtIssuer,
+                JwtAudience = options.JwtAudience,
                 DefaultScopes = options.DefaultScopes ?? new List<string> { "read", "write" },
                 TimeoutMs = 30000,
                 AutoRefresh = true
@@ -149,17 +152,19 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
             var logger = loggerFactory.CreateLogger<RealAuthClient>();
             
             return new RealAuthClient(options, logger);
-        }
-
-        /// <summary>
+        }        /// <summary>
         /// Create JWT Bearer client for tests
         /// </summary>
         public static IAuthClient CreateJwtBearerClient(string serverUrl, string clientId, string? jwtSigningKeyPath = null, string? jwtIssuer = null, string? jwtAudience = null, List<string>? defaultScopes = null)
-        {            var options = new AuthClientOptions
+        {
+            var options = new AuthClientOptions
             {
                 Mode = AuthMode.JwtBearer,
                 ServerUrl = serverUrl,
                 ClientId = clientId,
+                JwtSigningKeyPath = jwtSigningKeyPath,
+                JwtIssuer = jwtIssuer,
+                JwtAudience = jwtAudience,
                 DefaultScopes = defaultScopes ?? new List<string> { "read", "write" },
                 TimeoutMs = 30000,
                 AutoRefresh = true
@@ -168,7 +173,8 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
             var loggerFactory = LoggerFactory.Create(b => b.AddConsole());
             var logger = loggerFactory.CreateLogger<RealAuthClient>();
             
-            return new RealAuthClient(options, logger);        }
+            return new RealAuthClient(options, logger);
+        }
         
         /// <summary>
         /// Create Authorization Code client for tests

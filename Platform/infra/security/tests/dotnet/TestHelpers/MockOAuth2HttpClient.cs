@@ -76,13 +76,18 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
                 Console.WriteLine($"[MockHttpClient] Throwing configured exception for URL: {request.Url}");
                 _logger?.LogDebug("Throwing configured exception for URL: {Url}", request.Url);
                 throw exception;
-            }
-
-            // Record the request if enabled
+            }            // Record the request if enabled
             if (_recordRequests)
             {
                 _recordedRequests.Add(request);
                 _logger?.LogDebug("Recorded request: {Method} {Url}", request.Method, request.Url);
+            }
+
+            // Debug: Print all predefined response URLs for troubleshooting
+            Console.WriteLine($"[MockHttpClient] Checking predefined responses. Total count: {_predefinedResponses.Count}");
+            foreach (var kvp in _predefinedResponses)
+            {
+                Console.WriteLine($"[MockHttpClient] Predefined URL: {kvp.Key}");
             }
 
             // Look for predefined response matching this URL exactly
@@ -92,12 +97,9 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
                 _logger?.LogDebug("Found exact match for URL: {Url}", request.Url);
                 return Task.FromResult(exactResponse);
             }
-
-            // Debug: Print all predefined response URLs for troubleshooting
-            Console.WriteLine($"[MockHttpClient] Checking predefined responses. Total count: {_predefinedResponses.Count}");
-            foreach (var kvp in _predefinedResponses)
+            else
             {
-                Console.WriteLine($"[MockHttpClient] Predefined URL: {kvp.Key}");
+                Console.WriteLine($"[MockHttpClient] NO exact match found for URL: {request.Url}");
             }
 
             // Try pattern matching for token endpoints
@@ -109,12 +111,18 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
                 Console.WriteLine($"[MockHttpClient] OAuth2 token endpoint detected: {request.Url}");
                 _logger?.LogDebug("OAuth2 token endpoint detected: {Url}", request.Url);
 
-                // Check if there's a predefined response for this exact token URL first
-                if (_predefinedResponses.ContainsKey(request.Url))
+                // Check if there's a predefined response for any token URL pattern
+                var tokenUrlMatch = _predefinedResponses.Keys.FirstOrDefault(url => 
+                    url.EndsWith("/token") || 
+                    url.Contains("/oauth2/token") || 
+                    url.Contains("/oauth/token") || 
+                    url.Contains("/connect/token"));
+
+                if (tokenUrlMatch != null)
                 {
-                    Console.WriteLine($"[MockHttpClient] Using predefined response for token URL: {request.Url}");
-                    _logger?.LogDebug("Using predefined response for token URL: {Url}", request.Url);
-                    return Task.FromResult(_predefinedResponses[request.Url]);
+                    Console.WriteLine($"[MockHttpClient] Using pattern-matched predefined response for token URL: {tokenUrlMatch}");
+                    _logger?.LogDebug("Using pattern-matched predefined response for token URL: {Url}", tokenUrlMatch);
+                    return Task.FromResult(_predefinedResponses[tokenUrlMatch]);
                 }
                 return HandleTokenRequest(request);
             }
@@ -133,9 +141,10 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
             if (request.Url.Contains("/.well-known/jwks"))
             {
                 Console.WriteLine($"[MockHttpClient] JWKS endpoint detected: {request.Url}");
-                _logger?.LogDebug("JWKS endpoint detected: {Url}", request.Url);
-                return HandleJwksRequest(request);
-            }            // Try pattern matching for introspection endpoints
+                _logger?.LogDebug("JWKS endpoint detected: {Url}", request.Url);                return HandleJwksRequest(request);
+            }
+
+            // Try pattern matching for introspection endpoints
             if (request.Url.Contains("/introspect"))
             {
                 Console.WriteLine($"[MockHttpClient] OAuth2 introspection endpoint detected: {request.Url}");

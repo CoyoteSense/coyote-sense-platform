@@ -102,7 +102,27 @@ public class AuthClientTests : AuthTestBase
             scope = "read write"
         };
 
-        SetupHttpResponse(HttpStatusCode.OK, JsonSerializer.Serialize(tokenResponse));
+        // Debug: Check if we're using the same mock client instance
+        var httpClientFromDI = ServiceProvider.GetRequiredService<ICoyoteHttpClient>();
+        Console.WriteLine($"[TEST] Mock client from field: {_mockHttpClient.GetHashCode()}");
+        Console.WriteLine($"[TEST] HTTP client from DI: {httpClientFromDI.GetHashCode()}");
+        Console.WriteLine($"[TEST] Are they the same? {ReferenceEquals(_mockHttpClient, httpClientFromDI)}");
+
+        SetupHttpResponse(HttpStatusCode.OK, JsonSerializer.Serialize(tokenResponse));        // Debug: Check the predefined responses after setup
+        var predefinedResponsesField = _mockHttpClient.GetType().GetField("_predefinedResponses", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        var predefinedResponsesValue = predefinedResponsesField?.GetValue(_mockHttpClient);
+        if (predefinedResponsesValue is System.Collections.IDictionary responseDict)
+        {
+            Console.WriteLine($"[TEST] Number of predefined responses after setup: {responseDict.Count}");
+            foreach (System.Collections.DictionaryEntry kvp in responseDict)
+            {
+                Console.WriteLine($"[TEST] Predefined response URL: {kvp.Key}");
+            }
+        }
+        else
+        {
+            Console.WriteLine($"[TEST] Could not access predefined responses. Type: {predefinedResponsesValue?.GetType()}");
+        }
 
         _mockTokenStorage.Setup(x => x.StoreTokenAsync(It.IsAny<string>(), It.IsAny<AuthToken>()))
             .Returns(Task.CompletedTask);

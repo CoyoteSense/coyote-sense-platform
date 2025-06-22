@@ -45,11 +45,16 @@ namespace Coyote.Infra.Security.Tests.Unit
             {
                 var httpClient = provider.GetRequiredService<ICoyoteHttpClient>();
                 return new TestHttpClientFactory(httpClient);
-            });
-
-            services.AddSingleton(_config);
+            });            services.AddSingleton(_config);
+            services.AddSingleton(provider => _config.ToAuthClientOptions());
             services.AddTransient<IAuthTokenStorage, InMemoryTokenStorage>();
-            services.AddTransient<IAuthClient, AuthClient>();
+            // Register AuthClient with proper constructor parameters
+            services.AddTransient<IAuthClient>(provider => 
+            {
+                var options = provider.GetRequiredService<AuthClientOptions>();
+                var logger = provider.GetRequiredService<ILogger<AuthClient>>();
+                return new AuthClient(options, logger);
+            });
 
             _serviceProvider = services.BuildServiceProvider();
             _client = _serviceProvider.GetRequiredService<IAuthClient>();

@@ -41,11 +41,16 @@ public class AuthPerformanceTests : IDisposable
         {
             var httpClient = provider.GetRequiredService<ICoyoteHttpClient>();
             return new TestHttpClientFactory(httpClient);
-        });
-        
-        services.AddSingleton(config);
+        });        services.AddSingleton(config);
+        services.AddSingleton(provider => config.ToAuthClientOptions());
         services.AddTransient<IAuthTokenStorage, InMemoryTokenStorage>();
-        services.AddTransient<IAuthClient, AuthClient>();
+        // Register AuthClient with proper constructor parameters
+        services.AddTransient<IAuthClient>(provider => 
+        {
+            var options = provider.GetRequiredService<AuthClientOptions>();
+            var logger = provider.GetRequiredService<ILogger<AuthClient>>();
+            return new AuthClient(options, logger);
+        });
         
         _serviceProvider = services.BuildServiceProvider();
         _client = _serviceProvider.GetRequiredService<IAuthClient>();
@@ -215,11 +220,16 @@ public class AuthPerformanceTests : IDisposable
         {
             var httpClient = provider.GetRequiredService<ICoyoteHttpClient>();
             return new TestHttpClientFactory(httpClient);
-        });
-        
-        services.AddSingleton(shortExpiryConfig);
+        });        services.AddSingleton(shortExpiryConfig);
+        services.AddSingleton(provider => shortExpiryConfig.ToAuthClientOptions());
         services.AddTransient<IAuthTokenStorage, InMemoryTokenStorage>();
-        services.AddTransient<IAuthClient, AuthClient>();
+        // Register AuthClient with proper constructor parameters
+        services.AddTransient<IAuthClient>(provider => 
+        {
+            var options = provider.GetRequiredService<AuthClientOptions>();
+            var logger = provider.GetRequiredService<ILogger<AuthClient>>();
+            return new AuthClient(options, logger);
+        });
 
         using var serviceProvider = services.BuildServiceProvider();
         var autoRefreshClient = serviceProvider.GetRequiredService<IAuthClient>();
@@ -273,8 +283,7 @@ public class AuthPerformanceTests : IDisposable
                 var httpClient = provider.GetRequiredService<ICoyoteHttpClient>();
                 return new TestHttpClientFactory(httpClient);
             });
-            
-            services.AddSingleton(new AuthClientConfig
+              var config = new AuthClientConfig
             {
                 ServerUrl = _mockServer.BaseUrl,
                 ClientId = "test-client",
@@ -282,9 +291,16 @@ public class AuthPerformanceTests : IDisposable
                 DefaultScopes = new List<string> { "api.read" },
                 AutoRefresh = false, // Disabled to prevent background loops
                 TimeoutMs = 5000
-            });
+            };            services.AddSingleton(config);
+            services.AddSingleton(provider => config.ToAuthClientOptions());
             services.AddSingleton<IAuthTokenStorage>(sharedTokenStorage);
-            services.AddTransient<IAuthClient, AuthClient>();
+            // Register AuthClient with proper constructor parameters
+            services.AddTransient<IAuthClient>(provider => 
+            {
+                var options = provider.GetRequiredService<AuthClientOptions>();
+                var logger = provider.GetRequiredService<ILogger<AuthClient>>();
+                return new AuthClient(options, logger);
+            });
 
             var serviceProvider = services.BuildServiceProvider();
             clients.Add(serviceProvider.GetRequiredService<IAuthClient>());
