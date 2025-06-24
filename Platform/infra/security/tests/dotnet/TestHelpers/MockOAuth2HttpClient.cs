@@ -64,11 +64,16 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
                 };
                 var rateLimitJson = JsonSerializer.Serialize(rateLimitResponse);
                 return Task.FromResult(CreateResponse(429, rateLimitJson, "application/json"));
-            }
-
-            // Log all incoming requests at INFO level to ensure they're visible
+            }            // Log all incoming requests at INFO level to ensure they're visible
             Console.WriteLine($"[MockHttpClient] ExecuteAsync called: {request.Method} {request.Url}");
             _logger?.LogInformation("MockHttpClient ExecuteAsync: {Method} {Url}", request.Method, request.Url);
+
+            // Always log request body for debugging
+            if (!string.IsNullOrEmpty(request.Body))
+            {
+                Console.WriteLine($"[MockHttpClient] Request body: {request.Body}");
+                _logger?.LogInformation("Request body: {Body}", request.Body);
+            }
 
             // Check if an exception should be thrown for this URL
             if (_exceptionMap.TryGetValue(request.Url, out var exception))
@@ -76,33 +81,18 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
                 Console.WriteLine($"[MockHttpClient] Throwing configured exception for URL: {request.Url}");
                 _logger?.LogDebug("Throwing configured exception for URL: {Url}", request.Url);
                 throw exception;
-            }            // Record the request if enabled
-            if (_recordRequests)
+            }            // Record the request if enabled            if (_recordRequests)
             {
                 _recordedRequests.Add(request);
                 _logger?.LogDebug("Recorded request: {Method} {Url}", request.Method, request.Url);
             }
 
-            // Debug: Print all predefined response URLs for troubleshooting
-            Console.WriteLine($"[MockHttpClient] Checking predefined responses. Total count: {_predefinedResponses.Count}");
-            foreach (var kvp in _predefinedResponses)
-            {
-                Console.WriteLine($"[MockHttpClient] Predefined URL: {kvp.Key}");
-            }
-
             // Look for predefined response matching this URL exactly
             if (_predefinedResponses.TryGetValue(request.Url, out var exactResponse))
             {
-                Console.WriteLine($"[MockHttpClient] Found exact match for URL: {request.Url}");
                 _logger?.LogDebug("Found exact match for URL: {Url}", request.Url);
                 return Task.FromResult(exactResponse);
-            }
-            else
-            {
-                Console.WriteLine($"[MockHttpClient] NO exact match found for URL: {request.Url}");
-            }
-
-            // Try pattern matching for token endpoints
+            }            // Try pattern matching for token endpoints
             if (request.Url.Contains("/oauth2/token") ||
                 request.Url.Contains("/oauth/token") ||
                 request.Url.Contains("/connect/token") ||
@@ -111,28 +101,14 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
                 Console.WriteLine($"[MockHttpClient] OAuth2 token endpoint detected: {request.Url}");
                 _logger?.LogDebug("OAuth2 token endpoint detected: {Url}", request.Url);
 
-                // Check if there's a predefined response for any token URL pattern
-                var tokenUrlMatch = _predefinedResponses.Keys.FirstOrDefault(url => 
-                    url.EndsWith("/token") || 
-                    url.Contains("/oauth2/token") || 
-                    url.Contains("/oauth/token") || 
-                    url.Contains("/connect/token"));
-
-                if (tokenUrlMatch != null)
-                {
-                    Console.WriteLine($"[MockHttpClient] Using pattern-matched predefined response for token URL: {tokenUrlMatch}");
-                    _logger?.LogDebug("Using pattern-matched predefined response for token URL: {Url}", tokenUrlMatch);
-                    return Task.FromResult(_predefinedResponses[tokenUrlMatch]);
-                }
+                // Always handle token requests through HandleTokenRequest to validate credentials
+                // Don't use predefined responses that bypass credential validation
                 return HandleTokenRequest(request);
-            }
-
-            // Try pattern matching for discovery endpoints
+            }// Try pattern matching for discovery endpoints
             if (request.Url.Contains("/.well-known/openid_configuration") ||
                 request.Url.Contains("/.well-known/openid-configuration") ||
                 request.Url.Contains("/.well-known/oauth-authorization-server"))
             {
-                Console.WriteLine($"[MockHttpClient] OAuth2 discovery endpoint detected: {request.Url}");
                 _logger?.LogDebug("OAuth2 discovery endpoint detected: {Url}", request.Url);
                 return HandleDiscoveryRequest(request);
             }
@@ -140,7 +116,6 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
             // Try pattern matching for JWKS endpoints
             if (request.Url.Contains("/.well-known/jwks"))
             {
-                Console.WriteLine($"[MockHttpClient] JWKS endpoint detected: {request.Url}");
                 _logger?.LogDebug("JWKS endpoint detected: {Url}", request.Url);                return HandleJwksRequest(request);
             }
 
@@ -435,9 +410,14 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
             _logger?.LogDebug("Request URL: {Url}", request.Url);
             _logger?.LogDebug("Request Body: {Body}", SanitizeRequestBody(request.Body));
 
+            // Debug: Log the request body to see what credentials are being sent
+            Console.WriteLine($"[MockHttpClient DEBUG] Raw request body: {request.Body}");
+            Console.WriteLine($"[MockHttpClient DEBUG] HasInvalidCredentials check: {HasInvalidCredentials(request.Body)}");
+
             // Check for invalid credentials and return error
             if (HasInvalidCredentials(request.Body))
             {
+                Console.WriteLine($"[MockHttpClient DEBUG] Invalid credentials detected, returning 401 error");
                 var errorResponse = new
                 {
                     error = "invalid_client",
@@ -446,6 +426,8 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
                 var errorJson = JsonSerializer.Serialize(errorResponse);
                 return Task.FromResult(CreateResponse(401, errorJson, "application/json"));
             }
+
+            Console.WriteLine($"[MockHttpClient DEBUG] Credentials appear valid, proceeding with normal flow");
 
             // Return appropriate response based on grant type
             switch (grantType)
@@ -509,24 +491,26 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
 
             // Default to client_credentials if not specified
             return "client_credentials";
-        }
-
-        private Task<IHttpResponse> HandleDiscoveryRequest(IHttpRequest request)
+        }        private Task<IHttpResponse> HandleDiscoveryRequest(IHttpRequest request)
         {
+            // Try to extract the base URL from the request URL
+            // Example: https://test-auth.example.com/.well-known/oauth-authorization-server
+            var url = request.Url;
+            var baseUrl = url;
+            var idx = url.IndexOf("/.well-known/");
+            if (idx > 0)
+                baseUrl = url.Substring(0, idx);
+
             var discovery = new
             {
-                issuer = "https://mock-oauth-server.example.com",
-                authorization_endpoint = "https://mock-oauth-server.example.com/oauth2/authorize",
-                token_endpoint = "https://mock-oauth-server.example.com/oauth2/token",
-                userinfo_endpoint = "https://mock-oauth-server.example.com/oauth2/userinfo",
-                jwks_uri = "https://mock-oauth-server.example.com/.well-known/jwks",
-                introspection_endpoint = "https://mock-oauth-server.example.com/oauth2/introspect",
-                revocation_endpoint = "https://mock-oauth-server.example.com/oauth2/revoke",
-                scopes_supported = new[] { "openid", "profile", "email", "read", "write" },
-                response_types_supported = new[] { "code", "token", "id_token", "code token", "code id_token", "token id_token", "code token id_token" },
-                grant_types_supported = new[] { "authorization_code", "implicit", "password", "client_credentials", "refresh_token" },
-                token_endpoint_auth_methods_supported = new[] { "client_secret_basic", "client_secret_post" },
-                subject_types_supported = new[] { "public" }
+                issuer = baseUrl,
+                authorization_endpoint = baseUrl + "/authorize",
+                token_endpoint = baseUrl + "/token",
+                jwks_uri = baseUrl + "/jwks",
+                introspection_endpoint = baseUrl + "/introspect",
+                revocation_endpoint = baseUrl + "/revoke",
+                grant_types_supported = new[] { "client_credentials", "authorization_code", "refresh_token" },
+                token_endpoint_auth_methods_supported = new[] { "client_secret_basic", "client_secret_post", "tls_client_auth" }
             };
 
             var json = JsonSerializer.Serialize(discovery, new JsonSerializerOptions { WriteIndented = true });
@@ -552,22 +536,26 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
 
             var json = JsonSerializer.Serialize(jwks, new JsonSerializerOptions { WriteIndented = true });
             return Task.FromResult(CreateResponse(200, json, "application/json"));
-        }
-
-        private Task<IHttpResponse> HandleIntrospectionRequest(IHttpRequest request)
+        }        private Task<IHttpResponse> HandleIntrospectionRequest(IHttpRequest request)
         {
             // Extract token from request body
             string? token = ExtractTokenFromBody(request.Body);
 
+            _logger?.LogDebug("[INTROSPECTION DEBUG] Received token: {Token}", token);
+
             // Check if token is revoked
             if (!string.IsNullOrEmpty(token) && _revokedTokens.Contains(token))
             {
+                _logger?.LogDebug("[INTROSPECTION DEBUG] Token is revoked: {Token}", token);
                 var revokedResponse = new { active = false };
                 return Task.FromResult(CreateResponse(200, JsonSerializer.Serialize(revokedResponse), "application/json"));
             }
 
-            // Check if token is valid (not tampered)
-            bool isValid = string.IsNullOrEmpty(token) || IsValidJwt(token);
+            // For introspection, we should be more permissive - if we have a token, it's likely valid
+            // unless it's specifically revoked or empty/null
+            bool isValid = !string.IsNullOrEmpty(token) && IsValidJwt(token);
+
+            _logger?.LogDebug("[INTROSPECTION DEBUG] Token validation result: {IsValid} for token: {Token}", isValid, token);
 
             var response = new
             {
@@ -581,6 +569,7 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
             };
 
             var json = JsonSerializer.Serialize(response);
+            _logger?.LogDebug("[INTROSPECTION DEBUG] Returning response: {Response}", json);
             return Task.FromResult(CreateResponse(200, json, "application/json"));
         }
 
@@ -761,9 +750,7 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
 
             // Check if we've exceeded the rate limit
             return requestTimes.Count > RateLimitThreshold;
-        }
-
-        /// <summary>
+        }        /// <summary>
         /// Validate JWT token structure and check for tampering
         /// </summary>
         private bool IsValidJwt(string token)
@@ -773,23 +760,21 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
                 // Split JWT into parts
                 var parts = token.Split('.');
                 if (parts.Length != 3)
-                    return false;
-
-                // List of valid test tokens that should be accepted
-                var validTokens = new[]
                 {
-                    "mock-access-token-client-credentials",
-                    "mock-access-token-refreshed",
-                    "auth-code-token",
-                    "test-access-token",
-                    "jwt-access-token",
-                    "concurrent-token",
-                    "new-access-token"
-                };
+                    // For non-JWT tokens, check against valid mock tokens
+                    var validTokens = new[]
+                    {
+                        "mock-access-token-client-credentials",
+                        "mock-access-token-refreshed",
+                        "auth-code-token",
+                        "test-access-token",
+                        "jwt-access-token",
+                        "concurrent-token",
+                        "new-access-token"
+                    };
 
-                // For mock tokens (non-JWT format), accept them
-                if (validTokens.Any(vt => token.Equals(vt)))
-                    return true;
+                    return validTokens.Any(vt => token.Equals(vt));
+                }
 
                 // For actual JWT tokens, try to decode and check structure
                 try
@@ -809,31 +794,52 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
                     if (json.Contains("\"tampered\""))
                         return false;
 
+                    // Parse the JWT payload to check expiration
+                    var doc = JsonDocument.Parse(json);
+                    if (doc.RootElement.TryGetProperty("exp", out var expElement))
+                    {
+                        if (expElement.TryGetInt64(out var exp))
+                        {
+                            var expDateTime = DateTimeOffset.FromUnixTimeSeconds(exp);
+                            var now = DateTimeOffset.UtcNow;
+                            
+                            // Token is invalid if it's expired
+                            if (expDateTime <= now)
+                            {
+                                return false;
+                            }
+                        }
+                    }
+
                     return true;
                 }
                 catch
                 {
-                    // If we can't decode it, it might be tampered
                     return false;
                 }
             }
             catch
             {
                 return false;
-            }
-        }        /// <summary>
-                 /// Check if request contains invalid credentials
-                 /// </summary>
+            }        }
+
+        /// <summary>
+        /// Check if request contains invalid credentials
+        /// </summary>
         private bool HasInvalidCredentials(string? body)
         {
             if (string.IsNullOrEmpty(body))
                 return false;
 
             return body.Contains("client_id=invalid-client") ||
-                   body.Contains("client_secret=invalid-secret");
-        }        /// <summary>
-                 /// Set up a successful token response for the specified token URL
-                 /// </summary>
+                   body.Contains("client_id=invalid-client-id") ||
+                   body.Contains("client_secret=invalid-secret") ||
+                   body.Contains("client_secret=invalid-client-secret");
+        }
+
+        /// <summary>
+        /// Set up a successful token response for the specified token URL
+        /// </summary>
         public void SetSuccessfulTokenResponse(string tokenUrl, string accessToken, string tokenType, int expiresIn, string? refreshToken, string scope)
         {
             var response = new

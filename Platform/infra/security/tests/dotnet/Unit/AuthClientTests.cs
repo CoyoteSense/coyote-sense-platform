@@ -619,8 +619,7 @@ public class AuthClientTests : AuthTestBase
             result.IsSuccess.Should().BeTrue();
             result.Token.Should().NotBeNull();
             result.Token!.AccessToken.Should().Be("concurrent-token");
-        }
-    }
+        }        }
 
     #endregion
 
@@ -631,7 +630,6 @@ public class AuthClientTests : AuthTestBase
         // Use the MockOAuth2HttpClient's configuration methods to set up the response
         // Construct the token endpoint URL based on the server URL in config
         var tokenUrl = $"{_config.ServerUrl}/token";
-        Console.WriteLine($"[AuthClientTests] Setting up response for URL: {tokenUrl}");
 
         if (statusCode == HttpStatusCode.OK)
         {
@@ -655,19 +653,15 @@ public class AuthClientTests : AuthTestBase
 
                 var refreshToken = root.TryGetProperty("refresh_token", out var refreshTokenProp)
                     ? refreshTokenProp.GetString()
-                    : null;
-
-                var scope = root.TryGetProperty("scope", out var scopeProp)
+                    : null;                var scope = root.TryGetProperty("scope", out var scopeProp)
                     ? scopeProp.GetString() ?? "read write"
                     : "read write";
 
-                Console.WriteLine($"[AuthClientTests] Setting successful token response: {accessToken}");
                 _mockHttpClient.SetSuccessfulTokenResponse(tokenUrl, accessToken, tokenType, expiresIn, refreshToken, scope);
             }
-            catch (JsonException)
+            catch (System.Text.Json.JsonException)
             {
                 // If JSON parsing fails, use default successful response
-                Console.WriteLine($"[AuthClientTests] JSON parsing failed, using default successful response");
                 _mockHttpClient.SetSuccessfulTokenResponse(tokenUrl, "test-access-token", "Bearer", 3600, null, "read write");
             }
         }
@@ -681,19 +675,15 @@ public class AuthClientTests : AuthTestBase
 
                 var error = root.TryGetProperty("error", out var errorProp)
                     ? errorProp.GetString() ?? "invalid_client"
-                    : "invalid_client";
-
-                var errorDescription = root.TryGetProperty("error_description", out var errorDescProp)
+                    : "invalid_client";                var errorDescription = root.TryGetProperty("error_description", out var errorDescProp)
                     ? errorDescProp.GetString() ?? "Authentication failed"
                     : "Authentication failed";
 
-                Console.WriteLine($"[AuthClientTests] Setting error token response: {error}");
                 _mockHttpClient.SetErrorTokenResponse(tokenUrl, error, errorDescription, (int)statusCode);
             }
-            catch (JsonException)
+            catch (System.Text.Json.JsonException)
             {
                 // If JSON parsing fails, use default error response
-                Console.WriteLine($"[AuthClientTests] JSON parsing failed, using default error response");
                 _mockHttpClient.SetErrorTokenResponse(tokenUrl, "invalid_client", "Authentication failed", (int)statusCode);
             }
         }
@@ -709,13 +699,10 @@ public class AuthClientTests : AuthTestBase
         File.WriteAllText(tempPath, $"-----BEGIN RSA PRIVATE KEY-----\n{privateKeyPem}\n-----END RSA PRIVATE KEY-----");
 
         return tempPath;
-    }
-
-    private void SetupHttpException(Exception exception)
+    }    private void SetupHttpException(Exception exception)
     {
         // Set up the mock to throw an actual exception for the token URL
         var tokenUrl = $"{_config.ServerUrl}/token";
-        Console.WriteLine($"[AuthClientTests] Setting up exception for URL: {tokenUrl}");
         _mockHttpClient.SetExceptionForUrl(tokenUrl, exception);
     }
 

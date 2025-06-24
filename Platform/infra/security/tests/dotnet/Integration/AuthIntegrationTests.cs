@@ -25,17 +25,17 @@ public class AuthIntegrationTests : IDisposable
     private bool _disposed;
 
     public AuthIntegrationTests(ITestOutputHelper output)    {
-        _output = output;
-        
-        // Load configuration from environment variables
+        _output = output;        // Load configuration from environment variables
         _config = new AuthClientConfig
         {
             ServerUrl = Environment.GetEnvironmentVariable("OAUTH2_SERVER_URL") ?? "https://localhost:5001",
             ClientId = Environment.GetEnvironmentVariable("OAUTH2_CLIENT_ID") ?? "integration-test-client",
             ClientSecret = Environment.GetEnvironmentVariable("OAUTH2_CLIENT_SECRET") ?? "integration-test-secret",
-            DefaultScopes = new List<string> { Environment.GetEnvironmentVariable("OAUTH2_SCOPE") ?? "api.read,api.write" },            AutoRefresh = true
+            DefaultScopes = new List<string> { Environment.GetEnvironmentVariable("OAUTH2_SCOPE") ?? "api.read,api.write" },
+            AutoRefresh = false, // Disable auto-refresh to prevent background loops that could cause tests to hang
+            TimeoutMs = 5000 // 5 second timeout for faster tests
             // TODO: RetryPolicy removed - implement retry logic if needed
-        };        // Setup DI container
+        };// Setup DI container
         var services = new ServiceCollection();
         services.AddLogging(builder => builder.AddConsole().SetMinimumLevel(LogLevel.Debug));
         
@@ -183,9 +183,7 @@ public class AuthIntegrationTests : IDisposable
         
         // For now, just verify that the client is configured correctly
         Assert.True(true, "Discovery endpoint test placeholder");
-    }
-
-    [Fact]
+    }    [Fact]
     [Trait("Category", "Integration")]
     public async Task AutoRefresh_WhenTokenExpires_ShouldRefreshAutomatically()
     {
@@ -195,8 +193,40 @@ public class AuthIntegrationTests : IDisposable
             return;
         }
         
-        // Arrange - Get initial token
-        var initialResult = await _client.AuthenticateClientCredentialsAsync();
+        // Arrange - Create client with auto-refresh enabled for this test
+        var autoRefreshConfig = new AuthClientConfig
+        {
+            ServerUrl = _config.ServerUrl,
+            ClientId = _config.ClientId,
+            ClientSecret = _config.ClientSecret,
+            DefaultScopes = _config.DefaultScopes,
+            AutoRefresh = true, // Enable auto-refresh for this specific test
+            TimeoutMs = 5000
+        };
+        
+        var services = new ServiceCollection();
+        services.AddLogging(builder => builder.AddConsole());
+        services.AddSingleton<ICoyoteHttpClient, MockOAuth2HttpClient>();
+        services.AddSingleton<Coyote.Infra.Http.Factory.IHttpClientFactory>(provider => 
+        {
+            var httpClient = provider.GetRequiredService<ICoyoteHttpClient>();
+            return new TestHttpClientFactory(httpClient, RuntimeMode.Testing);
+        });
+        services.AddTransient<IAuthTokenStorage, InMemoryTokenStorage>();
+        services.AddSingleton(autoRefreshConfig);
+        services.AddSingleton(provider => autoRefreshConfig.ToAuthClientOptions());
+        services.AddTransient<IAuthClient>(provider => 
+        {
+            var options = provider.GetRequiredService<AuthClientOptions>();
+            var logger = provider.GetRequiredService<ILogger<AuthClient>>();
+            return new AuthClient(options, logger);
+        });
+        
+        using var serviceProvider = services.BuildServiceProvider();
+        var autoRefreshClient = serviceProvider.GetRequiredService<IAuthClient>();
+        
+        // Act - Get initial token
+        var initialResult = await autoRefreshClient.AuthenticateClientCredentialsAsync();
         initialResult.IsSuccess.Should().BeTrue();
         var initialToken = initialResult.Token!.AccessToken;
 
@@ -204,7 +234,7 @@ public class AuthIntegrationTests : IDisposable
         await Task.Delay(TimeSpan.FromSeconds(2));
 
         // Act - Request new token (should trigger auto-refresh)
-        var refreshedResult = await _client.AuthenticateClientCredentialsAsync();
+        var refreshedResult = await autoRefreshClient.AuthenticateClientCredentialsAsync();
 
         // Assert
         refreshedResult.Should().NotBeNull();
@@ -243,9 +273,7 @@ public class AuthIntegrationTests : IDisposable
             result.Token.Should().NotBeNull();
             result.Token!.AccessToken.Should().NotBeNullOrEmpty();
         });
-    }
-
-    [Fact]
+    }    [Fact]
     [Trait("Category", "Integration")]    public async Task InvalidCredentials_ShouldReturnFailureResult()
     {
         // Skip if OAuth2 server is not available
@@ -253,38 +281,43 @@ public class AuthIntegrationTests : IDisposable
         {
             _output.WriteLine("OAuth2 server is not available, skipping integration test");
             return;
-        }
-
-        // Arrange - Create client with invalid credentials  
+        }        // Arrange - Create client with invalid credentials using the mock infrastructure
         var invalidConfig = new AuthClientConfig
         {
             ServerUrl = _config.ServerUrl,
             ClientId = "invalid-client-id",
             ClientSecret = "invalid-client-secret",
-            DefaultScopes = _config.DefaultScopes
-        };        var services = new ServiceCollection();
-        services.AddLogging(builder => builder.AddConsole());
-        services.AddCoyoteHttpClient(configureMode: options => options.Mode = RuntimeMode.Testing);
-        services.AddTransient<IAuthTokenStorage, InMemoryTokenStorage>();
-        services.AddSingleton(invalidConfig);
-        services.AddSingleton(provider => invalidConfig.ToAuthClientOptions());
-        services.AddTransient<IAuthClient>(provider => 
-        {
-            var options = provider.GetRequiredService<AuthClientOptions>();
-            var logger = provider.GetRequiredService<ILogger<AuthClient>>();
-            return new AuthClient(options, logger);
-        });
+            DefaultScopes = _config.DefaultScopes,
+            TimeoutMs = 5000,
+            AutoRefresh = false
+        };        // Use the same mock HTTP client and token storage as the main test setup
+        var tokenStorage = _serviceProvider.GetRequiredService<IAuthTokenStorage>();
+        var logger = _serviceProvider.GetRequiredService<ILogger<AuthClient>>();
         
-        using var serviceProvider = services.BuildServiceProvider();
-        var invalidClient = serviceProvider.GetRequiredService<IAuthClient>();// Act
+        // Create AuthClient using the legacy constructor that accepts the mock HTTP client
+        var invalidClient = new AuthClient(invalidConfig, _httpClient, tokenStorage, new NullAuthLogger());
+
+        // Act
+        _output.WriteLine("Starting authentication with invalid credentials...");
+        _output.WriteLine($"Using ClientId: {invalidConfig.ClientId}");
+        _output.WriteLine($"Using ClientSecret: {invalidConfig.ClientSecret}");
+        _output.WriteLine($"Using ServerUrl: {invalidConfig.ServerUrl}");
+        
+        _output.WriteLine("About to call AuthenticateClientCredentialsAsync...");
         var result = await invalidClient.AuthenticateClientCredentialsAsync();
+        _output.WriteLine("AuthenticateClientCredentialsAsync call completed");
+        
+        // Debug output
+        _output.WriteLine($"Result IsSuccess: {result.IsSuccess}");
+        _output.WriteLine($"Result ErrorCode: {result.ErrorCode}");
+        _output.WriteLine($"Result ErrorDescription: {result.ErrorDescription}");
         
         // Assert
         result.Should().NotBeNull();
         result.IsSuccess.Should().BeFalse();
         result.ErrorCode.Should().Be("invalid_client");
         result.ErrorDescription.Should().NotBeNullOrEmpty();
-    }    // NOTE: HealthCheck method removed from API - test disabled
+    }// NOTE: HealthCheck method removed from API - test disabled
     // [Fact]
     // [Trait("Category", "Integration")]
     // public async Task HealthCheck_ShouldReturnServerStatus()

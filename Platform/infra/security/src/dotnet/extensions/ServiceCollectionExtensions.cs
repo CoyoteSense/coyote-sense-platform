@@ -69,16 +69,19 @@ public static class ServiceCollectionExtensions
         });
 
         return services;
-    }
-
-    /// <summary>
+    }    /// <summary>
     /// Add comprehensive authentication services including client pool and secure store
     /// </summary>
     /// <param name="services">Service collection</param>
     /// <returns>Service collection for chaining</returns>
     public static IServiceCollection AddAuthenticationServices(this IServiceCollection services)
-    {        // Add logging if not already added
+    {
+        // Add logging if not already added
         services.AddLogging();
+
+        // Register authentication services that tests expect
+        services.AddTransient<IAuthTokenStorage, InMemoryTokenStorage>();
+        services.AddTransient<IAuthLogger, ConsoleAuthLogger>();
 
         // Add secure store client
         services.AddSingleton<ISecureStoreClient>(provider =>

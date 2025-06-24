@@ -46,15 +46,16 @@ public class AuthSecurityTests : IDisposable
         {
             var httpClient = provider.GetRequiredService<ICoyoteHttpClient>();
             return new TestHttpClientFactory(httpClient);
-        });        services.AddSingleton(config);
-        services.AddSingleton(provider => config.ToAuthClientOptions());
+        });        services.AddSingleton(config);        services.AddSingleton(provider => config.ToAuthClientOptions());
         services.AddTransient<IAuthTokenStorage, InMemoryTokenStorage>();
         // Register AuthClient with proper constructor parameters
         services.AddTransient<IAuthClient>(provider => 
         {
-            var options = provider.GetRequiredService<AuthClientOptions>();
+            var httpClient = provider.GetRequiredService<ICoyoteHttpClient>();
+            var tokenStorage = provider.GetRequiredService<IAuthTokenStorage>();
             var logger = provider.GetRequiredService<ILogger<AuthClient>>();
-            return new AuthClient(options, logger);
+            var authLogger = new TestAuthLogger(logger);
+            return new AuthClient(config, httpClient, tokenStorage, authLogger);
         });
 
         _serviceProvider = services.BuildServiceProvider();
@@ -93,9 +94,11 @@ public class AuthSecurityTests : IDisposable
         // Register AuthClient with proper constructor parameters
         services.AddTransient<IAuthClient>(provider => 
         {
-            var options = provider.GetRequiredService<AuthClientOptions>();
+            var httpClient = provider.GetRequiredService<ICoyoteHttpClient>();
+            var tokenStorage = provider.GetRequiredService<IAuthTokenStorage>();
             var logger = provider.GetRequiredService<ILogger<AuthClient>>();
-            return new AuthClient(options, logger);
+            var authLogger = new TestAuthLogger(logger);
+            return new AuthClient(secureConfig, httpClient, tokenStorage, authLogger);
         });
 
         using var serviceProvider = services.BuildServiceProvider();
@@ -135,7 +138,14 @@ public class AuthSecurityTests : IDisposable
         });
         services.AddSingleton(provider => provider.GetRequiredService<AuthClientConfig>().ToAuthClientOptions());
         services.AddSingleton<IAuthTokenStorage>(secureTokenStorage);
-        services.AddTransient<IAuthClient>(provider => { var options = provider.GetRequiredService<AuthClientOptions>(); var logger = provider.GetRequiredService<ILogger<AuthClient>>(); return new AuthClient(options, logger); });
+        services.AddTransient<IAuthClient>(provider => { 
+            var config = provider.GetRequiredService<AuthClientConfig>(); 
+            var httpClient = provider.GetRequiredService<ICoyoteHttpClient>(); 
+            var tokenStorage = provider.GetRequiredService<IAuthTokenStorage>(); 
+            var logger = provider.GetRequiredService<ILogger<AuthClient>>(); 
+            var authLogger = new TestAuthLogger(logger); 
+            return new AuthClient(config, httpClient, tokenStorage, authLogger); 
+        });
 
         using var serviceProvider = services.BuildServiceProvider();
         var secureClient = serviceProvider.GetRequiredService<IAuthClient>();
@@ -180,7 +190,14 @@ public class AuthSecurityTests : IDisposable
         });        services.AddSingleton(httpsConfig);
         services.AddSingleton(provider => httpsConfig.ToAuthClientOptions());
         services.AddTransient<IAuthTokenStorage, InMemoryTokenStorage>();
-        services.AddTransient<IAuthClient>(provider => { var options = provider.GetRequiredService<AuthClientOptions>(); var logger = provider.GetRequiredService<ILogger<AuthClient>>(); return new AuthClient(options, logger); });
+        services.AddTransient<IAuthClient>(provider => { 
+            var config = provider.GetRequiredService<AuthClientConfig>(); 
+            var httpClient = provider.GetRequiredService<ICoyoteHttpClient>(); 
+            var tokenStorage = provider.GetRequiredService<IAuthTokenStorage>(); 
+            var logger = provider.GetRequiredService<ILogger<AuthClient>>();
+            var authLogger = new TestAuthLogger(logger); 
+            return new AuthClient(config, httpClient, tokenStorage, authLogger); 
+        });
 
         using var serviceProvider = services.BuildServiceProvider();
         var httpsClient = serviceProvider.GetRequiredService<IAuthClient>();
@@ -303,7 +320,14 @@ public class AuthSecurityTests : IDisposable
         });
         services.AddSingleton(provider => provider.GetRequiredService<AuthClientConfig>().ToAuthClientOptions());
         services.AddSingleton<IAuthTokenStorage>(disposableStorage);
-        services.AddTransient<IAuthClient>(provider => { var options = provider.GetRequiredService<AuthClientOptions>(); var logger = provider.GetRequiredService<ILogger<AuthClient>>(); return new AuthClient(options, logger); });
+        services.AddTransient<IAuthClient>(provider => { 
+            var config = provider.GetRequiredService<AuthClientConfig>(); 
+            var httpClient = provider.GetRequiredService<ICoyoteHttpClient>(); 
+            var tokenStorage = provider.GetRequiredService<IAuthTokenStorage>(); 
+            var logger = provider.GetRequiredService<ILogger<AuthClient>>(); 
+            var authLogger = new TestAuthLogger(logger); 
+            return new AuthClient(config, httpClient, tokenStorage, authLogger); 
+        });
 
         using var serviceProvider = services.BuildServiceProvider();
         var testClient = serviceProvider.GetRequiredService<IAuthClient>();
@@ -322,11 +346,10 @@ public class AuthSecurityTests : IDisposable
     [Fact]
     [Trait("Category", "Security")]
     public async Task RateLimiting_ShouldPreventBruteForceAttacks()
-    {
-        // Arrange - Create client with invalid credentials
+    {        // Arrange - Create client with invalid credentials
         var invalidConfig = new AuthClientConfig
         {
-            ServerUrl = _mockServer.BaseUrl,
+            ServerUrl = "https://invalid-auth.example.com", // Use fake URL that mock client will handle, no /token suffix
             ClientId = "invalid-client",
             ClientSecret = "invalid-secret",
             DefaultScopes = new List<string> { "api.read" }
@@ -335,7 +358,7 @@ public class AuthSecurityTests : IDisposable
             // {
             //     MaxRetries = 0 // Disable retries for this test
             // }
-        }; var services = new ServiceCollection();
+        };var services = new ServiceCollection();
         services.AddLogging(builder => builder.AddConsole());
 
         // Register the Coyote HTTP client factory
@@ -347,7 +370,14 @@ public class AuthSecurityTests : IDisposable
         });        services.AddSingleton(invalidConfig);
         services.AddSingleton(provider => invalidConfig.ToAuthClientOptions());
         services.AddTransient<IAuthTokenStorage, InMemoryTokenStorage>();
-        services.AddTransient<IAuthClient>(provider => { var options = provider.GetRequiredService<AuthClientOptions>(); var logger = provider.GetRequiredService<ILogger<AuthClient>>(); return new AuthClient(options, logger); });
+        services.AddTransient<IAuthClient>(provider => { 
+            var config = provider.GetRequiredService<AuthClientConfig>(); 
+            var httpClient = provider.GetRequiredService<ICoyoteHttpClient>(); 
+            var tokenStorage = provider.GetRequiredService<IAuthTokenStorage>(); 
+            var logger = provider.GetRequiredService<ILogger<AuthClient>>(); 
+            var authLogger = new TestAuthLogger(logger); 
+            return new AuthClient(config, httpClient, tokenStorage, authLogger); 
+        });
 
         using var serviceProvider = services.BuildServiceProvider();
         var invalidClient = serviceProvider.GetRequiredService<IAuthClient>();        // Act - Make multiple failed authentication attempts

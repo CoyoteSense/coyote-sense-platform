@@ -154,4 +154,9 @@ public class SecureStoreException : Exception
         ErrorCode = errorCode;
         HttpStatusCode = httpStatusCode;
     }
+    public SecureStoreException(string errorCode, string message, Exception innerException) : base(message, innerException)
+    {
+        ErrorCode = errorCode;
+        HttpStatusCode = null;
+    }
 }

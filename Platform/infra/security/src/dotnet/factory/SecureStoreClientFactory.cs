@@ -443,14 +443,14 @@ public static class SecureStoreClientFactory
             }
             
             return this;
-        }
-
-        public ISecureStoreClient Build()
+        }        public ISecureStoreClient Build()
         {
             if (_options == null)
                 throw new InvalidOperationException("Options must be provided");
+                
+            if (_authClient == null)
+                throw new InvalidOperationException("Either an auth client or token provider must be provided");
             
-            _authClient ??= CreateMockAuthClient();
             _logger ??= CreateDefaultLogger();
 
             return new SecureStoreClient(_options, _authClient, _logger);

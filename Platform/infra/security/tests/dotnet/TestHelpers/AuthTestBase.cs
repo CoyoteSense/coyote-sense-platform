@@ -9,6 +9,25 @@ using Coyote.Infra.Security.Tests.TestHelpers;
 namespace Coyote.Infra.Security.Tests.TestHelpers
 {
     /// <summary>
+    /// Simple wrapper to convert Microsoft ILogger to IAuthLogger for testing
+    /// </summary>
+    public class TestAuthLogger : IAuthLogger
+    {
+        private readonly ILogger _logger;
+
+        public TestAuthLogger(ILogger logger)
+        {
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        }
+
+        public void LogDebug(string message) => _logger.LogDebug(message);
+        public void LogInfo(string message) => _logger.LogInformation(message);
+        public void LogWarning(string message) => _logger.LogWarning(message);
+        public void LogError(string message) => _logger.LogError(message);
+        public void LogError(string message, Exception exception) => _logger.LogError(exception, message);
+    }
+
+    /// <summary>
     /// Base class for AuthClient tests that provides dependency injection setup
     /// </summary>
     public abstract class AuthTestBase : IDisposable
@@ -65,16 +84,17 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
                 var config = provider.GetRequiredService<AuthClientConfig>();
                 var msLogger = provider.GetRequiredService<ILogger<AuthClient>>();
                 var httpClient = provider.GetRequiredService<ICoyoteHttpClient>();
-                var tokenStorage = provider.GetRequiredService<IAuthTokenStorage>();
-                return new Coyote.Infra.Security.Auth.AuthClient(config, msLogger, httpClient, tokenStorage);
-            });            // Register SecureStoreClient for tests that need it
+                var tokenStorage = provider.GetRequiredService<IAuthTokenStorage>();                return new AuthClient(config, httpClient, tokenStorage, new TestAuthLogger(msLogger));
+            });
+
+            // Register SecureStoreClient for tests that need it
             services.AddTransient<SecureStoreClient>(provider =>
             {
                 var config = provider.GetRequiredService<AuthClientConfig>();
-                var authLogger = provider.GetRequiredService<ILogger<AuthClient>>();
+                var msLogger = provider.GetRequiredService<ILogger<AuthClient>>();
                 var httpClient = provider.GetRequiredService<ICoyoteHttpClient>();
                 var tokenStorage = provider.GetRequiredService<IAuthTokenStorage>();
-                var authClient = new Coyote.Infra.Security.Auth.AuthClient(config, authLogger, httpClient, tokenStorage);
+                var authClient = new AuthClient(config, httpClient, tokenStorage, new TestAuthLogger(msLogger));
                 
                 var secureStoreOptions = new SecureStoreOptions
                 {
@@ -98,17 +118,16 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
             var httpClient = ServiceProvider.GetRequiredService<ICoyoteHttpClient>();
             var tokenStorage = ServiceProvider.GetRequiredService<IAuthTokenStorage>();
 
-            // Use the real AuthClient from modes/real/dotnet that actually uses the HTTP client
-            return new Coyote.Infra.Security.Auth.AuthClient(config, msLogger, httpClient, tokenStorage);
-        }
-
-        protected AuthClient CreateAuthClientWithNullableConfig(AuthClientConfig? config)
+            // Use the mock AuthClient constructor: AuthClient(config, httpClient, tokenStorage, authLogger)
+            return new AuthClient(config, httpClient, tokenStorage, new TestAuthLogger(msLogger));
+        }        protected AuthClient CreateAuthClientWithNullableConfig(AuthClientConfig? config)
         {
+            var msLogger = ServiceProvider.GetRequiredService<ILogger<AuthClient>>();
             var httpClient = ServiceProvider.GetRequiredService<ICoyoteHttpClient>();
             var tokenStorage = ServiceProvider.GetRequiredService<IAuthTokenStorage>();
-            var logger = ServiceProvider.GetRequiredService<IAuthLogger>();
 
-            return new AuthClient(config!, httpClient, tokenStorage, logger);
+            // Use the mock AuthClient constructor with correct parameter order
+            return new AuthClient(config!, httpClient, tokenStorage, new TestAuthLogger(msLogger));
         }
 
         protected virtual void Dispose(bool disposing)

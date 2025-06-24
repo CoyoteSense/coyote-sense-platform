@@ -10,6 +10,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Web;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -577,7 +578,12 @@ public class AuthClient : IAuthClient
             ["Content-Type"] = "application/x-www-form-urlencoded"
         };
         
-        var response = await _httpClient.PostAsync($"{_config.ServerUrl}/token", formContent, headers, cancellationToken);
+        var tokenUrl = $"{_config.ServerUrl}/token";
+        Console.WriteLine($"[AuthClient] Making token request to URL: '{tokenUrl}'");
+        Console.WriteLine($"[AuthClient] Form content: '{formContent}'");
+        Console.WriteLine($"[AuthClient] ServerUrl from config: '{_config.ServerUrl}'");
+        
+        var response = await _httpClient.PostAsync(tokenUrl, formContent, headers, cancellationToken);
 
         if (!response.IsSuccess)
         {
@@ -692,6 +698,17 @@ public class AuthClient : IAuthClient
             .Replace('+', '-')
             .Replace('/', '_')
             .TrimEnd('=');
+    }
+
+    private static string CreateFormUrlEncodedContent(Dictionary<string, string> parameters)
+    {
+        if (parameters == null || parameters.Count == 0)
+            return string.Empty;
+
+        var encodedPairs = parameters.Select(kvp => 
+            $"{System.Web.HttpUtility.UrlEncode(kvp.Key)}={System.Web.HttpUtility.UrlEncode(kvp.Value)}");
+        
+        return string.Join("&", encodedPairs);
     }
 
     private void LoadStoredToken()
