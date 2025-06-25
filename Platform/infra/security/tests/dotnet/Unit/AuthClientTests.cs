@@ -24,12 +24,13 @@ namespace Coyote.Infra.Security.OAuth2.Tests.Unit;
 /// Unit tests for AuthClient
 /// </summary>
 public class AuthClientTests : AuthTestBase
-{
-    private readonly Mock<IAuthTokenStorage> _mockTokenStorage;
+{    private readonly Mock<IAuthTokenStorage> _mockTokenStorage;
     private readonly Mock<IAuthLogger> _mockLogger;
     private readonly MockOAuth2HttpClient _mockHttpClient;
     private readonly AuthClientConfig _config;
-    private readonly AuthClient _client; public AuthClientTests()
+    private readonly AuthClient _client;
+
+    public AuthClientTests()
     {
         _mockTokenStorage = new Mock<IAuthTokenStorage>();
         _mockLogger = new Mock<IAuthLogger>();

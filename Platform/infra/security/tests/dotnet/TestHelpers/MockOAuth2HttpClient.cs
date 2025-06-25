@@ -66,13 +66,12 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
                 return Task.FromResult(CreateResponse(429, rateLimitJson, "application/json"));
             }            // Log all incoming requests at INFO level to ensure they're visible
             Console.WriteLine($"[MockHttpClient] ExecuteAsync called: {request.Method} {request.Url}");
-            _logger?.LogInformation("MockHttpClient ExecuteAsync: {Method} {Url}", request.Method, request.Url);
-
-            // Always log request body for debugging
+            _logger?.LogInformation("MockHttpClient ExecuteAsync: {Method} {Url}", request.Method, request.Url);            // Always log request body for debugging (with sensitive data redacted)
             if (!string.IsNullOrEmpty(request.Body))
             {
-                Console.WriteLine($"[MockHttpClient] Request body: {request.Body}");
-                _logger?.LogInformation("Request body: {Body}", request.Body);
+                var safeBody = RedactSensitiveData(request.Body);
+                Console.WriteLine($"[MockHttpClient] Request body: {safeBody}");
+                _logger?.LogInformation("Request body: {Body}", safeBody);
             }
 
             // Check if an exception should be thrown for this URL
@@ -884,10 +883,33 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
             var headers = new Dictionary<string, string>
             {
                 ["Content-Type"] = "application/json"
-            };
-
-            var mockResponse = new MockHttpResponse(statusCode, json, headers);
+            };            var mockResponse = new MockHttpResponse(statusCode, json, headers);
             _predefinedResponses[tokenUrl] = mockResponse;
+        }
+
+        /// <summary>
+        /// Redact sensitive data from request bodies for safe logging
+        /// </summary>
+        private static string RedactSensitiveData(string requestBody)
+        {
+            if (string.IsNullOrEmpty(requestBody))
+                return requestBody;
+
+            // Redact client_secret parameters
+            var redacted = System.Text.RegularExpressions.Regex.Replace(
+                requestBody, 
+                @"client_secret=[^&]*", 
+                "client_secret=[REDACTED]",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+            // Redact password parameters
+            redacted = System.Text.RegularExpressions.Regex.Replace(
+                redacted, 
+                @"password=[^&]*", 
+                "password=[REDACTED]",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+            return redacted;
         }
     }
 }
