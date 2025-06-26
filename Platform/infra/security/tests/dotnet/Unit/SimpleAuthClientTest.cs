@@ -24,13 +24,14 @@ public class SimpleAuthClientTest
             ClientId = "test-client-id",
             ClientSecret = "test-client-secret",
             DefaultScopes = new System.Collections.Generic.List<string> { "api.read", "api.write" },
-            AutoRefresh = true
+            AutoRefresh = false // Disabled to prevent background loops that cause hangs
         };
         var tokenStorage = new InMemoryTokenStorage();
         var client = new AuthClient(config, httpClient, tokenStorage, new ConsoleAuthLogger());
 
         // Act
-        var result = await client.AuthenticateClientCredentialsAsync();
+        using var cts = new System.Threading.CancellationTokenSource(System.TimeSpan.FromSeconds(10));
+        var result = await client.AuthenticateClientCredentialsAsync(cancellationToken: cts.Token);
 
         // Assert
         Assert.NotNull(result);

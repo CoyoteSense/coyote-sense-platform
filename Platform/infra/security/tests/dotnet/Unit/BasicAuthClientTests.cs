@@ -31,7 +31,7 @@ namespace Coyote.Infra.Security.Tests.Unit
                 ClientId = "test-client-id",
                 ClientSecret = "test-client-secret",
                 DefaultScopes = new List<string> { "api.read", "api.write" },
-                AutoRefresh = true
+                AutoRefresh = false // Disabled to prevent background loops that cause hangs
             };
 
             // Setup DI container

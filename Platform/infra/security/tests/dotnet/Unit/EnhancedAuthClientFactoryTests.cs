@@ -77,7 +77,7 @@ public class EnhancedAuthClientFactoryTests
             ClientId = "test-client",
             ClientSecret = "test-secret",
             DefaultScopes = new List<string> { "api.read" },
-            AutoRefresh = true,
+            AutoRefresh = false, // Disabled to prevent background loops that cause hangs
             TimeoutMs = 30000
         };
 

@@ -52,7 +52,8 @@ public class AuthClientDirectTests
         var client = new Coyote.Infra.Security.Auth.Modes.Mock.MockAuthClient(options, logger);
         
         // Act
-        var result = await client.AuthenticateClientCredentialsAsync();
+        using var cts = new System.Threading.CancellationTokenSource(System.TimeSpan.FromSeconds(10));
+        var result = await client.AuthenticateClientCredentialsAsync(cancellationToken: cts.Token);
         
         // Assert
         Assert.True(result.IsSuccess);
@@ -76,7 +77,8 @@ public class AuthClientDirectTests
         var client = new Coyote.Infra.Security.Auth.Modes.Mock.MockAuthClient(options, logger);
         
         // Act
-        var result = await client.TestConnectionAsync();
+        using var cts = new System.Threading.CancellationTokenSource(System.TimeSpan.FromSeconds(10));
+        var result = await client.TestConnectionAsync(cts.Token);
         
         // Assert
         Assert.True(result);
@@ -99,7 +101,8 @@ public class AuthClientDirectTests
         var client = new Coyote.Infra.Security.Auth.Modes.Mock.MockAuthClient(options, logger);
         
         // Act
-        var result = await client.GetServerInfoAsync();
+        using var cts = new System.Threading.CancellationTokenSource(System.TimeSpan.FromSeconds(10));
+        var result = await client.GetServerInfoAsync(cts.Token);
         
         // Assert
         Assert.NotNull(result);
@@ -123,7 +126,8 @@ public class AuthClientDirectTests
         var client = new Coyote.Infra.Security.Auth.Modes.Mock.MockAuthClient(options, logger);
         
         // Authenticate first
-        await client.AuthenticateClientCredentialsAsync();
+        using var cts1 = new System.Threading.CancellationTokenSource(System.TimeSpan.FromSeconds(10));
+        await client.AuthenticateClientCredentialsAsync(cancellationToken: cts1.Token);
         Assert.True(client.IsAuthenticated);
         
         // Act

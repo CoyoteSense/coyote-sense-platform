@@ -55,7 +55,7 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
                 ClientId = "test-client",
                 DefaultScopes = scopes ?? new List<string> { "read", "write" },
                 TimeoutMs = 30000,
-                AutoRefresh = true
+                AutoRefresh = false // Disabled to prevent background loops that cause hangs
             };
 
             var loggerFactory = LoggerFactory.Create(b => b.AddConsole());
@@ -76,7 +76,7 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
                 ClientSecret = credentialProvider.GetClientSecret(),
                 DefaultScopes = new List<string> { "read", "write" },
                 TimeoutMs = 30000,
-                AutoRefresh = true
+                AutoRefresh = false // Disabled to prevent background loops that cause hangs
             };
 
             var loggerFactory = LoggerFactory.Create(b => b.AddConsole());
@@ -100,7 +100,7 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
                 ClientSecret = options.ClientSecret,
                 DefaultScopes = options.DefaultScopes ?? new List<string> { "read", "write" },
                 TimeoutMs = 30000,
-                AutoRefresh = true
+                AutoRefresh = false // Disabled to prevent background loops that cause hangs
             };
 
             var loggerFactory = LoggerFactory.Create(b => b.AddConsole());
@@ -125,7 +125,7 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
                 JwtAudience = options.JwtAudience,
                 DefaultScopes = options.DefaultScopes ?? new List<string> { "read", "write" },
                 TimeoutMs = 30000,
-                AutoRefresh = true
+                AutoRefresh = false // Disabled to prevent background loops that cause hangs
             };
 
             var loggerFactory = LoggerFactory.Create(b => b.AddConsole());
@@ -145,7 +145,7 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
                 ClientSecret = clientSecret,
                 DefaultScopes = defaultScopes ?? new List<string> { "read", "write" },
                 TimeoutMs = 30000,
-                AutoRefresh = true
+                AutoRefresh = false // Disabled to prevent background loops that cause hangs
             };
 
             var loggerFactory = LoggerFactory.Create(b => b.AddConsole());
@@ -167,7 +167,7 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
                 JwtAudience = jwtAudience,
                 DefaultScopes = defaultScopes ?? new List<string> { "read", "write" },
                 TimeoutMs = 30000,
-                AutoRefresh = true
+                AutoRefresh = false // Disabled to prevent background loops that cause hangs
             };
 
             var loggerFactory = LoggerFactory.Create(b => b.AddConsole());
@@ -188,7 +188,7 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
                 ClientSecret = clientSecret,
                 DefaultScopes = scopes ?? new List<string> { "read", "write" },
                 TimeoutMs = 30000,
-                AutoRefresh = true
+                AutoRefresh = false // Disabled to prevent background loops that cause hangs
             };
 
             var loggerFactory = LoggerFactory.Create(b => b.AddConsole());

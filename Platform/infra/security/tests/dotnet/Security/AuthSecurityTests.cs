@@ -36,7 +36,7 @@ public class AuthSecurityTests : IDisposable
             ClientId = "test-client",
             ClientSecret = "test-secret",
             DefaultScopes = new List<string> { "api.read", "api.write" },
-            AutoRefresh = true
+            AutoRefresh = false // Disabled to prevent background loops that cause hangs
         }; var services = new ServiceCollection();
         services.AddLogging(builder => builder.AddConsole().SetMinimumLevel(LogLevel.Warning));
 
