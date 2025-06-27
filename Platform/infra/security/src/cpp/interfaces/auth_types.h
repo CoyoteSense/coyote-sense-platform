@@ -4,6 +4,7 @@
 #include <chrono>
 #include <optional>
 #include <map>
+#include <vector>
 
 namespace coyote {
 namespace infra {
@@ -11,12 +12,27 @@ namespace security {
 namespace auth {
 
 /**
+ * @brief Multi-standard authentication modes supported by the platform
+ */
+enum class AuthMode {
+    /// Standard OAuth2 client credentials flow (RFC 6749)
+    ClientCredentials,
+    
+    /// Client credentials with mutual TLS authentication (RFC 8705)
+    ClientCredentialsMtls,
+    
+    /// JWT Bearer assertion flow (RFC 7523)
+    JwtBearer,
+    
+    /// Authorization code flow (RFC 6749)
+    AuthorizationCode,
+    
+    /// Authorization code flow with PKCE (RFC 7636)
+    AuthorizationCodePkce
+};
+
+/**
  * @brief Authentication Grant Types
- * 
- * This system supports multiple authentication standards:
- * - OAuth2 RFC 6749 (Client Credentials, Authorization Code)
- * - JWT Bearer RFC 7523 (JWT Bearer Assertion)
- * - mTLS RFC 8705 (Mutual TLS Client Authentication)
  */
 enum class GrantType {
   kClientCredentials,
@@ -26,19 +42,173 @@ enum class GrantType {
 };
 
 /**
- * @brief Authentication Modes
- * 
- * Comprehensive authentication modes supporting multiple standards:
- * - OAuth2 flows (RFC 6749)
- * - JWT Bearer assertions (RFC 7523)
- * - mTLS authentication (RFC 8705)
+ * @brief Authentication token information
  */
-enum class AuthMode {
-  kClientCredentials,    // Standard OAuth2 client credentials flow
-  kClientCredentialsMtls, // Client credentials with mTLS
-  kJwtBearer,           // JWT Bearer assertion flow
-  kAuthorizationCode,   // Authorization code flow
-  kAuthorizationCodePkce // Authorization code flow with PKCE
+struct AuthToken {
+    /// Access token
+    std::string access_token;
+    
+    /// Token type (usually "Bearer")
+    std::string token_type = "Bearer";
+    
+    /// Token expiration time
+    std::chrono::system_clock::time_point expires_at;
+    
+    /// Refresh token (if available)
+    std::optional<std::string> refresh_token;
+    
+    /// Token scopes
+    std::vector<std::string> scopes;
+    
+    /**
+     * @brief Check if token is expired
+     * @return true if token is expired
+     */
+    bool is_expired() const {
+        return std::chrono::system_clock::now() >= expires_at;
+    }
+    
+    /**
+     * @brief Check if token needs refresh (within buffer time)
+     * @param buffer_seconds Buffer time in seconds (default: 300 = 5 minutes)
+     * @return true if token needs refresh
+     */
+    bool needs_refresh(int buffer_seconds = 300) const {
+        auto buffer_time = std::chrono::seconds(buffer_seconds);
+        return std::chrono::system_clock::now() + buffer_time >= expires_at;
+    }
+    
+    /**
+     * @brief Get authorization header value
+     * @return Authorization header value (e.g., "Bearer <token>")
+     */
+    std::string get_authorization_header() const {
+        return token_type + " " + access_token;
+    }
+};
+
+/**
+ * @brief Authentication result
+ */
+struct AuthResult {
+    /// Whether authentication was successful
+    bool is_success = false;
+    
+    /// Authentication token (if successful)
+    std::optional<AuthToken> token;
+    
+    /// Error code (if failed)
+    std::optional<std::string> error_code;
+    
+    /// Error description (if failed)
+    std::optional<std::string> error_description;
+    
+    /// Additional error details
+    std::optional<std::string> error_details;
+    
+    /**
+     * @brief Create success result
+     * @param token Authentication token
+     * @return Success result
+     */
+    static AuthResult success(const AuthToken& token) {
+        AuthResult result;
+        result.is_success = true;
+        result.token = token;
+        return result;
+    }
+    
+    /**
+     * @brief Create error result
+     * @param error_code Error code
+     * @param error_description Error description (optional)
+     * @param error_details Additional error details (optional)
+     * @return Error result
+     */
+    static AuthResult error(const std::string& error_code,
+                           const std::optional<std::string>& error_description = std::nullopt,
+                           const std::optional<std::string>& error_details = std::nullopt) {
+        AuthResult result;
+        result.is_success = false;
+        result.error_code = error_code;
+        result.error_description = error_description;
+        result.error_details = error_details;
+        return result;
+    }
+};
+
+/**
+ * @brief Authentication server information
+ */
+struct AuthServerInfo {
+    /// Authorization endpoint URL
+    std::string authorization_endpoint;
+    
+    /// Token endpoint URL
+    std::string token_endpoint;
+    
+    /// Token introspection endpoint URL
+    std::optional<std::string> introspection_endpoint;
+    
+    /// Token revocation endpoint URL
+    std::optional<std::string> revocation_endpoint;
+    
+    /// Supported grant types
+    std::vector<std::string> grant_types_supported;
+    
+    /// Supported scopes
+    std::vector<std::string> scopes_supported;
+};
+
+/**
+ * @brief Authentication client options
+ */
+struct AuthClientOptions {
+    /// Server URL (authorization server)
+    std::string server_url;
+    
+    /// Client ID
+    std::string client_id;
+    
+    /// Client secret (optional for public clients)
+    std::optional<std::string> client_secret;
+    
+    /// Default scopes
+    std::vector<std::string> scopes;
+    
+    /// Redirect URI for authorization flows
+    std::optional<std::string> redirect_uri;
+    
+    /// Authentication mode
+    AuthMode mode = AuthMode::ClientCredentials;
+    
+    /// Enable automatic token refresh
+    bool auto_refresh = true;
+    
+    /// Token refresh buffer time
+    std::chrono::seconds token_refresh_buffer{300};
+    
+    /// HTTP timeout
+    std::chrono::seconds timeout{30};
+    
+    /// Verify SSL certificates
+    bool verify_ssl = true;
+    
+    /// Maximum retry attempts
+    int max_retries = 3;
+    
+    // mTLS configuration
+    std::optional<std::string> client_cert_path;
+    std::optional<std::string> client_key_path;
+    std::optional<std::string> ca_cert_path;
+    
+    // JWT Bearer configuration
+    std::optional<std::string> private_key_path;
+    std::optional<std::string> key_id;
+    
+    // PKCE configuration
+    bool use_pkce = true;
+    std::string code_challenge_method = "S256";
 };
 
 // Authentication Token Request
@@ -54,7 +224,7 @@ struct TokenRequest {
   std::map<std::string, std::string> additional_params;
 };
 
-// Authentication Token Response
+// Authentication Token Response (legacy compatibility)
 struct TokenResponse {
   std::string access_token;
   std::string token_type = "Bearer";
@@ -85,11 +255,20 @@ struct ErrorResponse {
   std::string error;
   std::optional<std::string> error_description;
   std::optional<std::string> error_uri;
+  int http_status_code = 400;
+  
+  std::string ToString() const {
+    std::string result = error;
+    if (error_description.has_value()) {
+      result += ": " + error_description.value();
+    }
+    return result;
+  }
 };
 
 // Authentication Token Introspection Response
 struct IntrospectResponse {
-  bool active;
+  bool active = false;
   std::optional<std::string> scope;
   std::optional<std::string> client_id;
   std::optional<std::string> username;
@@ -101,15 +280,17 @@ struct IntrospectResponse {
   std::optional<std::string> aud;
   std::optional<std::string> iss;
   std::optional<std::string> jti;
+  
+  bool IsExpired() const {
+    if (!exp.has_value()) {
+      return false;
+    }
+    return std::chrono::system_clock::now() >= exp.value();
+  }
 };
 
 /**
- * @brief Authentication Client Configuration
- * 
- * Supports configuration for multiple authentication standards:
- * - OAuth2 client credentials and authorization code flows
- * - JWT Bearer assertions with private key signing
- * - mTLS client certificate authentication
+ * @brief Authentication Client Configuration (legacy compatibility)
  */
 struct ClientConfig {
   std::string client_id;
