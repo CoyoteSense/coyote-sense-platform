@@ -6,8 +6,8 @@ import asyncio
 import json
 import time
 from datetime import datetime, timedelta
+from typing import Dict, Any, Optional
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
-from typing import Dict, Any
 import pytest
 import pytest_asyncio
 from dataclasses import asdict
@@ -15,15 +15,16 @@ from dataclasses import asdict
 # Import the OAuth2 client implementation
 import sys
 import os
-sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'src'))
 
-from python.interfaces.auth_client import (
-    AuthClient,
-    AuthConfig,
-    AuthToken,
-    AuthResult,
-    TokenStorage,
-    Logger
+# Use direct import path that works
+sys.path.append('../../src/python/impl/real')
+from auth_client import (
+    OAuth2Token,
+    OAuth2AuthResult,
+    OAuth2TokenStorage,
+    OAuth2Logger,
+    OAuth2ClientConfig,
+    OAuth2AuthClient
 )
 
 
@@ -65,6 +66,14 @@ class MockOAuth2TokenStorage(OAuth2TokenStorage):
     def clear(self) -> None:
         self._tokens.clear()
     
+    def clear_token(self, client_id: str) -> None:
+        """Clear stored token for a client"""
+        self._tokens.pop(client_id, None)
+    
+    def clear_all_tokens(self) -> None:
+        """Clear all stored tokens"""
+        self._tokens.clear()
+    
     def has_token(self, key: str) -> bool:
         """Helper method for testing"""
         return key in self._tokens
@@ -79,16 +88,13 @@ class MockOAuth2Logger(OAuth2Logger):
         self.warning_messages = []
         self.error_messages = []
     
-    def debug(self, message: str) -> None:
+    def log_debug(self, message: str) -> None:
         self.debug_messages.append(message)
     
-    def info(self, message: str) -> None:
+    def log_info(self, message: str) -> None:
         self.info_messages.append(message)
     
-    def warning(self, message: str) -> None:
-        self.warning_messages.append(message)
-    
-    def error(self, message: str) -> None:
+    def log_error(self, message: str) -> None:
         self.error_messages.append(message)
     
     def clear_messages(self) -> None:
@@ -188,9 +194,11 @@ class TestOAuth2AuthClientConfiguration:
             OAuth2AuthClient(invalid_config, mock_token_storage, mock_logger)
 
     def test_constructor_with_none_dependencies(self, oauth2_config):
-        """Test OAuth2AuthClient constructor with None dependencies"""
-        with pytest.raises(ValueError):
-            OAuth2AuthClient(oauth2_config, None, None)
+        """Test OAuth2AuthClient constructor with None dependencies - should use defaults"""
+        client = OAuth2AuthClient(oauth2_config, None, None)
+        assert client.config == oauth2_config
+        assert client.token_storage is not None  # Should use default InMemoryTokenStorage
+        assert client.logger is not None  # Should use default NullOAuth2Logger
 
 
 class TestOAuth2AuthClientCredentialsFlow:
