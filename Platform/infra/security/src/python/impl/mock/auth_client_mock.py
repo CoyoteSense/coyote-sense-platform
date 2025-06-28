@@ -30,9 +30,9 @@ class MockAuthClient(AuthClient):
     
     def __init__(
         self,
-        config: AuthClientConfig,
-        token_storage: Optional[IAuthTokenStorage] = None,
-        logger: Optional[IAuthLogger] = None,
+        config: AuthConfig,
+        token_storage: Optional[TokenStorage] = None,
+        logger: Optional[Logger] = None,
         custom_config: Optional[Dict[str, Any]] = None
     ):
         """

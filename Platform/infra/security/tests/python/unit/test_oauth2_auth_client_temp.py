@@ -16,15 +16,8 @@ from dataclasses import asdict
 import sys
 import os
 
-# Add the src directory to the path for proper package imports
-security_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..'))
-src_path = os.path.join(security_root, 'src', 'python')
-if src_path not in sys.path:
-    sys.path.insert(0, src_path)
-
-# Import directly from the real implementation to avoid mock class issues
-sys.path.insert(0, os.path.join(src_path, 'impl', 'real'))
-
+# Use direct import path that works
+sys.path.append('../../src/python/impl/real')
 from auth_client import (
     OAuth2Token,
     OAuth2AuthResult,
@@ -137,13 +130,10 @@ def oauth2_config():
     )
 
 
-@pytest_asyncio.fixture
-async def oauth2_client(oauth2_config, mock_token_storage, mock_logger):
+@pytest.fixture
+def oauth2_client(oauth2_config, mock_token_storage, mock_logger):
     """Fixture providing an OAuth2 client with mocked dependencies"""
-    client = OAuth2AuthClient(oauth2_config, mock_token_storage, mock_logger)
-    yield client
-    # Cleanup: close any open sessions
-    await client.aclose()
+    return OAuth2AuthClient(oauth2_config, mock_token_storage, mock_logger)
 
 
 def create_test_token(
@@ -165,32 +155,17 @@ def create_test_token(
     )
 
 
-def create_mock_aiohttp_session_with_response(mock_response):
-    """Helper to create properly mocked aiohttp session"""
-    mock_session = AsyncMock()
-    
-    # Create a proper async context manager mock
-    async def mock_post(*args, **kwargs):
-        context_manager = AsyncMock()
-        context_manager.__aenter__ = AsyncMock(return_value=mock_response)
-        context_manager.__aexit__ = AsyncMock(return_value=None)
-        return context_manager
-    
-    mock_session.post = mock_post
-    return mock_session
-
-
 def create_mock_response(
     status_code: int = 200,
     json_data: Dict[str, Any] = None,
     text_data: str = ""
 ) -> Mock:
     """Helper function to create mock HTTP responses"""
-    mock_response = AsyncMock()
-    mock_response.status = status_code
-    mock_response.text = AsyncMock(return_value=text_data or json.dumps(json_data or {}))
-    mock_response.json = AsyncMock(return_value=json_data or {})
-    mock_response.raise_for_status = AsyncMock()
+    mock_response = Mock()
+    mock_response.status_code = status_code
+    mock_response.json.return_value = json_data or {}
+    mock_response.text = text_data or json.dumps(json_data or {})
+    mock_response.raise_for_status = Mock()
     
     if status_code >= 400:
         mock_response.raise_for_status.side_effect = Exception(f"HTTP {status_code}")
@@ -201,20 +176,15 @@ def create_mock_response(
 class TestOAuth2AuthClientConfiguration:
     """Tests for OAuth2AuthClient configuration and initialization"""
 
-    @pytest.mark.asyncio
-    async def test_constructor_with_valid_config(self, oauth2_config, mock_token_storage, mock_logger):
+    def test_constructor_with_valid_config(self, oauth2_config, mock_token_storage, mock_logger):
         """Test OAuth2AuthClient constructor with valid configuration"""
         client = OAuth2AuthClient(oauth2_config, mock_token_storage, mock_logger)
         
         assert client.config.server_url == oauth2_config.server_url
         assert client.config.client_id == oauth2_config.client_id
         assert client.config.client_secret == oauth2_config.client_secret
-        
-        # Cleanup
-        await client.aclose()
 
-    @pytest.mark.asyncio
-    async def test_constructor_with_invalid_config(self, mock_token_storage, mock_logger):
+    def test_constructor_with_invalid_config(self, mock_token_storage, mock_logger):
         """Test OAuth2AuthClient constructor with invalid configuration - should accept any config"""
         invalid_config = OAuth2ClientConfig(
             server_url="",  # Empty values
@@ -225,20 +195,13 @@ class TestOAuth2AuthClientConfiguration:
         client = OAuth2AuthClient(invalid_config, mock_token_storage, mock_logger)
         assert client.config.server_url == ""
         assert client.config.client_id == ""
-        
-        # Cleanup
-        await client.aclose()
 
-    @pytest.mark.asyncio
-    async def test_constructor_with_none_dependencies(self, oauth2_config):
+    def test_constructor_with_none_dependencies(self, oauth2_config):
         """Test OAuth2AuthClient constructor with None dependencies - should use defaults"""
         client = OAuth2AuthClient(oauth2_config, None, None)
         assert client.config == oauth2_config
         assert client.token_storage is not None  # Should use default InMemoryTokenStorage
         assert client.logger is not None  # Should use default NullOAuth2Logger
-        
-        # Cleanup
-        await client.aclose()
 
 
 class TestOAuth2AuthClientCredentialsFlow:
@@ -255,9 +218,10 @@ class TestOAuth2AuthClientCredentialsFlow:
         }
         
         mock_response = create_mock_response(200, token_response)
-        mock_session = create_mock_aiohttp_session_with_response(mock_response)
         
-        with patch.object(oauth2_client, '_get_aio_session', return_value=mock_session):
+        with patch('aiohttp.ClientSession.post') as mock_post:
+            mock_post.return_value.__aenter__.return_value = mock_response
+            
             result = await oauth2_client.authenticate_client_credentials(["read", "write"])
         
         assert result.is_success is True
@@ -275,14 +239,9 @@ class TestOAuth2AuthClientCredentialsFlow:
         
         mock_response = create_mock_response(401, error_response)
         
-        # Mock the session and its post method's context manager
-        mock_session = AsyncMock()
-        mock_post_context = AsyncMock()
-        mock_post_context.__aenter__.return_value = mock_response
-        mock_post_context.__aexit__.return_value = None
-        mock_session.post.return_value = mock_post_context
-        
-        with patch.object(oauth2_client, '_get_aio_session', return_value=mock_session):
+        with patch('aiohttp.ClientSession.post') as mock_post:
+            mock_post.return_value.__aenter__.return_value = mock_response
+            
             result = await oauth2_client.authenticate_client_credentials(["read", "write"])
         
         assert result.is_success is False
@@ -290,8 +249,7 @@ class TestOAuth2AuthClientCredentialsFlow:
         assert result.error_description == "Authentication failed"
         assert result.token is None
 
-    @pytest.mark.asyncio
-    async def test_client_credentials_sync_success(self, oauth2_client):
+    def test_client_credentials_sync_success(self, oauth2_client):
         """Test successful client credentials flow (sync)"""
         token_response = {
             "access_token": "test-access-token",
@@ -324,7 +282,7 @@ class TestOAuth2AuthJwtBearerFlow:
     """Tests for OAuth2 JWT Bearer flow"""
 
     @pytest.mark.asyncio
-    async def test_authenticate_jwt_bearer_success(self, oauth2_client):
+    async def test_jwt_bearer_async_success(self, oauth2_client):
         """Test successful JWT Bearer flow"""
         # Configure JWT settings
         oauth2_client.config.jwt_signing_key_path = "test-key.pem"
@@ -343,22 +301,21 @@ class TestOAuth2AuthJwtBearerFlow:
              patch.object(oauth2_client, '_create_jwt_assertion', return_value="mock-jwt"):
             mock_post.return_value.__aenter__.return_value = mock_response
             
-            result = await oauth2_client.authenticate_jwt_bearer("test-subject", ["read", "write"])
+            result = await oauth2_client.jwt_bearer_async("test-subject", ["read", "write"])
         
         assert result.success is True
         assert result.token is not None
         assert result.token.access_token == "jwt-access-token"
 
     @pytest.mark.asyncio
-    async def test_authenticate_jwt_bearer_missing_config(self, oauth2_client):
+    async def test_jwt_bearer_async_missing_config(self, oauth2_client):
         """Test JWT Bearer flow with missing configuration"""
         # Don't set JWT configuration
         
         with pytest.raises(ValueError):
-            await oauth2_client.authenticate_jwt_bearer("test-subject", ["read", "write"])
+            await oauth2_client.jwt_bearer_async("test-subject", ["read", "write"])
 
-    @pytest.mark.asyncio
-    async def test_jwt_bearer_sync_success(self, oauth2_client):
+    def test_jwt_bearer_sync_success(self, oauth2_client):
         """Test successful JWT Bearer flow (sync)"""
         oauth2_client.config.jwt_signing_key_path = "test-key.pem"
         oauth2_client.config.jwt_issuer = "test-issuer"
@@ -386,7 +343,7 @@ class TestOAuth2AuthAuthorizationCodeFlow:
     """Tests for OAuth2 Authorization Code flow"""
 
     @pytest.mark.asyncio
-    async def test_authenticate_authorization_code_success(self, oauth2_client):
+    async def test_authorization_code_async_success(self, oauth2_client):
         """Test successful authorization code flow"""
         token_response = {
             "access_token": "auth-code-token",
@@ -401,7 +358,7 @@ class TestOAuth2AuthAuthorizationCodeFlow:
         with patch('aiohttp.ClientSession.post') as mock_post:
             mock_post.return_value.__aenter__.return_value = mock_response
             
-            result = await oauth2_client.authenticate_authorization_code(
+            result = await oauth2_client.authorization_code_async(
                 "test-auth-code", "test-verifier", ["read", "write"]
             )
         
@@ -411,7 +368,7 @@ class TestOAuth2AuthAuthorizationCodeFlow:
         assert result.token.refresh_token == "refresh-token-123"
 
     @pytest.mark.asyncio
-    async def test_authenticate_authorization_code_invalid_code(self, oauth2_client):
+    async def test_authorization_code_async_invalid_code(self, oauth2_client):
         """Test authorization code flow with invalid code"""
         error_response = {
             "error": "invalid_grant",
@@ -423,7 +380,7 @@ class TestOAuth2AuthAuthorizationCodeFlow:
         with patch('aiohttp.ClientSession.post') as mock_post:
             mock_post.return_value.__aenter__.return_value = mock_response
             
-            result = await oauth2_client.authenticate_authorization_code(
+            result = await oauth2_client.authorization_code_async(
                 "invalid-code", "test-verifier", ["read", "write"]
             )
         
@@ -431,19 +388,17 @@ class TestOAuth2AuthAuthorizationCodeFlow:
         assert result.error == "invalid_grant"
         assert result.error_description == "Authorization code is invalid"
 
-    @pytest.mark.asyncio
-    async def test__generate_code_verifier(self, oauth2_client):
+    def test_generate_pkce_challenge(self, oauth2_client):
         """Test PKCE challenge generation"""
-        verifier, challenge = oauth2_client._generate_code_verifier()
+        verifier, challenge = oauth2_client.generate_pkce_challenge()
         
         assert len(verifier) >= 43  # PKCE requirement
         assert len(challenge) > 0
         assert verifier != challenge
 
-    @pytest.mark.asyncio
-    async def test_start_authorization_code_flow(self, oauth2_client):
+    def test_generate_authorization_url(self, oauth2_client):
         """Test authorization URL generation"""
-        url = oauth2_client.start_authorization_code_flow(
+        url = oauth2_client.generate_authorization_url(
             ["read", "write"], "test-state", "test-challenge"
         )
         
@@ -459,7 +414,7 @@ class TestOAuth2AuthRefreshTokenFlow:
     """Tests for OAuth2 Refresh Token flow"""
 
     @pytest.mark.asyncio
-    async def test_refresh_token_success(self, oauth2_client):
+    async def test_refresh_token_async_success(self, oauth2_client):
         """Test successful refresh token flow"""
         token_response = {
             "access_token": "new-access-token",
@@ -474,7 +429,7 @@ class TestOAuth2AuthRefreshTokenFlow:
         with patch('aiohttp.ClientSession.post') as mock_post:
             mock_post.return_value.__aenter__.return_value = mock_response
             
-            result = await oauth2_client.refresh_token("existing-refresh-token")
+            result = await oauth2_client.refresh_token_async("existing-refresh-token")
         
         assert result.success is True
         assert result.token is not None
@@ -482,7 +437,7 @@ class TestOAuth2AuthRefreshTokenFlow:
         assert result.token.refresh_token == "new-refresh-token"
 
     @pytest.mark.asyncio
-    async def test_refresh_token_invalid_token(self, oauth2_client):
+    async def test_refresh_token_async_invalid_token(self, oauth2_client):
         """Test refresh token flow with invalid refresh token"""
         error_response = {
             "error": "invalid_grant",
@@ -494,7 +449,7 @@ class TestOAuth2AuthRefreshTokenFlow:
         with patch('aiohttp.ClientSession.post') as mock_post:
             mock_post.return_value.__aenter__.return_value = mock_response
             
-            result = await oauth2_client.refresh_token("invalid-refresh-token")
+            result = await oauth2_client.refresh_token_async("invalid-refresh-token")
         
         assert result.success is False
         assert result.error == "invalid_grant"
@@ -505,7 +460,7 @@ class TestOAuth2AuthTokenIntrospection:
     """Tests for OAuth2 Token Introspection"""
 
     @pytest.mark.asyncio
-    async def test_introspect_token_active(self, oauth2_client):
+    async def test_introspect_token_async_active(self, oauth2_client):
         """Test token introspection with active token"""
         introspection_response = {
             "active": True,
@@ -519,7 +474,7 @@ class TestOAuth2AuthTokenIntrospection:
         with patch('aiohttp.ClientSession.post') as mock_post:
             mock_post.return_value.__aenter__.return_value = mock_response
             
-            result = await oauth2_client.introspect_token("test-access-token")
+            result = await oauth2_client.introspect_token_async("test-access-token")
         
         assert result.success is True
         assert result.active is True
@@ -527,7 +482,7 @@ class TestOAuth2AuthTokenIntrospection:
         assert result.client_id == "test-client-id"
 
     @pytest.mark.asyncio
-    async def test_introspect_token_inactive(self, oauth2_client):
+    async def test_introspect_token_async_inactive(self, oauth2_client):
         """Test token introspection with inactive token"""
         introspection_response = {
             "active": False
@@ -538,7 +493,7 @@ class TestOAuth2AuthTokenIntrospection:
         with patch('aiohttp.ClientSession.post') as mock_post:
             mock_post.return_value.__aenter__.return_value = mock_response
             
-            result = await oauth2_client.introspect_token("inactive-token")
+            result = await oauth2_client.introspect_token_async("inactive-token")
         
         assert result.success is True
         assert result.active is False
@@ -548,26 +503,26 @@ class TestOAuth2AuthTokenRevocation:
     """Tests for OAuth2 Token Revocation"""
 
     @pytest.mark.asyncio
-    async def test_revoke_token_success(self, oauth2_client, mock_token_storage):
+    async def test_revoke_token_async_success(self, oauth2_client, mock_token_storage):
         """Test successful token revocation"""
         mock_response = create_mock_response(200, {})
         
         with patch('aiohttp.ClientSession.post') as mock_post:
             mock_post.return_value.__aenter__.return_value = mock_response
             
-            result = await oauth2_client.revoke_token("test-access-token")
+            result = await oauth2_client.revoke_token_async("test-access-token")
         
         assert result.success is True
 
     @pytest.mark.asyncio
-    async def test_revoke_token_error(self, oauth2_client):
+    async def test_revoke_token_async_error(self, oauth2_client):
         """Test token revocation with server error"""
         mock_response = create_mock_response(500, {})
         
         with patch('aiohttp.ClientSession.post') as mock_post:
             mock_post.return_value.__aenter__.return_value = mock_response
             
-            result = await oauth2_client.revoke_token("test-access-token")
+            result = await oauth2_client.revoke_token_async("test-access-token")
         
         assert result.success is False
 
@@ -589,8 +544,7 @@ class TestOAuth2AuthTokenStorage:
         assert retrieved is not None
         assert retrieved.access_token == "stored-token"
 
-    @pytest.mark.asyncio
-    async def test_store_and_retrieve_token_sync(self, oauth2_client, mock_token_storage):
+    def test_store_and_retrieve_token_sync(self, oauth2_client, mock_token_storage):
         """Test storing and retrieving tokens synchronously"""
         token = create_test_token("stored-token")
         
@@ -622,7 +576,7 @@ class TestOAuth2AuthServerDiscovery:
     """Tests for OAuth2 Server Discovery"""
 
     @pytest.mark.asyncio
-    async def test_discover_server_success(self, oauth2_client):
+    async def test_discover_server_async_success(self, oauth2_client):
         """Test successful server discovery"""
         discovery_response = {
             "issuer": "https://test-auth.example.com",
@@ -639,7 +593,7 @@ class TestOAuth2AuthServerDiscovery:
         with patch('aiohttp.ClientSession.get') as mock_get:
             mock_get.return_value.__aenter__.return_value = mock_response
             
-            result = await oauth2_client.discover_server()
+            result = await oauth2_client.discover_server_async()
         
         assert result.success is True
         assert result.server_info is not None
@@ -651,24 +605,21 @@ class TestOAuth2AuthServerDiscovery:
 class TestOAuth2AuthTokenExpiration:
     """Tests for OAuth2 Token Expiration"""
 
-    @pytest.mark.asyncio
-    async def test_is_token_expired_with_expired_token(self, oauth2_client):
+    def test_is_token_expired_with_expired_token(self, oauth2_client):
         """Test token expiration check with expired token"""
         expired_token = create_test_token("expired-token", expires_in=-3600)  # Expired 1 hour ago
         
         result = oauth2_client.is_token_expired(expired_token)
         assert result is True
 
-    @pytest.mark.asyncio
-    async def test_is_token_expired_with_valid_token(self, oauth2_client):
+    def test_is_token_expired_with_valid_token(self, oauth2_client):
         """Test token expiration check with valid token"""
         valid_token = create_test_token("valid-token", expires_in=3600)  # Expires in 1 hour
         
         result = oauth2_client.is_token_expired(valid_token)
         assert result is False
 
-    @pytest.mark.asyncio
-    async def test_is_token_near_expiry_with_near_expiry_token(self, oauth2_client):
+    def test_is_token_near_expiry_with_near_expiry_token(self, oauth2_client):
         """Test token near expiry check"""
         near_expiry_token = create_test_token("near-expiry-token", expires_in=30)  # Expires in 30 seconds
         buffer_seconds = 60  # 1 minute buffer
@@ -676,8 +627,7 @@ class TestOAuth2AuthTokenExpiration:
         result = oauth2_client.is_token_near_expiry(near_expiry_token, buffer_seconds)
         assert result is True
 
-    @pytest.mark.asyncio
-    async def test_is_token_near_expiry_with_valid_token(self, oauth2_client):
+    def test_is_token_near_expiry_with_valid_token(self, oauth2_client):
         """Test token near expiry check with valid token"""
         valid_token = create_test_token("valid-token", expires_in=3600)  # Expires in 1 hour
         buffer_seconds = 60  # 1 minute buffer
@@ -690,8 +640,8 @@ class TestOAuth2AuthAutoRefresh:
     """Tests for OAuth2 Auto-Refresh functionality"""
 
     @pytest.mark.asyncio
-    async def test_start_auto_refresh_functionality(self, mock_token_storage, mock_logger):
-        """Test starting auto-refresh functionality - method does not exist in implementation"""
+    async def test_start_auto_refresh(self, mock_token_storage, mock_logger):
+        """Test starting auto-refresh functionality"""
         config = OAuth2ClientConfig(
             server_url="https://test-auth.example.com",
             client_id="test-client-id",
@@ -719,8 +669,8 @@ class TestOAuth2AuthAutoRefresh:
         with patch('aiohttp.ClientSession.post') as mock_post:
             mock_post.return_value.__aenter__.return_value = mock_response
             
-            # Auto refresh methods not implemented - skip this test
-            pytest.skip("Auto refresh methods not implemented")
+            # Start auto-refresh
+            client.start_auto_refresh("test-key")
             
             # Wait a short time for potential refresh
             await asyncio.sleep(0.1)
@@ -728,12 +678,13 @@ class TestOAuth2AuthAutoRefresh:
             # Stop auto-refresh
             client.stop_auto_refresh()
 
-    @pytest.mark.asyncio
-    async def test_stop_auto_refresh(self, oauth2_client):
+    def test_stop_auto_refresh(self, oauth2_client):
         """Test stopping auto-refresh functionality"""
-        # Auto refresh methods don't exist in current implementation
-        # This test would need to be rewritten when auto-refresh is implemented
-        pytest.skip("Auto refresh methods not implemented")
+        # Start and then stop auto-refresh
+        oauth2_client.start_auto_refresh("test-key")
+        oauth2_client.stop_auto_refresh()
+        
+        # Should not raise any exceptions
 
 
 class TestOAuth2AuthConcurrency:
@@ -850,8 +801,7 @@ class TestOAuth2AuthLogging:
         logged_text = " ".join(mock_logger.info_messages)
         assert "client_credentials" in logged_text.lower()
 
-    @pytest.mark.asyncio
-    async def test_error_logging(self, oauth2_client, mock_logger):
+    def test_error_logging(self, oauth2_client, mock_logger):
         """Test that errors are properly logged"""
         with patch('requests.post', side_effect=Exception("Network error")):
             result = oauth2_client.client_credentials(["read", "write"])
@@ -866,5 +816,6 @@ class TestOAuth2AuthLogging:
         assert "error" in logged_text.lower()
 
 
-# Remove the recursive pytest call that causes infinite loop
-# Tests should be run with: python -m pytest test_oauth2_auth_client.py -v
+if __name__ == "__main__":
+    # Run tests with pytest
+    pytest.main([__file__, "-v"])
