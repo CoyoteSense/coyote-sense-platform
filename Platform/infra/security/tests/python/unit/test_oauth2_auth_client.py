@@ -170,13 +170,13 @@ def create_mock_aiohttp_session_with_response(mock_response):
     mock_session = AsyncMock()
     
     # Create a proper async context manager mock
-    async def mock_post(*args, **kwargs):
-        context_manager = AsyncMock()
-        context_manager.__aenter__ = AsyncMock(return_value=mock_response)
-        context_manager.__aexit__ = AsyncMock(return_value=None)
-        return context_manager
+    mock_context = AsyncMock()
+    mock_context.__aenter__ = AsyncMock(return_value=mock_response)
+    mock_context.__aexit__ = AsyncMock(return_value=None)
     
-    mock_session.post = mock_post
+    mock_session.post = AsyncMock(return_value=mock_context)
+    mock_session.get = AsyncMock(return_value=mock_context)
+    
     return mock_session
 
 
@@ -274,13 +274,7 @@ class TestOAuth2AuthClientCredentialsFlow:
         }
         
         mock_response = create_mock_response(401, error_response)
-        
-        # Mock the session and its post method's context manager
-        mock_session = AsyncMock()
-        mock_post_context = AsyncMock()
-        mock_post_context.__aenter__.return_value = mock_response
-        mock_post_context.__aexit__.return_value = None
-        mock_session.post.return_value = mock_post_context
+        mock_session = create_mock_aiohttp_session_with_response(mock_response)
         
         with patch.object(oauth2_client, '_get_aio_session', return_value=mock_session):
             result = await oauth2_client.authenticate_client_credentials(["read", "write"])
@@ -303,20 +297,20 @@ class TestOAuth2AuthClientCredentialsFlow:
         mock_response = create_mock_response(200, token_response)
         
         with patch('requests.post', return_value=mock_response):
-            result = oauth2_client.client_credentials(["read", "write"])
+            result = oauth2_client.authenticate_client_credentials_sync(["read", "write"])
         
-        assert result.success is True
+        assert result.is_success is True
         assert result.token is not None
         assert result.token.access_token == "test-access-token"
 
     @pytest.mark.asyncio
     async def test_client_credentials_network_error(self, oauth2_client):
         """Test client credentials flow with network error"""
-        with patch('aiohttp.ClientSession.post', side_effect=Exception("Network error")):
+        with patch.object(oauth2_client, '_get_aio_session', side_effect=Exception("Network error")):
             result = await oauth2_client.authenticate_client_credentials(["read", "write"])
         
-        assert result.success is False
-        assert "Network error" in result.error
+        assert result.is_success is False
+        assert "Network error" in result.error_details
         assert result.token is None
 
 
@@ -338,14 +332,14 @@ class TestOAuth2AuthJwtBearerFlow:
         }
         
         mock_response = create_mock_response(200, token_response)
+        mock_session = create_mock_aiohttp_session_with_response(mock_response)
         
-        with patch('aiohttp.ClientSession.post') as mock_post, \
+        with patch.object(oauth2_client, '_get_aio_session', return_value=mock_session), \
              patch.object(oauth2_client, '_create_jwt_assertion', return_value="mock-jwt"):
-            mock_post.return_value.__aenter__.return_value = mock_response
             
             result = await oauth2_client.authenticate_jwt_bearer("test-subject", ["read", "write"])
         
-        assert result.success is True
+        assert result.is_success is True
         assert result.token is not None
         assert result.token.access_token == "jwt-access-token"
 
@@ -375,9 +369,9 @@ class TestOAuth2AuthJwtBearerFlow:
         with patch('requests.post', return_value=mock_response), \
              patch.object(oauth2_client, '_create_jwt_assertion', return_value="mock-jwt"):
             
-            result = oauth2_client.jwt_bearer("test-subject", ["read", "write"])
+            result = oauth2_client.authenticate_jwt_bearer_sync("test-subject", ["read", "write"])
         
-        assert result.success is True
+        assert result.is_success is True
         assert result.token is not None
         assert result.token.access_token == "jwt-access-token"
 
@@ -397,15 +391,14 @@ class TestOAuth2AuthAuthorizationCodeFlow:
         }
         
         mock_response = create_mock_response(200, token_response)
+        mock_session = create_mock_aiohttp_session_with_response(mock_response)
         
-        with patch('aiohttp.ClientSession.post') as mock_post:
-            mock_post.return_value.__aenter__.return_value = mock_response
-            
+        with patch.object(oauth2_client, '_get_aio_session', return_value=mock_session):
             result = await oauth2_client.authenticate_authorization_code(
-                "test-auth-code", "test-verifier", ["read", "write"]
+                "test-auth-code", "https://example.com/callback", "test-verifier"
             )
         
-        assert result.success is True
+        assert result.is_success is True
         assert result.token is not None
         assert result.token.access_token == "auth-code-token"
         assert result.token.refresh_token == "refresh-token-123"
@@ -419,22 +412,22 @@ class TestOAuth2AuthAuthorizationCodeFlow:
         }
         
         mock_response = create_mock_response(400, error_response)
+        mock_session = create_mock_aiohttp_session_with_response(mock_response)
         
-        with patch('aiohttp.ClientSession.post') as mock_post:
-            mock_post.return_value.__aenter__.return_value = mock_response
-            
+        with patch.object(oauth2_client, '_get_aio_session', return_value=mock_session):
             result = await oauth2_client.authenticate_authorization_code(
-                "invalid-code", "test-verifier", ["read", "write"]
+                "invalid-code", "https://example.com/callback", "test-verifier"
             )
         
-        assert result.success is False
-        assert result.error == "invalid_grant"
+        assert result.is_success is False
+        assert result.error_code == "invalid_grant"
         assert result.error_description == "Authorization code is invalid"
 
     @pytest.mark.asyncio
-    async def test__generate_code_verifier(self, oauth2_client):
+    async def test_generate_code_verifier(self, oauth2_client):
         """Test PKCE challenge generation"""
-        verifier, challenge = oauth2_client._generate_code_verifier()
+        verifier = oauth2_client._generate_code_verifier()
+        challenge = oauth2_client._generate_code_challenge(verifier)
         
         assert len(verifier) >= 43  # PKCE requirement
         assert len(challenge) > 0
@@ -443,8 +436,8 @@ class TestOAuth2AuthAuthorizationCodeFlow:
     @pytest.mark.asyncio
     async def test_start_authorization_code_flow(self, oauth2_client):
         """Test authorization URL generation"""
-        url = oauth2_client.start_authorization_code_flow(
-            ["read", "write"], "test-state", "test-challenge"
+        url, verifier, state = await oauth2_client.start_authorization_code_flow(
+            "https://example.com/callback", ["read", "write"], "test-state"
         )
         
         assert oauth2_client.config.server_url in url
@@ -452,7 +445,9 @@ class TestOAuth2AuthAuthorizationCodeFlow:
         assert "client_id=test-client-id" in url
         assert "scope=read+write" in url
         assert "state=test-state" in url
-        assert "code_challenge=test-challenge" in url
+        assert "code_challenge=" in url
+        assert len(verifier) >= 43  # PKCE requirement
+        assert state == "test-state"
 
 
 class TestOAuth2AuthRefreshTokenFlow:
@@ -470,13 +465,12 @@ class TestOAuth2AuthRefreshTokenFlow:
         }
         
         mock_response = create_mock_response(200, token_response)
+        mock_session = create_mock_aiohttp_session_with_response(mock_response)
         
-        with patch('aiohttp.ClientSession.post') as mock_post:
-            mock_post.return_value.__aenter__.return_value = mock_response
-            
+        with patch.object(oauth2_client, '_get_aio_session', return_value=mock_session):
             result = await oauth2_client.refresh_token("existing-refresh-token")
         
-        assert result.success is True
+        assert result.is_success is True
         assert result.token is not None
         assert result.token.access_token == "new-access-token"
         assert result.token.refresh_token == "new-refresh-token"
@@ -490,14 +484,13 @@ class TestOAuth2AuthRefreshTokenFlow:
         }
         
         mock_response = create_mock_response(400, error_response)
+        mock_session = create_mock_aiohttp_session_with_response(mock_response)
         
-        with patch('aiohttp.ClientSession.post') as mock_post:
-            mock_post.return_value.__aenter__.return_value = mock_response
-            
+        with patch.object(oauth2_client, '_get_aio_session', return_value=mock_session):
             result = await oauth2_client.refresh_token("invalid-refresh-token")
         
-        assert result.success is False
-        assert result.error == "invalid_grant"
+        assert result.is_success is False
+        assert result.error_code == "invalid_grant"
         assert result.error_description == "Refresh token is invalid"
 
 
@@ -515,16 +508,12 @@ class TestOAuth2AuthTokenIntrospection:
         }
         
         mock_response = create_mock_response(200, introspection_response)
+        mock_session = create_mock_aiohttp_session_with_response(mock_response)
         
-        with patch('aiohttp.ClientSession.post') as mock_post:
-            mock_post.return_value.__aenter__.return_value = mock_response
-            
+        with patch.object(oauth2_client, '_get_aio_session', return_value=mock_session):
             result = await oauth2_client.introspect_token("test-access-token")
         
-        assert result.success is True
-        assert result.active is True
-        assert result.scope == "read write"
-        assert result.client_id == "test-client-id"
+        assert result is True  # Token is active
 
     @pytest.mark.asyncio
     async def test_introspect_token_inactive(self, oauth2_client):
@@ -534,14 +523,12 @@ class TestOAuth2AuthTokenIntrospection:
         }
         
         mock_response = create_mock_response(200, introspection_response)
+        mock_session = create_mock_aiohttp_session_with_response(mock_response)
         
-        with patch('aiohttp.ClientSession.post') as mock_post:
-            mock_post.return_value.__aenter__.return_value = mock_response
-            
+        with patch.object(oauth2_client, '_get_aio_session', return_value=mock_session):
             result = await oauth2_client.introspect_token("inactive-token")
         
-        assert result.success is True
-        assert result.active is False
+        assert result is False  # Token is inactive
 
 
 class TestOAuth2AuthTokenRevocation:
@@ -551,13 +538,12 @@ class TestOAuth2AuthTokenRevocation:
     async def test_revoke_token_success(self, oauth2_client, mock_token_storage):
         """Test successful token revocation"""
         mock_response = create_mock_response(200, {})
+        mock_session = create_mock_aiohttp_session_with_response(mock_response)
         
-        with patch('aiohttp.ClientSession.post') as mock_post:
-            mock_post.return_value.__aenter__.return_value = mock_response
-            
+        with patch.object(oauth2_client, '_get_aio_session', return_value=mock_session):
             result = await oauth2_client.revoke_token("test-access-token")
         
-        assert result.success is True
+        assert result is True
 
     @pytest.mark.asyncio
     async def test_revoke_token_error(self, oauth2_client):
