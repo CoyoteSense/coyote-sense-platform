@@ -17,6 +17,7 @@ from interfaces import (
     AuthToken, AuthResult, TokenStorage, Logger
 )
 from factory import create_auth_client
+from impl.real.auth_client import InMemoryTokenStorage
 
 
 class TestAuthConfig:
@@ -51,7 +52,7 @@ class TestAuthConfig:
     
     def test_jwt_bearer_config(self):
         """Test JWT Bearer configuration"""
-        config = AuthClientConfig(
+        config = AuthConfig(
             server_url="https://auth.example.com",
             client_id="test-client",
             auth_mode=AuthMode.JWT_BEARER,
@@ -67,7 +68,7 @@ class TestAuthConfig:
     def test_invalid_config(self):
         """Test invalid configuration"""
         # Missing client_secret for client credentials
-        config = AuthClientConfig(
+        config = AuthConfig(
             server_url="https://auth.example.com",
             client_id="test-client",
             auth_mode=AuthMode.CLIENT_CREDENTIALS
@@ -146,7 +147,7 @@ class TestMockAuthClient:
     @pytest.fixture
     def config(self):
         """Test configuration"""
-        return AuthClientConfig(
+        return AuthConfig(
             server_url="https://auth.example.com",
             client_id="test-client",
             client_secret="test-secret",
@@ -211,7 +212,7 @@ class TestDebugAuthClient:
     @pytest.fixture
     def config(self):
         """Test configuration"""
-        return AuthClientConfig(
+        return AuthConfig(
             server_url="https://auth.example.com",
             client_id="debug-client",
             client_secret="debug-secret",
@@ -266,7 +267,7 @@ class TestAuthClientFactory:
     
     def test_invalid_mode(self):
         """Test creating client with invalid mode"""
-        config = AuthClientConfig(
+        config = AuthConfig(
             server_url="https://auth.example.com",
             client_id="test-client",
             client_secret="test-secret"
@@ -281,7 +282,7 @@ if __name__ == "__main__":
     print("Running basic security component tests...")
     
     # Test configuration
-    config = AuthClientConfig(
+    config = AuthConfig(
         server_url="https://auth.example.com",
         client_id="test-client",
         client_secret="test-secret",

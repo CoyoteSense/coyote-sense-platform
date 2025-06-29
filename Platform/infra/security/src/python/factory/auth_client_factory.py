@@ -90,8 +90,15 @@ def create_auth_client(
     return AuthClientFactory.create_client(config, None, token_storage, logger)
 
 
+# Legacy aliases for backward compatibility
+OAuth2ClientFactory = AuthClientFactory
+create_oauth2_client = create_auth_client
+
+
 # Export the factory and convenience function
 __all__ = [
     'AuthClientFactory',
-    'create_auth_client'
+    'create_auth_client',
+    'OAuth2ClientFactory',
+    'create_oauth2_client'
 ]

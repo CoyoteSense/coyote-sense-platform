@@ -492,37 +492,38 @@ class RealAuthClient(AuthClient):
             self.logger.log_error(f"Connection test failed: {e}")
             return False
     
-    async def get_server_info_async(self) -> Optional[AuthServerInfo]:
-        """Get authentication server information."""
-        try:
-            # Try well-known endpoints first
-            status, response_data = await self._make_request(
-                "GET",
-                f"{self.config.server_url}/.well-known/oauth-authorization-server"
-            )
-            
-            if status != 200:
-                # Try OpenID Connect discovery
-                status, response_data = await self._make_request(
-                    "GET",
-                    f"{self.config.server_url}/.well-known/openid_configuration"
-                )
-            
-            if status == 200:
-                return AuthServerInfo(
-                    authorization_endpoint=response_data.get("authorization_endpoint", ""),
-                    token_endpoint=response_data.get("token_endpoint", ""),
-                    introspection_endpoint=response_data.get("introspection_endpoint"),
-                    revocation_endpoint=response_data.get("revocation_endpoint"),
-                    grant_types_supported=response_data.get("grant_types_supported", []),
-                    scopes_supported=response_data.get("scopes_supported", [])
-                )
-            else:
-                return None
-                
-        except Exception as e:
-            self.logger.log_error(f"Failed to get server info: {e}")
-            return None
+    # Note: This method is not in the base interface, commenting out for now
+    # async def get_server_info_async(self) -> Optional[AuthServerInfo]:
+    #     """Get authentication server information."""
+    #     try:
+    #         # Try well-known endpoints first
+    #         status, response_data = await self._make_request(
+    #             "GET",
+    #             f"{self.config.server_url}/.well-known/oauth-authorization-server"
+    #         )
+    #         
+    #         if status != 200:
+    #             # Try OpenID Connect discovery
+    #             status, response_data = await self._make_request(
+    #                 "GET",
+    #                 f"{self.config.server_url}/.well-known/openid_configuration"
+    #             )
+    #         
+    #         if status == 200:
+    #             return AuthServerInfo(
+    #                 authorization_endpoint=response_data.get("authorization_endpoint", ""),
+    #                 token_endpoint=response_data.get("token_endpoint", ""),
+    #                 introspection_endpoint=response_data.get("introspection_endpoint"),
+    #                 revocation_endpoint=response_data.get("revocation_endpoint"),
+    #                 grant_types_supported=response_data.get("grant_types_supported", []),
+    #                 scopes_supported=response_data.get("scopes_supported", [])
+    #             )
+    #         else:
+    #             return None
+    #             
+    #     except Exception as e:
+    #         self.logger.log_error(f"Failed to get server info: {e}")
+    #         return None
     
     def clear_tokens(self) -> None:
         """Clear stored tokens."""

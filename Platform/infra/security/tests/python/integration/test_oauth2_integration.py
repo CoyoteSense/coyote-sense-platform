@@ -11,15 +11,21 @@ from unittest.mock import Mock
 import sys
 
 # Add src directory to path for imports
-sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'src'))
+security_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..'))
+src_path = os.path.join(security_root, 'src', 'python')
+if src_path not in sys.path:
+    sys.path.insert(0, src_path)
 
-from python.interfaces.auth_client import (
+from interfaces.auth_client import (
     AuthClient,
     AuthConfig,
     TokenStorage,
     Logger
 )
-from python.factory.auth_client_factory import create_auth_client
+from factory.auth_client_factory import create_auth_client
+
+# Import OAuth2 specific classes
+from impl.real.auth_client import OAuth2TokenStorage
 
 
 class TestOAuth2TokenStorage(OAuth2TokenStorage):

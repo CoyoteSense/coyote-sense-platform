@@ -24,6 +24,9 @@ from interfaces.auth_client import (
     TokenStorage, Logger, AuthMode
 )
 
+# Import OAuth2ServerInfo from the real implementation
+from impl.real.auth_client import OAuth2ServerInfo
+
 
 class MockAuthClient(AuthClient):
     """Mock authentication client implementation for testing."""
@@ -56,19 +59,20 @@ class MockAuthClient(AuthClient):
         self.token_lifetime_seconds = self.mock_config.get("token_lifetime_seconds", 3600)
         
         # Mock server info
-        self.mock_server_info = AuthServerInfo(
-            authorization_endpoint=f"{config.server_url}/authorize",
-            token_endpoint=f"{config.server_url}/token",
-            introspection_endpoint=f"{config.server_url}/introspect",
-            revocation_endpoint=f"{config.server_url}/revoke",
-            grant_types_supported=[
-                "client_credentials",
-                "authorization_code",
-                "refresh_token",
-                "urn:ietf:params:oauth:grant-type:jwt-bearer"
-            ],
-            scopes_supported=["read", "write", "admin", "trading", "analytics"]
-        )
+        # Note: Commented out since get_server_info_async is not in the interface
+        # self.mock_server_info = OAuth2ServerInfo(
+        #     authorization_endpoint=f"{config.server_url}/authorize",
+        #     token_endpoint=f"{config.server_url}/token",
+        #     introspection_endpoint=f"{config.server_url}/introspect",
+        #     revocation_endpoint=f"{config.server_url}/revoke",
+        #     grant_types_supported=[
+        #         "client_credentials",
+        #         "authorization_code",
+        #         "refresh_token",
+        #         "urn:ietf:params:oauth:grant-type:jwt-bearer"
+        #     ],
+        #     scopes_supported=["read", "write", "admin", "trading", "analytics"]
+        # )
         
         self.logger.log_info("Mock authentication client initialized")
     
@@ -285,16 +289,17 @@ class MockAuthClient(AuthClient):
         self.logger.log_info("Mock connection test successful")
         return True
     
-    async def get_server_info_async(self) -> Optional[AuthServerInfo]:
-        """Get authentication server information (mock)."""
-        await self._simulate_delay()
-        
-        if self._should_simulate_failure():
-            self.logger.log_error("Mock server info retrieval failed")
-            return None
-        
-        self.logger.log_info("Mock server info retrieved")
-        return self.mock_server_info
+    # Note: This method is not in the base interface, commenting out for now  
+    # async def get_server_info_async(self) -> Optional[OAuth2ServerInfo]:
+    #     """Get authentication server information (mock)."""
+    #     await self._simulate_delay()
+    #     
+    #     if self._should_simulate_failure():
+    #         self.logger.log_error("Mock server info retrieval failed")
+    #         return None
+    #     
+    #     self.logger.log_info("Mock server info retrieved")
+    #     return self.mock_server_info
     
     def clear_tokens(self) -> None:
         """Clear stored tokens."""
