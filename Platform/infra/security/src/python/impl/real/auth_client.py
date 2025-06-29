@@ -12,7 +12,7 @@ import time
 import urllib.parse
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Tuple, Any
 from threading import Timer
 from concurrent.futures import ThreadPoolExecutor
@@ -51,18 +51,34 @@ class OAuth2Token:
     """OAuth2 token information"""
     access_token: str
     token_type: str = "Bearer"
-    expires_at: datetime = field(default_factory=lambda: datetime.utcnow() + timedelta(hours=1))
+    expires_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc) + timedelta(hours=1))
     refresh_token: Optional[str] = None
     scopes: List[str] = field(default_factory=list)
 
     @property
     def is_expired(self) -> bool:
         """Check if token is expired"""
-        return datetime.utcnow() >= self.expires_at
+        from datetime import timezone
+        now = datetime.now(timezone.utc)
+        # Handle both timezone-aware and timezone-naive expires_at
+        if self.expires_at.tzinfo is None:
+            # If expires_at is naive, assume it's UTC
+            expires_at_aware = self.expires_at.replace(tzinfo=timezone.utc)
+        else:
+            expires_at_aware = self.expires_at
+        return now >= expires_at_aware
 
     def needs_refresh(self, buffer_seconds: int = 300) -> bool:
         """Check if token needs refresh (within buffer time)"""
-        return datetime.utcnow() + timedelta(seconds=buffer_seconds) >= self.expires_at
+        from datetime import timezone
+        now = datetime.now(timezone.utc)
+        # Handle both timezone-aware and timezone-naive expires_at
+        if self.expires_at.tzinfo is None:
+            # If expires_at is naive, assume it's UTC
+            expires_at_aware = self.expires_at.replace(tzinfo=timezone.utc)
+        else:
+            expires_at_aware = self.expires_at
+        return now + timedelta(seconds=buffer_seconds) >= expires_at_aware
 
     def get_authorization_header(self) -> str:
         """Get authorization header value"""
@@ -179,17 +195,17 @@ class ConsoleOAuth2Logger(OAuth2Logger):
 
     def log_info(self, message: str) -> None:
         """Log information message"""
-        timestamp = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+        timestamp = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
         print(f"[{timestamp}] [{self.prefix}] INFO: {message}")
 
     def log_error(self, message: str) -> None:
         """Log error message"""
-        timestamp = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+        timestamp = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
         print(f"[{timestamp}] [{self.prefix}] ERROR: {message}")
 
     def log_debug(self, message: str) -> None:
         """Log debug message"""
-        timestamp = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+        timestamp = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
         print(f"[{timestamp}] [{self.prefix}] DEBUG: {message}")
 
 
@@ -624,7 +640,7 @@ class OAuth2AuthClient:
                 token = OAuth2Token(
                     access_token=access_token,
                     token_type=token_type,
-                    expires_at=datetime.utcnow() + timedelta(seconds=expires_in),
+                    expires_at=datetime.now(timezone.utc) + timedelta(seconds=expires_in),
                     refresh_token=refresh_token,
                     scopes=scope.split() if scope else []
                 )
@@ -642,7 +658,7 @@ class OAuth2AuthClient:
         with open(self.config.jwt_signing_key_path, 'r') as f:
             private_key = f.read()
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         payload = {
             'iss': self.config.jwt_issuer,
             'aud': self.config.jwt_audience,

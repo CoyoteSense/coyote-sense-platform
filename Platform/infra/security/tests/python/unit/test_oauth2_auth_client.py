@@ -154,7 +154,8 @@ def create_test_token(
     scope: str = "read write"
 ) -> OAuth2Token:
     """Helper function to create test tokens"""
-    expires_at = datetime.utcnow() + timedelta(seconds=expires_in)
+    from datetime import timezone
+    expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
     scopes = scope.split() if scope else []
     return OAuth2Token(
         access_token=access_token,
