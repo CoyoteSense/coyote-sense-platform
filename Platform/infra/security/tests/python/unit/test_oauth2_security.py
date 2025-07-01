@@ -241,11 +241,11 @@ class TestOAuth2SecurityValidation:
         
         try:
             # Create a sensitive token
-            from datetime import datetime, timedelta
+            from datetime import datetime, timedelta, timezone
             sensitive_token = OAuth2Token(
                 access_token="highly-sensitive-access-token",
                 token_type="Bearer",
-                expires_at=datetime.utcnow() + timedelta(hours=1),
+                expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
                 refresh_token="highly-sensitive-refresh-token",
                 scopes=["read", "write"]
             )

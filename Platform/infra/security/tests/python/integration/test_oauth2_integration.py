@@ -25,87 +25,81 @@ from interfaces.auth_client import (
 from factory.auth_client_factory import create_auth_client
 
 # Import OAuth2 specific classes
-from impl.real.auth_client import OAuth2TokenStorage
+from impl.real.auth_client import OAuth2TokenStorage, OAuth2Logger, OAuth2Token
 
 
-class TestOAuth2TokenStorage(OAuth2TokenStorage):
-    """Test implementation of token storage for integration tests"""
+class MockOAuth2TokenStorage(OAuth2TokenStorage):
+    """Mock implementation of token storage for integration tests"""
     
     def __init__(self):
-        self._tokens: Dict[str, Dict[str, Any]] = {}
+        self._tokens: Dict[str, OAuth2Token] = {}
     
-    async def get_token(self, key: str) -> Optional[Dict[str, Any]]:
-        return self._tokens.get(key)
+    async def store_token(self, client_id: str, token: OAuth2Token) -> None:
+        """Store a token for a client"""
+        self._tokens[client_id] = token
     
-    async def store_token(self, key: str, token: Dict[str, Any]) -> None:
-        self._tokens[key] = token
+    def get_token(self, client_id: str) -> Optional[OAuth2Token]:
+        """Retrieve a token for a client"""
+        return self._tokens.get(client_id)
     
-    async def remove_token(self, key: str) -> None:
-        self._tokens.pop(key, None)
+    def clear_token(self, client_id: str) -> None:
+        """Clear stored token for a client"""
+        self._tokens.pop(client_id, None)
     
-    async def clear_all_tokens(self) -> None:
+    def clear_all_tokens(self) -> None:
+        """Clear all stored tokens"""
         self._tokens.clear()
 
 
-class TestOAuth2Logger(OAuth2Logger):
-    """Test implementation of logger for integration tests"""
+class MockOAuth2Logger(OAuth2Logger):
+    """Mock implementation of logger for integration tests"""
     
     def __init__(self):
         self.logs = []
     
-    def debug(self, message: str, **kwargs) -> None:
+    def log_debug(self, message: str) -> None:
         self.logs.append(f"DEBUG: {message}")
     
-    def info(self, message: str, **kwargs) -> None:
+    def log_info(self, message: str) -> None:
         self.logs.append(f"INFO: {message}")
     
-    def warning(self, message: str, **kwargs) -> None:
-        self.logs.append(f"WARNING: {message}")
-    
-    def error(self, message: str, **kwargs) -> None:
+    def log_error(self, message: str) -> None:
         self.logs.append(f"ERROR: {message}")
 
 
 @pytest.fixture
 async def oauth2_config():
     """Configuration for OAuth2 client"""
-    return OAuth2ClientConfiguration(
+    from impl.real.auth_client import OAuth2ClientConfig
+    return OAuth2ClientConfig(
         server_url=os.getenv("OAUTH2_SERVER_URL", "https://localhost:5001"),
         client_id=os.getenv("OAUTH2_CLIENT_ID", "integration-test-client"),
         client_secret=os.getenv("OAUTH2_CLIENT_SECRET", "integration-test-secret"),
-        scope=os.getenv("OAUTH2_SCOPE", "api.read api.write"),
-        enable_auto_refresh=True,
-        retry_policy=OAuth2RetryPolicy(
-            max_retries=3,
-            base_delay=1.0,
-            max_delay=10.0,
-            use_exponential_backoff=True
-        )
+        default_scopes=["api.read", "api.write"],
+        auto_refresh=True,
+        timeout_seconds=30
     )
 
 
 @pytest.fixture
 async def token_storage():
     """Token storage for tests"""
-    return TestOAuth2TokenStorage()
+    return MockOAuth2TokenStorage()
 
 
 @pytest.fixture
 async def logger():
     """Logger for tests"""
-    return TestOAuth2Logger()
+    return MockOAuth2Logger()
 
 
 @pytest.fixture
 async def oauth2_client(oauth2_config, token_storage, logger):
     """OAuth2 client for integration tests"""
-    client = OAuth2AuthClient(
-        config=oauth2_config,
-        token_storage=token_storage,
-        logger=logger
-    )
+    from impl.real.auth_client import OAuth2AuthClient
+    client = OAuth2AuthClient(oauth2_config, token_storage, logger)
     yield client
-    await client.close()
+    await client.aclose()
 
 
 @pytest.fixture
@@ -130,13 +124,14 @@ async def test_client_credentials_flow_success(oauth2_client, is_server_availabl
         pytest.skip("OAuth2 server is not available")
     
     # Act
-    result = await oauth2_client.authenticate_client_credentials()
+    result = await oauth2_client.authenticate_client_credentials(["api.read", "api.write"])
     
     # Assert
     assert result is not None
-    assert result.get("access_token") is not None
-    assert result.get("token_type") == "Bearer"
-    assert result.get("expires_in", 0) > 0
+    assert result.is_success is True
+    assert result.token is not None
+    assert result.token.access_token is not None
+    assert result.token.token_type == "Bearer"
 
 
 @pytest.mark.integration
@@ -304,8 +299,8 @@ async def test_invalid_credentials_failure(oauth2_config, is_server_available):
     
     invalid_client = OAuth2AuthClient(
         config=invalid_config,
-        token_storage=TestOAuth2TokenStorage(),
-        logger=TestOAuth2Logger()
+        token_storage=MockOAuth2TokenStorage(),
+        logger=MockOAuth2Logger()
     )
     
     try:
@@ -352,8 +347,8 @@ async def test_large_scope_authentication(oauth2_client, is_server_available):
     
     large_scope_client = OAuth2AuthClient(
         config=large_scope_config,
-        token_storage=TestOAuth2TokenStorage(),
-        logger=TestOAuth2Logger()
+        token_storage=MockOAuth2TokenStorage(),
+        logger=MockOAuth2Logger()
     )
     
     try:
@@ -384,8 +379,8 @@ async def test_error_handling_network_issues(oauth2_config):
     
     unreachable_client = OAuth2AuthClient(
         config=unreachable_config,
-        token_storage=TestOAuth2TokenStorage(),
-        logger=TestOAuth2Logger()
+        token_storage=MockOAuth2TokenStorage(),
+        logger=MockOAuth2Logger()
     )
     
     try:
@@ -412,8 +407,8 @@ async def test_timeout_handling(oauth2_config):
     
     timeout_client = OAuth2AuthClient(
         config=timeout_config,
-        token_storage=TestOAuth2TokenStorage(),
-        logger=TestOAuth2Logger()
+        token_storage=MockOAuth2TokenStorage(),
+        logger=MockOAuth2Logger()
     )
     
     try:

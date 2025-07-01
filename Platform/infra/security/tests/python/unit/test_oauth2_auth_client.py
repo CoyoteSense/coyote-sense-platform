@@ -132,7 +132,7 @@ def oauth2_config():
         client_id="test-client-id",
         client_secret="test-client-secret",
         default_scopes=["read", "write"],
-        auto_refresh=False,  # Disable for most tests
+        auto_refresh=False,  # Disable for all tests to prevent background timers
         timeout_seconds=30
     )
 
@@ -142,8 +142,11 @@ async def oauth2_client(oauth2_config, mock_token_storage, mock_logger):
     """Fixture providing an OAuth2 client with mocked dependencies"""
     client = OAuth2AuthClient(oauth2_config, mock_token_storage, mock_logger)
     yield client
-    # Cleanup: close any open sessions
-    await client.aclose()
+    # Cleanup: close any open sessions and cancel timers
+    try:
+        await client.aclose()
+    except Exception:
+        pass  # Ignore cleanup errors
 
 
 def create_test_token(

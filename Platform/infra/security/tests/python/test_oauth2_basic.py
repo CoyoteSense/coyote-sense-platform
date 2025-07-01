@@ -15,10 +15,11 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'src', 'p
 from auth_client import OAuth2AuthClient, OAuth2ClientConfig, OAuth2Token, OAuth2Logger, OAuth2TokenStorage
 
 
-class TestOAuth2Logger(OAuth2Logger):
-    """Test logger implementation"""
+class MockOAuth2Logger(OAuth2Logger):
+    """Mock logger implementation"""
     
     def __init__(self):
+        super().__init__()
         self.messages = []
     
     def log_info(self, message: str) -> None:
@@ -31,10 +32,11 @@ class TestOAuth2Logger(OAuth2Logger):
         self.messages.append(f"DEBUG: {message}")
 
 
-class TestOAuth2TokenStorage(OAuth2TokenStorage):
-    """Test token storage implementation"""
+class MockOAuth2TokenStorage(OAuth2TokenStorage):
+    """Mock token storage implementation"""
     
     def __init__(self):
+        super().__init__()
         self.tokens = {}
     
     async def store_token(self, client_id: str, token: OAuth2Token) -> None:
@@ -64,11 +66,11 @@ class TestBasicOAuth2Functionality:
     
     @pytest.fixture
     def logger(self):
-        return TestOAuth2Logger()
+        return MockOAuth2Logger()
     
     @pytest.fixture
     def storage(self):
-        return TestOAuth2TokenStorage()
+        return MockOAuth2TokenStorage()
     
     @pytest.fixture
     def client(self, config, storage, logger):

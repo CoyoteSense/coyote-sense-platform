@@ -730,14 +730,19 @@ class OAuth2AuthClient:
         """Close synchronous resources"""
         if self._refresh_timer:
             self._refresh_timer.cancel()
+            self._refresh_timer = None
         if self._session:
             self._session.close()
+            self._session = None
 
     async def aclose(self) -> None:
         """Close asynchronous resources"""
         if self._refresh_timer:
             self._refresh_timer.cancel()
+            self._refresh_timer = None
         if self._aio_session:
             await self._aio_session.close()
+            self._aio_session = None
         if self._session:
             self._session.close()
+            self._session = None
