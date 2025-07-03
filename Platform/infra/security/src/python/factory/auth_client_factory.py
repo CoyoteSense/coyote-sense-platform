@@ -15,7 +15,7 @@ parent_dir = os.path.dirname(current_dir)
 if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
 
-from interfaces.auth_client import AuthClient, AuthConfig, TokenStorage, Logger, AuthMode
+from interfaces.auth_client import IAuthClient, AuthClientConfig, IAuthTokenStorage, IAuthLogger, AuthMode
 from impl.mock.auth_client_mock import MockAuthClient
 from impl.debug.auth_client_debug import DebugAuthClient
 
@@ -25,11 +25,11 @@ class AuthClientFactory:
     
     @staticmethod
     def create_client(
-        config: AuthConfig,
+        config: AuthClientConfig,
         mode: str = None,
-        token_storage: Optional[TokenStorage] = None,
-        logger: Optional[Logger] = None
-    ) -> AuthClient:
+        token_storage: Optional[IAuthTokenStorage] = None,
+        logger: Optional[IAuthLogger] = None
+    ) -> IAuthClient:
         """
         Create an authentication client based on the specified mode.
         
@@ -37,10 +37,10 @@ class AuthClientFactory:
             config: Authentication client configuration
             mode: Runtime mode ("mock", "debug") - if None, uses config.mode
             token_storage: Optional token storage implementation
-            logger: Optional logger implementation
+            IAuthLogger: Optional IAuthLogger implementation
             
         Returns:
-            AuthClient: Authentication client instance
+            IAuthClient: Authentication client instance
             
         Raises:
             ValueError: If mode is not supported
@@ -54,9 +54,9 @@ class AuthClientFactory:
         mode = mode.lower()
         
         if mode == "mock":
-            return MockAuthClient(config, token_storage, logger)
+            return MockIAuthClient(config, token_storage, IAuthLogger)
         elif mode == "debug":
-            return DebugAuthClient(config, token_storage, logger)
+            return DebugIAuthClient(config, token_storage, IAuthLogger)
         elif mode == "real":
             raise ValueError("Real mode not yet available - use mock or debug mode")
         else:
@@ -69,23 +69,23 @@ class AuthClientFactory:
 
 
 def create_auth_client(
-    config: AuthConfig,
-    token_storage: Optional[TokenStorage] = None,
-    logger: Optional[Logger] = None
-) -> AuthClient:
+    config: AuthClientConfig,
+    token_storage: Optional[IAuthTokenStorage] = None,
+    IAuthLogger: Optional[IAuthLogger] = None
+) -> IAuthClient:
     """
     Create an authentication client (convenience function).
     
-    This is a wrapper around AuthClientFactory.create_client() for 
+    This is a wrapper around IAuthClientFactory.create_client() for 
     backward compatibility and ease of use.
     
     Args:
         config: Authentication configuration
         token_storage: Optional token storage implementation
-        logger: Optional logger implementation
+        IAuthLogger: Optional IAuthLogger implementation
         
     Returns:
-        AuthClient: An authentication client instance
+        IAuthClient: An authentication client instance
     """
     return AuthClientFactory.create_client(config, None, token_storage, logger)
 

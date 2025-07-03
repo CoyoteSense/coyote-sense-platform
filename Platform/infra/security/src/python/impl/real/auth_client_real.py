@@ -26,19 +26,19 @@ if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
 
 from interfaces.auth_client import (
-    AuthClient, AuthConfig, AuthToken, AuthResult,
-    TokenStorage, Logger, AuthMode
+    IAuthClient, AuthClientConfig, AuthToken, AuthResult,
+    IAuthTokenStorage, IAuthLogger, AuthMode
 )
 
 
-class RealAuthClient(AuthClient):
+class RealAuthClient(IAuthClient):
     """Real authentication client implementation for production use."""
     
     def __init__(
         self,
-        config: AuthConfig,
-        token_storage: Optional[TokenStorage] = None,
-        logger: Optional[Logger] = None
+        config: AuthClientConfig,
+        token_storage: Optional[IAuthTokenStorage] = None,
+        logger: Optional[IAuthLogger] = None
     ):
         """
         Initialize the real authentication client.

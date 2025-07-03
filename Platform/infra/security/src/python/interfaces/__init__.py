@@ -6,21 +6,49 @@ This module provides authentication and security interfaces for the CoyoteSense 
 
 from .auth_client import (
     AuthMode,
-    AuthConfig,
+    AuthClientConfig,
     AuthToken,
     AuthResult,
-    TokenStorage,
-    Logger,
-    AuthClient
+    AuthServerInfo,
+    IAuthTokenStorage,
+    IAuthLogger,
+    IAuthClient,
+    InMemoryTokenStorage,
+    ConsoleAuthLogger,
+    NullAuthLogger,
+    # Legacy aliases
+    OAuth2ClientConfig,
+    OAuth2Token,
+    OAuth2AuthResult,
+    OAuth2ServerInfo,
+    IOAuth2TokenStorage,
+    IOAuth2Logger,
+    IOAuth2AuthClient,
+    ConsoleOAuth2Logger,
+    NullOAuth2Logger,
 )
 
 # Export all interfaces
 __all__ = [
     'AuthMode',
-    'AuthConfig',
-    'AuthToken', 
+    'AuthClientConfig',
+    'AuthToken',
     'AuthResult',
-    'TokenStorage',
-    'Logger',
-    'AuthClient'
+    'AuthServerInfo',
+    'IAuthTokenStorage',
+    'IAuthLogger',
+    'IAuthClient',
+    'InMemoryTokenStorage',
+    'ConsoleAuthLogger',
+    'NullAuthLogger',
+    # Legacy aliases
+    'OAuth2ClientConfig',
+    'OAuth2Token',
+    'OAuth2AuthResult',
+    'OAuth2ServerInfo',
+    'IOAuth2TokenStorage',
+    'IOAuth2Logger',
+    'IOAuth2AuthClient',
+    'ConsoleOAuth2Logger',
+    'NullOAuth2Logger',
 ]

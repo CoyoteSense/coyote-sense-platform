@@ -13,8 +13,8 @@ def test_interfaces_import():
     """Test that interfaces can be imported"""
     try:
         from interfaces import (
-            AuthMode, AuthConfig, AuthToken, AuthResult,
-            TokenStorage, Logger, AuthClient
+            AuthMode, AuthClientConfig, AuthToken, AuthResult,
+            IAuthTokenStorage, IAuthLogger, IAuthClient
         )
         print("✓ Interfaces imported successfully")
         assert True  # Test passed

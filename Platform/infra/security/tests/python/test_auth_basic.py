@@ -13,20 +13,21 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'src', 'python'))
 
 from interfaces import (
-    AuthConfig, AuthMode, 
-    AuthToken, AuthResult, TokenStorage, Logger
+    AuthClientConfig, AuthMode, 
+    AuthToken, AuthResult, IAuthTokenStorage, IAuthLogger
 )
 from factory import create_auth_client
 from impl.real.auth_client import InMemoryTokenStorage
 
 
-class TestAuthConfig:
+class TestAuthClientConfig:
     """Test authentication client configuration"""
     
     def test_config_creation(self):
         """Test basic configuration creation"""
-        config = AuthConfig(
+        config = AuthClientConfig(
             client_id="test_client",
+            server_url="https://auth.example.com",
             client_secret="test_secret",
             auth_url="https://auth.example.com/oauth/authorize",
             token_url="https://auth.example.com/oauth/token"
@@ -36,23 +37,23 @@ class TestAuthConfig:
         assert config.client_secret == "test_secret"
         assert config.auth_url == "https://auth.example.com/oauth/authorize"
         assert config.token_url == "https://auth.example.com/oauth/token"
-        assert config.mode == AuthMode.REAL  # Default mode
+        assert config.mode == AuthMode.CLIENT_CREDENTIALS  # Default mode
         
     def test_config_with_mode(self):
         """Test configuration with different modes"""
-        config = AuthConfig(
+        config = AuthClientConfig(
             client_id="test_client",
             client_secret="test_secret",
             auth_url="https://auth.example.com/oauth/authorize",
             token_url="https://auth.example.com/oauth/token",
-            mode=AuthMode.MOCK
+            mode=AuthMode.CLIENT_CREDENTIALS
         )
         
-        assert config.mode == AuthMode.MOCK
+        assert config.mode == AuthMode.CLIENT_CREDENTIALS
     
     def test_jwt_bearer_config(self):
         """Test JWT Bearer configuration"""
-        config = AuthConfig(
+        config = AuthClientConfig(
             server_url="https://auth.example.com",
             client_id="test-client",
             auth_mode=AuthMode.JWT_BEARER,
@@ -68,7 +69,7 @@ class TestAuthConfig:
     def test_invalid_config(self):
         """Test invalid configuration"""
         # Missing client_secret for client credentials
-        config = AuthConfig(
+        config = AuthClientConfig(
             server_url="https://auth.example.com",
             client_id="test-client",
             auth_mode=AuthMode.CLIENT_CREDENTIALS
@@ -147,7 +148,7 @@ class TestMockAuthClient:
     @pytest.fixture
     def config(self):
         """Test configuration"""
-        return AuthConfig(
+        return AuthClientConfig(
             server_url="https://auth.example.com",
             client_id="test-client",
             client_secret="test-secret",
@@ -212,7 +213,7 @@ class TestDebugAuthClient:
     @pytest.fixture
     def config(self):
         """Test configuration"""
-        return AuthConfig(
+        return AuthClientConfig(
             server_url="https://auth.example.com",
             client_id="debug-client",
             client_secret="debug-secret",
@@ -267,7 +268,7 @@ class TestAuthClientFactory:
     
     def test_invalid_mode(self):
         """Test creating client with invalid mode"""
-        config = AuthConfig(
+        config = AuthClientConfig(
             server_url="https://auth.example.com",
             client_id="test-client",
             client_secret="test-secret"
@@ -282,7 +283,7 @@ if __name__ == "__main__":
     print("Running basic security component tests...")
     
     # Test configuration
-    config = AuthConfig(
+    config = AuthClientConfig(
         server_url="https://auth.example.com",
         client_id="test-client",
         client_secret="test-secret",
