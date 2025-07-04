@@ -9,7 +9,7 @@ using Xunit.Abstractions;
 using Coyote.Infra.Security.Auth;
 using Coyote.Infra.Security.Tests.TestHelpers;
 using Coyote.Infra.Http;
-using Coyote.Infra.Http.Debug;
+using Coyote.Infra.Security.Auth.Modes.Debug;
 
 namespace Coyote.Infra.Security.Tests.Integration;
 
