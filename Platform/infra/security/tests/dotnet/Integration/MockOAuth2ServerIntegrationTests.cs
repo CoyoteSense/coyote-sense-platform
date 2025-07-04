@@ -7,10 +7,14 @@ using Xunit.Abstractions;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using CoyoteSense.OAuth2.Client.Tests.Mocks;
 using Coyote.Infra.Security.Auth;
 using Coyote.Infra.Http;
 using Coyote.Infra.Http.Factory;
+using Coyote.Infra.Http.Modes.Real;
+using Coyote.Infra.Http.Modes.Mock;
+using Coyote.Infra.Http.Modes.Debug;
 using Coyote.Infra.Security.Tests.TestHelpers;
 using IHttpClientFactory = Coyote.Infra.Http.Factory.IHttpClientFactory;
 
@@ -34,16 +38,30 @@ public class MockOAuth2ServerIntegrationTests : IDisposable
         // Setup real MockOAuth2Server with WireMock
         _mockServer = new MockOAuth2Server();
         
-        // Setup DI container with specialized OAuth2 HTTP client
+        // Setup DI container with REAL HTTP client for real server testing
         var services = new ServiceCollection();
         services.AddLogging(builder => builder.AddConsole().SetMinimumLevel(LogLevel.Warning)); // Reduce logging noise
         
-        // Create our specialized MockOAuth2HttpClient instead of using standard DI
-        var mockOAuth2HttpClient = new MockOAuth2HttpClient();
-        mockOAuth2HttpClient.SetDefaultTimeout(5000); // 5 second timeout for faster tests
-          // Use TestHttpClientFactory to ensure we get our specialized client
-        var testFactory = new TestHttpClientFactory(mockOAuth2HttpClient, RuntimeMode.Testing);
-        services.AddSingleton<IHttpClientFactory>(_ => testFactory);
+        // Configure HTTP client options for real HTTP communication
+        services.Configure<HttpClientOptions>(options =>
+        {
+            options.DefaultTimeoutMs = 5000; // 5 second timeout
+            options.VerifyPeer = false; // Don't verify SSL for test server
+        });
+        
+        // Configure HTTP client mode for Production (real HTTP client)
+        services.Configure<HttpClientModeOptions>(options =>
+        {
+            options.Mode = RuntimeMode.Production; // Use real HTTP client
+        });
+        
+        // Add the HTTP client factory that will create real HTTP clients
+        services.AddSingleton<IHttpClientFactory, HttpClientFactory>();
+        
+        // Register HTTP client implementations
+        services.AddTransient<RealHttpClient>();
+        services.AddTransient<MockHttpClient>();
+        services.AddTransient<DebugHttpClient>();
         
         // Register auth infrastructure
         services.AddTransient<IAuthTokenStorage, InMemoryTokenStorage>();
@@ -51,8 +69,9 @@ public class MockOAuth2ServerIntegrationTests : IDisposable
         
         _serviceProvider = services.BuildServiceProvider();
         
-        // Use our specialized HTTP client directly
-        _httpClient = mockOAuth2HttpClient;
+        // Create real HTTP client for real server communication
+        var httpClientFactory = _serviceProvider.GetRequiredService<IHttpClientFactory>();
+        _httpClient = httpClientFactory.CreateHttpClientForMode(RuntimeMode.Production);
         
         // Create auth client configuration using the real mock server
         var config = new AuthClientConfig

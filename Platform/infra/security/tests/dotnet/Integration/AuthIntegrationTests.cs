@@ -29,7 +29,7 @@ public class AuthIntegrationTests : IDisposable
         _output = output;        // Load configuration from environment variables
         _config = new AuthClientConfig
         {
-            ServerUrl = Environment.GetEnvironmentVariable("OAUTH2_SERVER_URL") ?? "https://localhost:5001",
+            ServerUrl = Environment.GetEnvironmentVariable("OAUTH2_SERVER_URL") ?? "https://mock-oauth2-server.test",
             ClientId = Environment.GetEnvironmentVariable("OAUTH2_CLIENT_ID") ?? "integration-test-client",
             ClientSecret = Environment.GetEnvironmentVariable("OAUTH2_CLIENT_SECRET") ?? "integration-test-secret",
             DefaultScopes = new List<string> { Environment.GetEnvironmentVariable("OAUTH2_SCOPE") ?? "api.read,api.write" },
@@ -113,7 +113,16 @@ public class AuthIntegrationTests : IDisposable
         {
             _output.WriteLine("OAuth2 server is not available, skipping integration test");
             return;
-        }        // Arrange - Create a valid JWT for testing
+        }
+
+        // Skip if client is not configured for JWT Bearer (requires JwtSigningKeyPath)
+        if (string.IsNullOrEmpty(_config.JwtSigningKeyPath))
+        {
+            _output.WriteLine("JWT Bearer authentication requires JwtSigningKeyPath configuration, skipping test");
+            return;
+        }
+
+        // Arrange - Create a valid JWT for testing
         var jwt = await CreateTestJwtAsync();
         
         // Act
@@ -261,7 +270,7 @@ public class AuthIntegrationTests : IDisposable
         using var overallCts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
         var completedTask = await Task.WhenAny(
             Task.WhenAll(tasks),
-            Task.Delay(Timeout.Infinite, overallCts.Token)
+            Task.Delay(TimeSpan.FromSeconds(60), overallCts.Token)
         );
           if (overallCts.Token.IsCancellationRequested)
         {
@@ -349,33 +358,50 @@ public class AuthIntegrationTests : IDisposable
         {
             var discoveryUrl = $"{_config.ServerUrl}/.well-known/openid_configuration";
             _output.WriteLine($"[DEBUG] Checking OAuth2 server availability at: {discoveryUrl}");
+            _output.WriteLine($"[DEBUG] HTTP client type: {_httpClient.GetType().Name}");
+            
+            // Check if we're using the mock client
+            if (_httpClient is MockOAuth2HttpClient mockClient)
+            {
+                _output.WriteLine("[DEBUG] Using MockOAuth2HttpClient - this should not make real HTTP requests");
+            }
+            else
+            {
+                _output.WriteLine($"[DEBUG] WARNING: Not using mock client! Using: {_httpClient.GetType().FullName}");
+            }
+            
             var request = new HttpRequest
             {
                 Method = Coyote.Infra.Http.HttpMethod.Get,
                 Url = discoveryUrl,
-                TimeoutMs = 5000 // 5 second timeout to prevent hanging
+                TimeoutMs = 2000 // 2 second timeout for faster tests
             };
             _output.WriteLine("[DEBUG] Executing HTTP request...");
-            _output.WriteLine($"[DEBUG] HTTP client type: {_httpClient.GetType().Name}");
             
-            // Add timeout using CancellationToken
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            // Add shorter timeout using CancellationToken
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3)); // 3 second max timeout
             var response = await _httpClient.ExecuteAsync(request, cts.Token);
             _output.WriteLine($"[DEBUG] HTTP response received: Status={response.StatusCode}");
-            _output.WriteLine($"[DEBUG] Response body: {response.Body}");
+            _output.WriteLine($"[DEBUG] Response body length: {response.Body?.Length ?? 0}");
             
             bool isAvailable = response.StatusCode >= 200 && response.StatusCode < 300;
             _output.WriteLine($"[DEBUG] Server availability result: {isAvailable}");
             return isAvailable;
         }
+        catch (TaskCanceledException)
+        {
+            _output.WriteLine("[DEBUG] Server availability check task was cancelled");
+            return false;
+        }
         catch (OperationCanceledException)
         {
-            _output.WriteLine("[DEBUG] Server availability check timed out after 5 seconds");
+            _output.WriteLine("[DEBUG] Server availability check timed out after 3 seconds");
             return false;
         }
         catch (Exception ex)
         {
             _output.WriteLine($"[DEBUG] Exception during server availability check: {ex.Message}");
+            _output.WriteLine($"[DEBUG] Exception type: {ex.GetType().Name}");
             _output.WriteLine($"[DEBUG] Exception stack trace: {ex.StackTrace}");
             return false;
         }

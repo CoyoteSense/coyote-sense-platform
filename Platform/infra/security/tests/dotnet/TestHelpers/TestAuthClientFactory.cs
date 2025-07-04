@@ -186,6 +186,7 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
                 ServerUrl = serverUrl,
                 ClientId = clientId,
                 ClientSecret = clientSecret,
+                RedirectUri = redirectUri, // Fix: Set the RedirectUri property
                 DefaultScopes = scopes ?? new List<string> { "read", "write" },
                 TimeoutMs = 30000,
                 AutoRefresh = false // Disabled to prevent background loops that cause hangs

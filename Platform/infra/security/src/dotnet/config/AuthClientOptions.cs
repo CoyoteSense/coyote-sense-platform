@@ -153,6 +153,16 @@ public class AuthClientOptions
     public string? JwtAudience { get; set; }
 
     /// <summary>
+    /// Redirect URI for Authorization Code flow
+    /// </summary>
+    public string? RedirectUri { get; set; }
+
+    /// <summary>
+    /// Whether to use PKCE for Authorization Code flow
+    /// </summary>
+    public bool UsePkce { get; set; } = true;
+
+    /// <summary>
     /// User agent string for HTTP requests
     /// </summary>
     public string UserAgent { get; set; } = "CoyoteAuth/1.0";
@@ -197,6 +207,12 @@ public class AuthClientOptions
                 throw new ArgumentException("JwtIssuer is required for JWT Bearer mode", nameof(JwtIssuer));
             if (string.IsNullOrWhiteSpace(JwtAudience))
                 throw new ArgumentException("JwtAudience is required for JWT Bearer mode", nameof(JwtAudience));
+        }
+
+        if (Mode == AuthMode.AuthorizationCode || Mode == AuthMode.AuthorizationCodePkce)
+        {
+            if (string.IsNullOrWhiteSpace(RedirectUri))
+                throw new ArgumentException("RedirectUri is required for Authorization Code mode", nameof(RedirectUri));
         }
     }
 }

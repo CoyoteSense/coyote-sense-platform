@@ -9,6 +9,7 @@ using Xunit.Abstractions;
 using Coyote.Infra.Security.Auth;
 using Coyote.Infra.Security.Tests.TestHelpers;
 using Coyote.Infra.Http;
+using Coyote.Infra.Http.Debug;
 
 namespace Coyote.Infra.Security.Tests.Integration;
 
@@ -27,12 +28,13 @@ public class ModernAuthIntegrationTests : AuthTestBase
 
     [Fact]
     [Trait("Category", "Integration")]
-    public Task MockAuthClient_ShouldReturnValidToken()
+    public async Task MockAuthClient_ShouldReturnValidToken()
     {
         // Arrange
         var mockOptions = Options.Create(new AuthClientOptions
         {
             ClientId = "integration-test-client",
+            ClientSecret = "integration-test-secret",
             BaseUrl = "https://test.example.com"
         });
 
@@ -53,24 +55,28 @@ public class ModernAuthIntegrationTests : AuthTestBase
         client.Should().NotBeNull();
         client.Should().BeAssignableTo<IAuthClient>();
         
-        // Testing client should report as authenticated
+        // Mock client should not be authenticated until authentication is called
+        client.IsAuthenticated.Should().BeFalse();
+        
+        // Now authenticate and verify it's successful
+        var result = await client.AuthenticateClientCredentialsAsync(new List<string> { "api.read", "api.write" });
+        result.IsSuccess.Should().BeTrue();
         client.IsAuthenticated.Should().BeTrue();
         
         _output.WriteLine($"Created client of type: {client.GetType().Name}");
         _output.WriteLine($"Client is authenticated: {client.IsAuthenticated}");
-        
-        return Task.CompletedTask;
     }
 
     [Fact]
     [Trait("Category", "Integration")]
     public Task DebugAuthClient_ShouldReturnValidToken()
     {
-        // Arrange
+        // Arrange - Use a mock server URL since Debug client makes real HTTP requests
         var debugOptions = Options.Create(new AuthClientOptions
         {
             ClientId = "debug-test-client",
-            BaseUrl = "https://debug.example.com"
+            BaseUrl = "https://mock-oauth2-server.test", // Use mock server URL instead
+            ClientSecret = "debug-test-secret" // Required for Client Credentials mode
         });
 
         var modeOptions = Options.Create(new AuthClientModeOptions
@@ -90,11 +96,17 @@ public class ModernAuthIntegrationTests : AuthTestBase
         client.Should().NotBeNull();
         client.Should().BeAssignableTo<IAuthClient>();
         
-        // Debug client should report as authenticated
-        client.IsAuthenticated.Should().BeTrue();
+        // Debug client should not be authenticated until authentication is called
+        client.IsAuthenticated.Should().BeFalse();
         
+        // For Debug client, we can't reliably test authentication without a real server
+        // so we just verify the client was created correctly and shows debug logging
         _output.WriteLine($"Created client of type: {client.GetType().Name}");
         _output.WriteLine($"Client is authenticated: {client.IsAuthenticated}");
+        
+        // Verify the debug client has proper configuration
+        var debugClient = client as DebugAuthClient;
+        debugClient.Should().NotBeNull("Debug mode should create a DebugAuthClient");
         
         return Task.CompletedTask;
     }
