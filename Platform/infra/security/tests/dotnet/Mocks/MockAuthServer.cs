@@ -118,21 +118,49 @@ public class MockOAuth2Server : IDisposable
                 })));        // Token Endpoint (OAuth2 standard path)
         _server
             .Given(Request.Create().WithPath("/oauth2/token").UsingPost())
-            .RespondWith(Response.Create().WithCallback(request => HandleTokenRequest(request)));
+            .RespondWith(Response.Create()
+                .WithStatusCode(HttpStatusCode.OK)
+                .WithHeader("Content-Type", "application/json")
+                .WithBodyAsJson(new 
+                {
+                    access_token = "test-access-token-oauth2",
+                    token_type = "Bearer",
+                    expires_in = 3600,
+                    scope = "api.read api.write"
+                }));
 
-        // Token Endpoint (AuthClient expected path)
+        // Token Endpoint (AuthClient expected path) - using static response for testing
         _server
             .Given(Request.Create().WithPath("/token").UsingPost())
-            .RespondWith(Response.Create().WithCallback(request => HandleTokenRequest(request)));
+            .RespondWith(Response.Create()
+                .WithStatusCode(HttpStatusCode.OK)
+                .WithHeader("Content-Type", "application/json")
+                .WithBodyAsJson(new 
+                {
+                    access_token = "test-access-token-static",
+                    token_type = "Bearer",
+                    expires_in = 3600,
+                    scope = "api.read api.write"
+                }));
 
         // Token Introspection Endpoint
         _server
             .Given(Request.Create().WithPath("/oauth2/introspect").UsingPost())
             .RespondWith(Response.Create().WithCallback(request => HandleIntrospectionRequest(request)));
+            
+        // Token Introspection Endpoint (AuthClient expected path)
+        _server
+            .Given(Request.Create().WithPath("/introspect").UsingPost())
+            .RespondWith(Response.Create().WithCallback(request => HandleIntrospectionRequest(request)));
 
         // Token Revocation Endpoint
         _server
             .Given(Request.Create().WithPath("/oauth2/revoke").UsingPost())
+            .RespondWith(Response.Create().WithCallback(request => HandleRevocationRequest(request)));
+            
+        // Token Revocation Endpoint (AuthClient expected path)
+        _server
+            .Given(Request.Create().WithPath("/revoke").UsingPost())
             .RespondWith(Response.Create().WithCallback(request => HandleRevocationRequest(request)));
 
         // Health Check Endpoint
@@ -184,8 +212,11 @@ public class MockOAuth2Server : IDisposable
 
     private WireMock.ResponseMessage HandleClientCredentialsGrant(string clientId, Dictionary<string, string> formData)
     {
+        Console.WriteLine($"[MockOAuth2Server] HandleClientCredentialsGrant called with clientId: {clientId}");
         var scope = formData.GetValueOrDefault("scope", "api.read");
         var token = GenerateAccessToken(clientId, scope);
+
+        Console.WriteLine($"[MockOAuth2Server] Generated token: {token}");
 
         var tokenInfo = new MockTokenInfo
         {
@@ -204,7 +235,13 @@ public class MockOAuth2Server : IDisposable
             token_type = "Bearer",
             expires_in = 3600,
             scope
-        }; return new WireMock.ResponseMessage
+        };
+
+        var jsonResponse = JsonSerializer.Serialize(response);
+        Console.WriteLine($"[MockOAuth2Server] JSON response: {jsonResponse}");
+        Console.WriteLine($"[MockOAuth2Server] JSON response length: {jsonResponse.Length}");
+
+        var responseMessage = new WireMock.ResponseMessage
         {
             StatusCode = (int)HttpStatusCode.OK,
             Headers = new Dictionary<string, WireMockList<string>>
@@ -213,9 +250,16 @@ public class MockOAuth2Server : IDisposable
             },
             BodyData = new WireMock.Util.BodyData
             {
-                BodyAsString = JsonSerializer.Serialize(response)
+                BodyAsString = jsonResponse,
+                DetectedBodyType = WireMock.Types.BodyType.Json,
+                BodyAsBytes = System.Text.Encoding.UTF8.GetBytes(jsonResponse)
             }
         };
+
+        Console.WriteLine($"[MockOAuth2Server] Response message created with StatusCode: {responseMessage.StatusCode}");
+        Console.WriteLine($"[MockOAuth2Server] Response message BodyData.BodyAsString: {responseMessage.BodyData?.BodyAsString ?? "null"}");
+        
+        return responseMessage;
     }
     private WireMock.ResponseMessage HandleJwtBearerGrant(string clientId, Dictionary<string, string> formData)
     {
@@ -274,7 +318,7 @@ public class MockOAuth2Server : IDisposable
             BodyData = new WireMock.Util.BodyData
             {
                 BodyAsString = jsonResponse,
-                DetectedBodyType = WireMock.Types.BodyType.String
+                DetectedBodyType = WireMock.Types.BodyType.Json
             }
         };
     }
@@ -325,7 +369,8 @@ public class MockOAuth2Server : IDisposable
             },
             BodyData = new WireMock.Util.BodyData
             {
-                BodyAsString = jsonResponse
+                BodyAsString = jsonResponse,
+                DetectedBodyType = WireMock.Types.BodyType.Json
             }
         };
 
@@ -373,7 +418,7 @@ public class MockOAuth2Server : IDisposable
             expires_in = 3600,
             refresh_token = newRefreshToken,
             scope = tokenInfo.Scope
-        }; return new WireMock.ResponseMessage
+        };        return new WireMock.ResponseMessage
         {
             StatusCode = (int)HttpStatusCode.OK,
             Headers = new Dictionary<string, WireMockList<string>>
@@ -382,7 +427,8 @@ public class MockOAuth2Server : IDisposable
             },
             BodyData = new WireMock.Util.BodyData
             {
-                BodyAsString = JsonSerializer.Serialize(response)
+                BodyAsString = JsonSerializer.Serialize(response),
+                DetectedBodyType = WireMock.Types.BodyType.Json
             }
         };
     }
@@ -417,7 +463,8 @@ public class MockOAuth2Server : IDisposable
                     },
                     BodyData = new WireMock.Util.BodyData
                     {
-                        BodyAsString = JsonSerializer.Serialize(inactiveResponse)
+                        BodyAsString = JsonSerializer.Serialize(inactiveResponse),
+                        DetectedBodyType = WireMock.Types.BodyType.Json
                     }
                 };
             }
@@ -439,7 +486,8 @@ public class MockOAuth2Server : IDisposable
                 },
                 BodyData = new WireMock.Util.BodyData
                 {
-                    BodyAsString = JsonSerializer.Serialize(activeResponse)
+                    BodyAsString = JsonSerializer.Serialize(activeResponse),
+                    DetectedBodyType = WireMock.Types.BodyType.Json
                 }
             };
         }
@@ -679,7 +727,8 @@ public class MockOAuth2Server : IDisposable
             },
             BodyData = new WireMock.Util.BodyData
             {
-                BodyAsString = JsonSerializer.Serialize(errorResponse)
+                BodyAsString = JsonSerializer.Serialize(errorResponse),
+                DetectedBodyType = WireMock.Types.BodyType.Json
             }
         };
     }

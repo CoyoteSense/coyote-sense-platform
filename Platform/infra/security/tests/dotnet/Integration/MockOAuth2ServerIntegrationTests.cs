@@ -113,9 +113,62 @@ public class MockOAuth2ServerIntegrationTests : IDisposable
     public async Task TokenIntrospection_WithValidToken_ShouldReturnActive()
     {
         // Arrange
+        _output.WriteLine($"[DEBUG] Test setup - HTTP client type: {_httpClient.GetType().Name}");
+        _output.WriteLine($"[DEBUG] Test setup - AuthClient type: {_authClient.GetType().Name}");
+        _output.WriteLine($"[DEBUG] Mock server URL: {_mockServer.BaseUrl}");
+        
+        // Test the HTTP client directly first
+        _output.WriteLine($"[DEBUG] Testing HTTP client directly...");
+        var directResponse = await _httpClient.GetAsync($"{_mockServer.BaseUrl}/.well-known/openid_configuration");
+        _output.WriteLine($"[DEBUG] Direct HTTP client response: StatusCode={directResponse.StatusCode}, IsSuccess={directResponse.IsSuccess}");
+        
+        // Check if AuthClient is using the correct HTTP client by testing a simple HTTP operation
+        _output.WriteLine($"[DEBUG] Testing direct PostAsync call...");
+        var testResponse = await _httpClient.PostAsync($"{_mockServer.BaseUrl}/token", 
+            "grant_type=client_credentials&client_id=test-client&client_secret=test-secret", 
+            new Dictionary<string, string> { ["Content-Type"] = "application/x-www-form-urlencoded" });
+        _output.WriteLine($"[DEBUG] Direct PostAsync response: StatusCode={testResponse.StatusCode}, IsSuccess={testResponse.IsSuccess}");
+        if (testResponse.IsSuccess && !string.IsNullOrEmpty(testResponse.Body))
+        {
+            _output.WriteLine($"[DEBUG] Direct PostAsync body: {testResponse.Body.Substring(0, Math.Min(200, testResponse.Body.Length))}...");
+        }
+        else
+        {
+            _output.WriteLine($"[DEBUG] Direct PostAsync body is null or empty");
+        }
+        
+        // Let's also try using .NET HttpClient directly to get the raw response
+        _output.WriteLine($"[DEBUG] Testing with raw HttpClient...");
+        using var rawHttpClient = new System.Net.Http.HttpClient();
+        var rawResponse = await rawHttpClient.PostAsync(
+            $"{_mockServer.BaseUrl}/token",
+            new System.Net.Http.StringContent("grant_type=client_credentials&client_id=test-client&client_secret=test-secret&scope=api.read", 
+                System.Text.Encoding.UTF8, 
+                "application/x-www-form-urlencoded"));
+        var rawContent = await rawResponse.Content.ReadAsStringAsync();
+        _output.WriteLine($"[DEBUG] Raw HttpClient response: StatusCode={rawResponse.StatusCode}, Content={rawContent}");
+        
         var authResult = await _authClient.AuthenticateClientCredentialsAsync();
         authResult.Should().NotBeNull();
+        
+        _output.WriteLine($"[DEBUG] AuthResult.IsSuccess: {authResult.IsSuccess}");
+        _output.WriteLine($"[DEBUG] AuthResult.ErrorCode: {authResult.ErrorCode ?? "null"}");
+        _output.WriteLine($"[DEBUG] AuthResult.ErrorDescription: {authResult.ErrorDescription ?? "null"}");
+        _output.WriteLine($"[DEBUG] AuthResult.ErrorDetails: {authResult.ErrorDetails ?? "null"}");
+        if (authResult.Token != null)
+        {
+            _output.WriteLine($"[DEBUG] AuthResult.Token.AccessToken: {authResult.Token.AccessToken}");
+        }
+        else
+        {
+            _output.WriteLine($"[DEBUG] AuthResult.Token is null");
+        }
+        
         authResult.IsSuccess.Should().BeTrue();
+        
+        _output.WriteLine($"[DEBUG] Generated token: {authResult.Token!.AccessToken}");
+        _output.WriteLine($"[DEBUG] Token length: {authResult.Token!.AccessToken.Length}");
+        _output.WriteLine($"[DEBUG] Token starts with: {authResult.Token!.AccessToken.Substring(0, Math.Min(20, authResult.Token!.AccessToken.Length))}");
         
         // Act
         var introspectionResult = await _authClient.IntrospectTokenAsync(authResult.Token!.AccessToken);

@@ -109,9 +109,25 @@ namespace Coyote.Infra.Security.Auth
                     };
 
                     _logger.LogDebug($"Making token request to: {tokenUrl}");                    var response = await _httpClient.PostAsync(tokenUrl, requestBody, headers, cancellationToken);
+                    
+                    // _logger.LogDebug($"Response received - StatusCode: {response.StatusCode}, IsSuccess: {response.IsSuccess}");
+                    // _logger.LogDebug($"Response body: {response.Body ?? "null"}");
                       if (response.IsSuccess)
                     {
+                        // _logger.LogDebug("Response is successful, attempting to parse JSON");
+                        if (string.IsNullOrEmpty(response.Body))
+                        {
+                            _logger.LogError("Response body is null or empty");
+                            return new AuthResult 
+                            { 
+                                IsSuccess = false, 
+                                ErrorCode = "invalid_response",
+                                ErrorDescription = "Empty response body"
+                            };
+                        }
+                        
                         var tokenResponse = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(response.Body);
+                        // _logger.LogDebug($"JSON parsed successfully, contains access_token: {tokenResponse?.ContainsKey("access_token")}");
                         
                         if (tokenResponse?.ContainsKey("access_token") == true)
                         {                            var accessToken = tokenResponse["access_token"].GetString();
@@ -214,13 +230,24 @@ namespace Coyote.Infra.Security.Auth
                 }
             }
             
-            // Fallback to mock implementation when no HTTP client is available
-            var mockToken = await GetValidTokenAsync(cancellationToken);
+            // Only fallback to mock implementation when no HTTP client is available
+            if (_httpClient == null || _config == null)
+            {
+                var mockToken = await GetValidTokenAsync(cancellationToken);
+                return new AuthResult 
+                { 
+                    IsSuccess = true, 
+                    Token = mockToken,
+                    ErrorDescription = null
+                };
+            }
+            
+            // If we have HTTP client and config but reached here, something went wrong
             return new AuthResult 
             { 
-                IsSuccess = true, 
-                Token = mockToken,
-                ErrorDescription = null
+                IsSuccess = false, 
+                ErrorCode = "unexpected_error",
+                ErrorDescription = "Authentication failed unexpectedly"
             };
         }        public async Task<AuthResult> AuthenticateJwtBearerAsync(string? subject = null, List<string>? scopes = null, CancellationToken cancellationToken = default)
         {
