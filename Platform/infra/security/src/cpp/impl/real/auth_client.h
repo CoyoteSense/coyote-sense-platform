@@ -14,9 +14,9 @@ namespace infra {
 namespace auth {
 
 // Import types from security namespace
-using coyote::infra::security::AuthMode;
-using coyote::infra::security::TokenResponse;
-using coyote::infra::security::IntrospectResponse;
+using coyote::infra::security::auth::AuthMode;
+using coyote::infra::security::auth::TokenResponse;
+using coyote::infra::security::auth::IntrospectResponse;
 
 // Forward declarations
 class AuthTokenStorage;
@@ -24,21 +24,21 @@ class AuthLogger;
 
 // OAuth2 Authentication Client Configuration
 struct AuthClientConfig {
-    AuthMode auth_mode = AuthMode::kClientCredentials;
+    AuthMode auth_mode = AuthMode::ClientCredentials;
     std::string auth_server_url = "https://auth-service.coyotesense.local";
     std::string client_id;
     std::string client_secret;
     std::vector<std::string> scopes;
     
-    // mTLS configuration (for kClientCredentialsMtls mode)
+    // mTLS configuration (for ClientCredentialsMtls mode)
     std::string client_cert_path;
     std::string client_key_path;
     std::string ca_cert_path;
     
-    // JWT Bearer configuration (for kJwtBearer mode)
+    // JWT Bearer configuration (for JwtBearer mode)
     std::string jwt_private_key_path;
     std::string jwt_algorithm = "RS256";
-      // Authorization Code + PKCE configuration (for kAuthorizationCode* modes)
+      // Authorization Code + PKCE configuration (for AuthorizationCode* modes)
     std::string redirect_uri;
     bool use_pkce = true;
     
@@ -54,20 +54,20 @@ struct AuthClientConfig {
     
     // Helper methods
     bool IsClientCredentialsMode() const {
-        return auth_mode == AuthMode::kClientCredentials;
+        return auth_mode == AuthMode::ClientCredentials;
     }
     
     bool IsMtlsMode() const {
-        return auth_mode == AuthMode::kClientCredentialsMtls;
+        return auth_mode == AuthMode::ClientCredentialsMtls;
     }
     
     bool IsJwtBearerMode() const {
-        return auth_mode == AuthMode::kJwtBearer;
+        return auth_mode == AuthMode::JwtBearer;
     }
     
     bool IsAuthorizationCodeMode() const {
-        return auth_mode == AuthMode::kAuthorizationCode || 
-               auth_mode == AuthMode::kAuthorizationCodePkce;
+        return auth_mode == AuthMode::AuthorizationCode || 
+               auth_mode == AuthMode::AuthorizationCodePkce;
     }
     
     bool RequiresCertificates() const {
@@ -93,18 +93,18 @@ struct AuthClientConfig {
         }
         
         switch (auth_mode) {
-            case AuthMode::kClientCredentials:
+            case AuthMode::ClientCredentials:
                 return !client_secret.empty();
                 
-            case AuthMode::kClientCredentialsMtls:
+            case AuthMode::ClientCredentialsMtls:
                 return !client_secret.empty() && !client_cert_path.empty() && 
                        !client_key_path.empty();
                        
-            case AuthMode::kJwtBearer:
+            case AuthMode::JwtBearer:
                 return !jwt_private_key_path.empty();
                 
-            case AuthMode::kAuthorizationCode:
-            case AuthMode::kAuthorizationCodePkce:
+            case AuthMode::AuthorizationCode:
+            case AuthMode::AuthorizationCodePkce:
                 return !redirect_uri.empty();
                 
             default:
@@ -295,8 +295,8 @@ class AuthClientFactory {
       bool use_pkce = true,
       std::unique_ptr<coyote::infra::HttpClient> http_client = nullptr);
 };
-};
 
 } // namespace auth
+} // namespace security
 } // namespace infra
 } // namespace coyote

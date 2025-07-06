@@ -6,7 +6,7 @@
 #include <cstdlib>
 #include <memory>
 
-#include "oauth2_auth_client.h"
+#include "auth_client.h"
 #include "oauth2_test_mocks.h"
 
 namespace coyote_sense {

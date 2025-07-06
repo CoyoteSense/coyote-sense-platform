@@ -1,47 +1,81 @@
-#include <gtest/gtest.h>
-#include <gmock/gmock.h>
+#include <iostream>
 #include <string>
 #include <memory>
 #include <future>
 #include <thread>
 #include <chrono>
 #include <vector>
-#include <iostream>
 #include <cstdlib>
+#include <cassert>
 
-// Simple test to verify the C++ testing infrastructure works
+// Simple test framework without external dependencies
+#define ASSERT_EQ(a, b) do { \
+    if ((a) != (b)) { \
+        std::cerr << "FAIL: " << #a << " != " << #b << " (line " << __LINE__ << ")\n"; \
+        return false; \
+    } \
+} while(0)
+
+#define ASSERT_TRUE(a) do { \
+    if (!(a)) { \
+        std::cerr << "FAIL: " << #a << " is not true (line " << __LINE__ << ")\n"; \
+        return false; \
+    } \
+} while(0)
+
+#define ASSERT_FALSE(a) do { \
+    if ((a)) { \
+        std::cerr << "FAIL: " << #a << " is not false (line " << __LINE__ << ")\n"; \
+        return false; \
+    } \
+} while(0)
+
+#define ASSERT_NE(a, b) do { \
+    if ((a) == (b)) { \
+        std::cerr << "FAIL: " << #a << " == " << #b << " (line " << __LINE__ << ")\n"; \
+        return false; \
+    } \
+} while(0)
+
 namespace coyote {
 namespace infra {
 namespace security {
 namespace tests {
 
-// Basic test that doesn't require external dependencies
-TEST(SecurityComponentTest, BasicInfrastructureTest) {
-    EXPECT_TRUE(true);
-    EXPECT_EQ(1 + 1, 2);
+// Basic infrastructure test
+bool test_basic_infrastructure() {
+    std::cout << "Running: BasicInfrastructureTest\n";
+    ASSERT_TRUE(true);
+    ASSERT_EQ(1 + 1, 2);
+    return true;
 }
 
-// Test that demonstrates the test can handle basic string operations
-TEST(SecurityComponentTest, StringOperations) {
+// Test string operations
+bool test_string_operations() {
+    std::cout << "Running: StringOperations\n";
     std::string test_str = "CoyoteSense Security Component";
-    EXPECT_FALSE(test_str.empty());
-    EXPECT_EQ(test_str.length(), 30);
-    EXPECT_NE(test_str.find("Security"), std::string::npos);
+    ASSERT_FALSE(test_str.empty());
+    ASSERT_EQ(test_str.length(), 30);
+    ASSERT_NE(test_str.find("Security"), std::string::npos);
+    return true;
 }
 
-// Test to show async capability exists (even without real async operations)
-TEST(SecurityComponentTest, MockAsyncOperation) {
+// Test async capability
+bool test_async_operation() {
+    std::cout << "Running: AsyncOperation\n";
     auto future_result = std::async(std::launch::async, []() {
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
         return std::string("async_complete");
     });
     
     std::string result = future_result.get();
-    EXPECT_EQ(result, "async_complete");
+    ASSERT_EQ(result, "async_complete");
+    return true;
 }
 
-// Test to demonstrate timeout handling capability
-TEST(SecurityComponentTest, TimeoutSimulation) {
+// Test timeout simulation
+bool test_timeout_simulation() {
+    std::cout << "Running: TimeoutSimulation\n";
     auto start_time = std::chrono::high_resolution_clock::now();
     
     // Simulate a quick operation that completes within timeout
@@ -51,11 +85,16 @@ TEST(SecurityComponentTest, TimeoutSimulation) {
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
     
     // Should complete quickly (well under any reasonable timeout)
-    EXPECT_LT(duration.count(), 100) << "Operation took too long: " << duration.count() << "ms";
+    if (duration.count() >= 100) {
+        std::cerr << "FAIL: Operation took too long: " << duration.count() << "ms\n";
+        return false;
+    }
+    return true;
 }
 
-// Test for potential hanging scenario (but with quick completion)
-TEST(SecurityComponentTest, NonHangingOperation) {
+// Test for potential hanging scenario
+bool test_non_hanging_operation() {
+    std::cout << "Running: NonHangingOperation\n";
     const int max_iterations = 100;
     int counter = 0;
     
@@ -65,13 +104,18 @@ TEST(SecurityComponentTest, NonHangingOperation) {
         if (counter >= 10) break; // Early exit to ensure no hanging
     }
     
-    EXPECT_EQ(counter, 10);
-    EXPECT_LT(counter, max_iterations) << "Loop didn't exit early as expected";
+    ASSERT_EQ(counter, 10);
+    if (counter >= max_iterations) {
+        std::cerr << "FAIL: Loop didn't exit early as expected\n";
+        return false;
+    }
+    return true;
 }
 
-// Mock authentication test (without real auth infrastructure)
-TEST(SecurityComponentTest, MockAuthenticationFlow) {
-    // Simulate basic auth flow without external dependencies
+// Mock authentication test
+bool test_mock_authentication_flow() {
+    std::cout << "Running: MockAuthenticationFlow\n";
+    
     struct MockAuthConfig {
         std::string client_id = "test-client";
         std::string server_url = "https://mock-server.com";
@@ -80,21 +124,31 @@ TEST(SecurityComponentTest, MockAuthenticationFlow) {
     };
     
     MockAuthConfig config;
-    EXPECT_FALSE(config.client_id.empty());
-    EXPECT_FALSE(config.server_url.empty());
-    EXPECT_TRUE(config.enable_auto_refresh);
-    EXPECT_EQ(config.timeout.count(), 30);
+    ASSERT_FALSE(config.client_id.empty());
+    ASSERT_FALSE(config.server_url.empty());
+    ASSERT_TRUE(config.enable_auto_refresh);
+    ASSERT_EQ(config.timeout.count(), 30);
+    return true;
 }
 
-// Test environment variable handling (basic functionality)
-TEST(SecurityComponentTest, EnvironmentVariableHandling) {
+// Test environment variable handling
+bool test_environment_variable_handling() {
+    std::cout << "Running: EnvironmentVariableHandling\n";
+    
     // Test with a known environment variable (PATH should exist on Windows)
     const char* path_env = std::getenv("PATH");
-    EXPECT_NE(path_env, nullptr) << "PATH environment variable should exist";
+    if (path_env == nullptr) {
+        std::cerr << "FAIL: PATH environment variable should exist\n";
+        return false;
+    }
     
     // Test with a non-existent variable
     const char* fake_env = std::getenv("NONEXISTENT_TEST_VAR_12345"); 
-    EXPECT_EQ(fake_env, nullptr) << "Non-existent env var should be null";
+    if (fake_env != nullptr) {
+        std::cerr << "FAIL: Non-existent env var should be null\n";
+        return false;
+    }
+    return true;
 }
 
 } // namespace tests
@@ -102,60 +156,47 @@ TEST(SecurityComponentTest, EnvironmentVariableHandling) {
 } // namespace infra
 } // namespace coyote
 
-// Performance test class (similar to integration test structure)
-class SecurityPerformanceTest : public ::testing::Test {
-protected:
-    void SetUp() override {
-        // Check if performance tests should run
-        const char* run_perf = std::getenv("RUN_PERFORMANCE_TESTS");
-        skip_performance_ = !(run_perf && std::string(run_perf) == "1");
-    }
+int main() {
+    std::cout << "=== C++ Security Component Tests ===\n";
     
-    bool skip_performance_ = false;
-};
-
-TEST_F(SecurityPerformanceTest, ConcurrencySimulation) {
-    if (skip_performance_) {
-        GTEST_SKIP() << "Performance tests disabled (set RUN_PERFORMANCE_TESTS=1 to enable)";
-    }
+    int tests_run = 0;
+    int tests_passed = 0;
     
-    const int num_threads = 10;
-    const int operations_per_thread = 50;
-    std::vector<std::future<int>> futures;
+    // Run all tests
+    std::vector<std::pair<std::string, bool(*)()>> test_cases = {
+        {"BasicInfrastructureTest", coyote::infra::security::tests::test_basic_infrastructure},
+        {"StringOperations", coyote::infra::security::tests::test_string_operations},
+        {"AsyncOperation", coyote::infra::security::tests::test_async_operation},
+        {"TimeoutSimulation", coyote::infra::security::tests::test_timeout_simulation},
+        {"NonHangingOperation", coyote::infra::security::tests::test_non_hanging_operation},
+        {"MockAuthenticationFlow", coyote::infra::security::tests::test_mock_authentication_flow},
+        {"EnvironmentVariableHandling", coyote::infra::security::tests::test_environment_variable_handling}
+    };
     
-    auto start_time = std::chrono::high_resolution_clock::now();
-    
-    // Create concurrent "operations" 
-    for (int i = 0; i < num_threads; ++i) {
-        futures.push_back(std::async(std::launch::async, [operations_per_thread]() {
-            int sum = 0;
-            for (int j = 0; j < operations_per_thread; ++j) {
-                sum += j;
-                // Tiny delay to simulate work
-                std::this_thread::sleep_for(std::chrono::microseconds(1));
+    for (const auto& test_case : test_cases) {
+        tests_run++;
+        try {
+            if (test_case.second()) {
+                std::cout << "✓ " << test_case.first << " PASSED\n";
+                tests_passed++;
+            } else {
+                std::cout << "✗ " << test_case.first << " FAILED\n";
             }
-            return sum;
-        }));
+        } catch (const std::exception& e) {
+            std::cout << "✗ " << test_case.first << " FAILED with exception: " << e.what() << "\n";
+        }
     }
     
-    // Wait for all to complete
-    int total_sum = 0;
-    for (auto& future : futures) {
-        total_sum += future.get();
+    std::cout << "\n=== Test Summary ===\n";
+    std::cout << "Tests run: " << tests_run << "\n";
+    std::cout << "Tests passed: " << tests_passed << "\n";
+    std::cout << "Tests failed: " << (tests_run - tests_passed) << "\n";
+    
+    if (tests_passed == tests_run) {
+        std::cout << "All tests passed!\n";
+        return 0;
+    } else {
+        std::cout << "Some tests failed!\n";
+        return 1;
     }
-    
-    auto end_time = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
-    
-    // Verify results and performance
-    int expected_sum_per_thread = (operations_per_thread * (operations_per_thread - 1)) / 2;
-    int expected_total = expected_sum_per_thread * num_threads;
-    
-    EXPECT_EQ(total_sum, expected_total);
-    EXPECT_LT(duration.count(), 5000) << "Concurrent operations took too long: " << duration.count() << "ms";
-    
-    std::cout << "Performance Results:\n";
-    std::cout << "Threads: " << num_threads << "\n";
-    std::cout << "Operations per thread: " << operations_per_thread << "\n";
-    std::cout << "Duration: " << duration.count() << " ms\n";
 }

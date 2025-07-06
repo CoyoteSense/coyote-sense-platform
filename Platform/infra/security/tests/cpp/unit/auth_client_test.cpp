@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
-#include "oauth2_auth_client.h"
+#include "auth_client.h"
 #include "../mocks/oauth2_test_mocks.h"
 #include <thread>
 #include <chrono>
