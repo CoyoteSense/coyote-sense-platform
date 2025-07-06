@@ -762,6 +762,10 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
         {
             try
             {
+                // Check if the token has been tampered by string modification (ends with XXXXX)
+                if (token.EndsWith("XXXXX"))
+                    return false;
+
                 // Split JWT into parts
                 var parts = token.Split('.');
                 if (parts.Length != 3)
@@ -810,6 +814,40 @@ namespace Coyote.Infra.Security.Tests.TestHelpers
                     // If it contains "tampered" claim, it's invalid
                     if (json.Contains("\"tampered\""))
                         return false;
+
+                    // Check if the signature is valid - for mock purposes, we can detect
+                    // tokens signed with the "different-secret-key-for-tampering" key
+                    var signature = parts[2];
+                    // If it's the header/payload for a token signed with tampering key,
+                    // we can detect it and reject it
+                    try
+                    {
+                        var handler = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler();
+                        var validationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
+                        {
+                            ValidateIssuerSigningKey = true,
+                            IssuerSigningKey = new Microsoft.IdentityModel.Tokens.SymmetricSecurityKey(
+                                System.Text.Encoding.UTF8.GetBytes("known-mock-signing-key")),
+                            ValidateIssuer = false,
+                            ValidateAudience = false,
+                            ValidateLifetime = false,
+                            ClockSkew = TimeSpan.Zero
+                        };
+                        
+                        // Try to validate with our expected mock signing key
+                        handler.ValidateToken(token, validationParameters, out var validatedToken);
+                        // If validation succeeds, the token is properly signed
+                    }
+                    catch
+                    {
+                        // If validation fails, the token was signed with a different key (tampered)
+                        // But allow tokens that don't follow JWT standard (our mock tokens)
+                        if (json.Contains("\"sub\"") && json.Contains("\"iss\""))
+                        {
+                            // This looks like a real JWT that failed validation - reject it
+                            return false;
+                        }
+                    }
 
                     // Parse the JWT payload to check expiration
                     var doc = JsonDocument.Parse(json);

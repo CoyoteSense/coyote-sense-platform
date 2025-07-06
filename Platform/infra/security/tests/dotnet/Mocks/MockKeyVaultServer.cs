@@ -73,13 +73,23 @@ public class MockKeyVaultServer : IDisposable
         {            // Health endpoint
             endpoints.MapGet("/v1/health", HandleHealthAsync);
             
-            // Secret metadata (must come before general secret operations)
-            endpoints.MapGet("/v1/secret/{path}/metadata", HandleGetSecretMetadataAsync);
-            
-            // Secret operations
-            endpoints.MapGet("/v1/secret/{*path}", HandleGetSecretAsync);
-            endpoints.MapPost("/v1/secret/{*path}", HandleSetSecretAsync);
-            endpoints.MapDelete("/v1/secret/{*path}", HandleDeleteSecretAsync);
+            // Secret operations (order matters - most specific first)
+            endpoints.MapGet("/v1/secret/{*secretPath}", async context =>
+            {
+                var path = context.Request.Path.Value ?? "";
+                if (path.EndsWith("/metadata"))
+                {
+                    // Handle metadata request
+                    await HandleGetSecretMetadataAsync(context);
+                }
+                else
+                {
+                    // Handle regular secret request
+                    await HandleGetSecretAsync(context);
+                }
+            });
+            endpoints.MapPost("/v1/secret/{*secretPath}", HandleSetSecretAsync);
+            endpoints.MapDelete("/v1/secret/{*secretPath}", HandleDeleteSecretAsync);
             
             // List secrets
             endpoints.MapGet("/v1/secrets", HandleListSecretsAsync);
@@ -147,7 +157,7 @@ public class MockKeyVaultServer : IDisposable
             return;
         }
 
-        var path = context.Request.RouteValues["path"]?.ToString();
+        var path = context.Request.RouteValues["secretPath"]?.ToString();
         if (string.IsNullOrEmpty(path))
         {
             context.Response.StatusCode = 400;
@@ -190,7 +200,7 @@ public class MockKeyVaultServer : IDisposable
             return;
         }
 
-        var path = context.Request.RouteValues["path"]?.ToString();
+        var path = context.Request.RouteValues["secretPath"]?.ToString();
         if (string.IsNullOrEmpty(path))
         {
             context.Response.StatusCode = 400;
@@ -248,7 +258,7 @@ public class MockKeyVaultServer : IDisposable
             return;
         }
 
-        var path = context.Request.RouteValues["path"]?.ToString();
+        var path = context.Request.RouteValues["secretPath"]?.ToString();
         if (string.IsNullOrEmpty(path))
         {
             context.Response.StatusCode = 400;
@@ -276,18 +286,34 @@ public class MockKeyVaultServer : IDisposable
             return;
         }
 
-        var path = context.Request.RouteValues["path"]?.ToString();
-        if (string.IsNullOrEmpty(path))
+        var pathFromUrl = context.Request.Path.Value ?? "";
+        string secretPath;
+        MockSecret? secret;
+        
+        // Extract path from "/v1/secret/{path}/metadata" format
+        // Example: "/v1/secret/test/metadata/secret/metadata" should extract "test/metadata/secret"
+        if (pathFromUrl.StartsWith("/v1/secret/") && pathFromUrl.EndsWith("/metadata"))
+        {
+            secretPath = pathFromUrl.Substring("/v1/secret/".Length, pathFromUrl.Length - "/v1/secret/".Length - "/metadata".Length);
+            
+            if (string.IsNullOrEmpty(secretPath))
+            {
+                context.Response.StatusCode = 400;
+                await context.Response.WriteAsync("Invalid path");
+                return;
+            }
+
+            if (!_secrets.TryGetValue(secretPath, out secret))
+            {
+                context.Response.StatusCode = 404;
+                await context.Response.WriteAsync("Secret not found");
+                return;
+            }
+        }
+        else
         {
             context.Response.StatusCode = 400;
-            await context.Response.WriteAsync("Invalid path");
-            return;
-        }
-
-        if (!_secrets.TryGetValue(path, out var secret))
-        {
-            context.Response.StatusCode = 404;
-            await context.Response.WriteAsync("Secret not found");
+            await context.Response.WriteAsync("Invalid metadata URL format");
             return;
         }
 
@@ -371,6 +397,7 @@ public class MockAuthClient : IAuthClient
     private string? _currentToken;
     private DateTime _tokenExpiry;
     private int _getTokenCallCount;
+    private bool _wasUpdatedAfterExpiry = false;
 
     public MockAuthClient(string? initialToken, DateTime expiry)
     {
@@ -382,6 +409,7 @@ public class MockAuthClient : IAuthClient
     {
         _currentToken = token;
         _tokenExpiry = expiry;
+        _wasUpdatedAfterExpiry = true;
     }
 
     public int GetTokenCallCount => _getTokenCallCount;
@@ -405,7 +433,27 @@ public class MockAuthClient : IAuthClient
     {
         _getTokenCallCount++;
         
-        if (string.IsNullOrEmpty(_currentToken) || DateTime.UtcNow >= _tokenExpiry)
+        if (string.IsNullOrEmpty(_currentToken))
+        {
+            return Task.FromResult<AuthToken?>(null);
+        }
+
+        // If token is expired but we have a fresh token available (UpdateToken was called), return fresh token
+        if (DateTime.UtcNow >= _tokenExpiry && _wasUpdatedAfterExpiry)
+        {
+            _wasUpdatedAfterExpiry = false; // Reset flag
+            
+            // Return the fresh token
+            return Task.FromResult<AuthToken?>(new AuthToken
+            {
+                AccessToken = _currentToken,
+                ExpiresAt = _tokenExpiry,
+                Scopes = new List<string> { "keyvault.read", "keyvault.write" }
+            });
+        }
+
+        // If token is expired and no fresh token is available, return null
+        if (DateTime.UtcNow >= _tokenExpiry)
         {
             return Task.FromResult<AuthToken?>(null);
         }

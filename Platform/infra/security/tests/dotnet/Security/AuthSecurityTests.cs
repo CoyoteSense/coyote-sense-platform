@@ -8,7 +8,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 using Xunit;
 using Xunit.Abstractions;
-using CoyoteSense.OAuth2.Client.Tests.Mocks;
 using Coyote.Infra.Security.Auth;
 using Coyote.Infra.Http.Factory;
 using Coyote.Infra.Http;
@@ -22,22 +21,20 @@ namespace CoyoteSense.OAuth2.Client.Tests.Security;
 public class AuthSecurityTests : IDisposable
 {
     private readonly ITestOutputHelper _output;
-    private readonly MockOAuth2Server _mockServer;
     private readonly ServiceProvider _serviceProvider;
     private readonly IAuthClient _client;
-    private bool _disposed; public AuthSecurityTests(ITestOutputHelper output)
+    private bool _disposed;    public AuthSecurityTests(ITestOutputHelper output)
     {
         _output = output;
-        _mockServer = new MockOAuth2Server();
 
         var config = new AuthClientConfig
         {
-            ServerUrl = _mockServer.BaseUrl,
+            ServerUrl = "https://login.microsoftonline.com/test-tenant",
             ClientId = "test-client",
             ClientSecret = "test-secret",
             DefaultScopes = new List<string> { "api.read", "api.write" },
             AutoRefresh = false // Disabled to prevent background loops that cause hangs
-        }; var services = new ServiceCollection();
+        };var services = new ServiceCollection();
         services.AddLogging(builder => builder.AddConsole().SetMinimumLevel(LogLevel.Warning));
 
         // Use our OAuth2 mock HTTP client instead of the generic mock
@@ -72,13 +69,13 @@ public class AuthSecurityTests : IDisposable
         {
             builder.AddProvider(new TestLoggerProvider(logMessages));
             builder.SetMinimumLevel(LogLevel.Trace);
-        }); var secureConfig = new AuthClientConfig
+        });        var secureConfig = new AuthClientConfig
         {
-            ServerUrl = _mockServer.BaseUrl,
+            ServerUrl = "https://login.microsoftonline.com/test-tenant",
             ClientId = "test-client",
             ClientSecret = "super-secret-that-should-not-appear-in-logs",
             DefaultScopes = new List<string> { "api.read" }
-        }; var services = new ServiceCollection();
+        };var services = new ServiceCollection();
         services.AddSingleton<ILoggerFactory>(loggerFactory);
         services.AddLogging();
 
@@ -129,9 +126,10 @@ public class AuthSecurityTests : IDisposable
         {
             var httpClient = provider.GetRequiredService<ICoyoteHttpClient>();
             return new TestHttpClientFactory(httpClient);
-        });        services.AddSingleton(new AuthClientConfig
+        });        
+        services.AddSingleton(new AuthClientConfig
         {
-            ServerUrl = _mockServer.BaseUrl,
+            ServerUrl = "https://login.microsoftonline.com/test-tenant",
             ClientId = "test-client",
             ClientSecret = "test-secret",
             DefaultScopes = new List<string> { "api.read" }
@@ -141,10 +139,10 @@ public class AuthSecurityTests : IDisposable
         services.AddTransient<IAuthClient>(provider => { 
             var config = provider.GetRequiredService<AuthClientConfig>(); 
             var httpClient = provider.GetRequiredService<ICoyoteHttpClient>(); 
-            var tokenStorage = provider.GetRequiredService<IAuthTokenStorage>(); 
-            var logger = provider.GetRequiredService<ILogger<AuthClient>>(); 
-            var authLogger = new TestAuthLogger(logger); 
-            return new AuthClient(config, httpClient, tokenStorage, authLogger); 
+            var tokenStorage = provider.GetRequiredService<IAuthTokenStorage>();
+            var logger = provider.GetRequiredService<ILogger<AuthClient>>();
+            var authLogger = new TestAuthLogger(logger);
+            return new AuthClient(config, httpClient, tokenStorage, authLogger);
         });
 
         using var serviceProvider = services.BuildServiceProvider();
@@ -311,9 +309,10 @@ public class AuthSecurityTests : IDisposable
         {
             var httpClient = provider.GetRequiredService<ICoyoteHttpClient>();
             return new TestHttpClientFactory(httpClient);
-        });        services.AddSingleton(new AuthClientConfig
+        });        
+        services.AddSingleton(new AuthClientConfig
         {
-            ServerUrl = _mockServer.BaseUrl,
+            ServerUrl = "https://login.microsoftonline.com/test-tenant",
             ClientId = "test-client",
             ClientSecret = "test-secret",
             DefaultScopes = new List<string> { "api.read" }
@@ -323,10 +322,10 @@ public class AuthSecurityTests : IDisposable
         services.AddTransient<IAuthClient>(provider => { 
             var config = provider.GetRequiredService<AuthClientConfig>(); 
             var httpClient = provider.GetRequiredService<ICoyoteHttpClient>(); 
-            var tokenStorage = provider.GetRequiredService<IAuthTokenStorage>(); 
-            var logger = provider.GetRequiredService<ILogger<AuthClient>>(); 
-            var authLogger = new TestAuthLogger(logger); 
-            return new AuthClient(config, httpClient, tokenStorage, authLogger); 
+            var tokenStorage = provider.GetRequiredService<IAuthTokenStorage>();
+            var logger = provider.GetRequiredService<ILogger<AuthClient>>();
+            var authLogger = new TestAuthLogger(logger);
+            return new AuthClient(config, httpClient, tokenStorage, authLogger);
         });
 
         using var serviceProvider = services.BuildServiceProvider();
@@ -457,7 +456,6 @@ public class AuthSecurityTests : IDisposable
     {
         if (!_disposed)
         {
-            _mockServer?.Dispose();
             _serviceProvider?.Dispose();
             _disposed = true;
         }

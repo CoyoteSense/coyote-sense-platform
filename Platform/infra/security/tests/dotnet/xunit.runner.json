@@ -1,0 +1,11 @@
+{
+  "methodDisplay": "method",
+  "methodDisplayOptions": "all",
+  "maxParallelThreads": 1,
+  "parallelizeAssembly": false,
+  "parallelizeTestCollections": false,
+  "preEnumerateTheories": false,
+  "shadowCopy": false,
+  "stopOnFail": false,
+  "longRunningTestSeconds": 30
+}

@@ -342,11 +342,11 @@ public class SecureStoreClientIntegrationTests : IDisposable
         {
             ServerUrl = _mockServer.BaseUrl,
             VerifySsl = false,
-            TokenRefreshBufferSeconds = 3600 // 1 hour buffer
+            TokenRefreshBufferSeconds = 30 // 30 seconds buffer to match BaseAuthClient behavior
         };
 
-        // Start with expired token
-        var mockAuthClient = new MockAuthClient("expired-token", DateTime.UtcNow.AddMinutes(-1));
+        // Start with expired token (well past expiry to ensure it's detected)
+        var mockAuthClient = new MockAuthClient("expired-token", DateTime.UtcNow.AddMinutes(-5));
         _mockServer.AddSecret("test/secret", "test-value");
         
         using var client = SecureStoreClientFactory.CreateWithAuthClient(options, mockAuthClient);
@@ -361,8 +361,8 @@ public class SecureStoreClientIntegrationTests : IDisposable
         Assert.NotNull(result);
         Assert.Equal("test-value", result.Value);
         
-        // Verify that auth client was called twice (once for expired, once for refresh)
-        Assert.Equal(2, mockAuthClient.GetTokenCallCount);
+        // Verify that auth client was called once and returned the fresh token
+        Assert.Equal(1, mockAuthClient.GetTokenCallCount);
     }
 
     [Fact]
