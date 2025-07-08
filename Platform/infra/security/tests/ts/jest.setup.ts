@@ -1,12 +1,19 @@
 // Jest setup file for OAuth2 client tests
-import { jest } from '@jest/globals';
+import { jest, beforeEach, afterEach } from '@jest/globals';
 
 // Global test configuration
 jest.setTimeout(30000);
 
+// Mock global fetch using jest-fetch-mock
+const { FetchMock } = require('jest-fetch-mock');
+
+// Enable fetch mocks
+const fetchMock = require('jest-fetch-mock');
+fetchMock.enableMocks();
+
 // Mock global fetch if not available
 if (!global.fetch) {
-  global.fetch = jest.fn();
+  global.fetch = fetchMock as any;
 }
 
 // Mock console methods to reduce noise during testing
@@ -69,8 +76,15 @@ expect.extend({
 
     try {
       // Validate base64url encoding of header and payload
-      JSON.parse(Buffer.from(parts[0], 'base64url').toString());
-      JSON.parse(Buffer.from(parts[1], 'base64url').toString());
+      if (parts[0] && parts[1]) {
+        JSON.parse(Buffer.from(parts[0], 'base64url').toString());
+        JSON.parse(Buffer.from(parts[1], 'base64url').toString());
+      } else {
+        return {
+          message: () => `expected ${received} to be a valid JWT (missing parts)`,
+          pass: false
+        };
+      }
       return {
         message: () => `expected ${received} not to be a valid JWT`,
         pass: true
@@ -103,8 +117,16 @@ export class TestUtils {
       status,
       statusText: status === 200 ? 'OK' : 'Error',
       headers: new Headers(headers),
+      redirected: false,
+      type: 'basic' as ResponseType,
+      url: '',
+      body: null,
+      bodyUsed: false,
       json: async () => data,
       text: async () => JSON.stringify(data),
+      arrayBuffer: async () => new ArrayBuffer(0),
+      blob: async () => new Blob(),
+      formData: async () => new FormData(),
       clone: () => TestUtils.createMockResponse(data, status, headers)
     } as Response;
   }

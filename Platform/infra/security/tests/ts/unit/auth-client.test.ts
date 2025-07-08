@@ -1,15 +1,21 @@
 import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
-import { AuthClient, AuthClientFactory } from '../../../src/ts/factory/auth-client-factory';
 import {
+    OAuth2AuthClient,
+    OAuth2AuthClientFactory,
     AuthClientConfig,
     TokenResponse,
     AuthError,
     AuthMode,
     IntrospectResponse,
     ServerDiscoveryResponse,
-    AuthTokenStorage,
-    AuthLogger
-} from '../../../src/ts/interfaces/auth-interfaces';
+    OAuth2TokenStorage,
+    OAuth2Logger,
+    OAuth2Config,
+    OAuth2TokenResponse,
+    OAuth2TokenIntrospectionResponse,
+    OAuth2ServerDiscoveryResponse
+} from '../src/index';
+import { TestUtils } from '../jest.setup';
 
 // Mock implementations
 class MockOAuth2TokenStorage implements OAuth2TokenStorage {
@@ -169,8 +175,29 @@ class OAuth2TestDataFactory {
 }
 
 // Mock fetch function
-const mockFetch = jest.fn();
+const mockFetch = jest.fn() as jest.MockedFunction<typeof fetch>;
 global.fetch = mockFetch;
+
+// Helper function to create mock Response
+function createMockResponse(data: any, options: { ok?: boolean, status?: number } = {}): Response {
+    return {
+        ok: options.ok ?? true,
+        status: options.status ?? 200,
+        statusText: 'OK',
+        headers: new Headers(),
+        redirected: false,
+        type: 'basic',
+        url: '',
+        body: null,
+        bodyUsed: false,
+        json: async () => data,
+        text: async () => JSON.stringify(data),
+        arrayBuffer: async () => new ArrayBuffer(0),
+        blob: async () => new Blob(),
+        formData: async () => new FormData(),
+        clone: () => createMockResponse(data, options)
+    } as Response;
+}
 
 describe('OAuth2AuthClient', () => {
     let client: OAuth2AuthClient;
@@ -788,6 +815,7 @@ describe('OAuth2AuthClientFactory', () => {
         const minimalConfig: OAuth2Config = {
             clientId: 'test-client',
             clientSecret: 'test-secret',
+            authorizationUrl: 'https://auth.example.com/authorize',
             tokenUrl: 'https://auth.example.com/token'
         };
 
@@ -857,7 +885,7 @@ describe('JWT Helper Functions', () => {
         const parts = jwt.split('.');
         expect(parts).toHaveLength(3);
 
-        const decodedPayload = JSON.parse(Buffer.from(parts[1], 'base64url').toString());
+        const decodedPayload = JSON.parse(Buffer.from(parts[1] || '', 'base64url').toString());
         expect(decodedPayload.sub).toBe('test-user');
     });
 
@@ -872,8 +900,8 @@ describe('JWT Helper Functions', () => {
         const expiredParts = expiredJwt.split('.');
         const validParts = validJwt.split('.');
 
-        const expiredDecoded = JSON.parse(Buffer.from(expiredParts[1], 'base64url').toString());
-        const validDecoded = JSON.parse(Buffer.from(validParts[1], 'base64url').toString());
+        const expiredDecoded = JSON.parse(Buffer.from(expiredParts[1] || '', 'base64url').toString());
+        const validDecoded = JSON.parse(Buffer.from(validParts[1] || '', 'base64url').toString());
 
         expect(expiredDecoded.exp).toBeLessThan(Math.floor(Date.now() / 1000));
         expect(validDecoded.exp).toBeGreaterThan(Math.floor(Date.now() / 1000));

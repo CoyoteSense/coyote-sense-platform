@@ -27,8 +27,5 @@ module.exports = {
   },
   setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
   testTimeout: 30000,
-  verbose: true,
-  moduleNameMapping: {
-    '^@/(.*)$': '<rootDir>/../../../typescript/$1'
-  }
+  verbose: true
 };

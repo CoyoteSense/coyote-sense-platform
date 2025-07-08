@@ -1,12 +1,18 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from '@jest/globals';
-import { AuthClient, AuthClientFactory } from '../../../typescript/auth-client';
 import {
-    AuthConfig,
-    AuthTokenResponse,
-    AuthServerDiscoveryResponse,
-    AuthTokenStorage,
-    AuthLogger
-} from '../../../typescript/auth-client';
+    OAuth2AuthClient,
+    OAuth2AuthClientFactory,
+    AuthClient,
+    AuthClientFactory,
+    AuthClientConfig,
+    TokenResponse,
+    ServerDiscoveryResponse,
+    OAuth2TokenStorage,
+    OAuth2Logger,
+    OAuth2Config,
+    OAuth2TokenResponse,
+    OAuth2ServerDiscoveryResponse
+} from '../src/index';
 
 /**
  * Integration tests for AuthClient against a real authentication server
@@ -39,7 +45,7 @@ const TEST_CONFIG = {
 };
 
 // Simple in-memory token storage for integration tests
-class IntegrationTokenStorage implements AuthTokenStorage {
+class IntegrationTokenStorage implements OAuth2TokenStorage {
     private tokens: Map<string, string> = new Map();
 
     async getToken(key: string): Promise<string | null> {
@@ -60,7 +66,7 @@ class IntegrationTokenStorage implements AuthTokenStorage {
 }
 
 // Simple console logger for integration tests
-class IntegrationLogger implements AuthLogger {
+class IntegrationLogger implements OAuth2Logger {
     debug(message: string, data?: any): void {
         if (process.env.AUTH_TEST_DEBUG === 'true') {
             console.debug(`[DEBUG] ${message}`, data || '');
@@ -101,8 +107,8 @@ async function waitForServerAvailability(url: string, timeoutMs: number = 30000)
 const describeIntegration = SKIP_INTEGRATION_TESTS ? describe.skip : describe;
 
 describeIntegration('AuthClient Integration Tests', () => {
-    let client: AuthClient;
-    let config: AuthConfig;
+    let client: OAuth2AuthClient;
+    let config: OAuth2Config;
     let tokenStorage: IntegrationTokenStorage;
     let logger: IntegrationLogger;
 
@@ -136,7 +142,7 @@ describeIntegration('AuthClient Integration Tests', () => {
             enableServerDiscovery: true
         };
 
-        client = new AuthClient(config, tokenStorage, logger);
+        client = new OAuth2AuthClient(config, tokenStorage, logger);
     }, 60000);
 
     beforeEach(async () => {
@@ -308,7 +314,7 @@ describeIntegration('AuthClient Integration Tests', () => {
             expect(accessToken).toBeTruthy();
             
             // Verify the token is active
-            const introspection = await client.introspectToken(accessToken);
+            const introspection = await client.introspectToken(accessToken.access_token);
             expect(introspection.active).toBe(true);
         });
     });
@@ -441,7 +447,7 @@ describeIntegration('AuthClientFactory Integration Tests', () => {
             AUTH_AUTHORIZATION_URL: `${TEST_CONFIG.serverUrl}/oauth2/authorize`
         };
 
-        try {            const client = AuthClientFactory.createFromEnvironment(tokenStorage, logger);
+        try {            const client = OAuth2AuthClientFactory.createFromEnvironment(tokenStorage, logger);
             expect(client).toBeInstanceOf(AuthClient);
         } finally {
             process.env = originalEnv;
@@ -476,6 +482,7 @@ describeIntegration('AuthClient Performance Tests', () => {
         const config: OAuth2Config = {
             clientId: TEST_CONFIG.clientId,
             clientSecret: TEST_CONFIG.clientSecret,
+            authorizationUrl: `${TEST_CONFIG.serverUrl}/oauth2/authorize`,
             tokenUrl: `${TEST_CONFIG.serverUrl}/oauth2/token`,
             maxRetryAttempts: 1, // Reduce retries for performance tests
             requestTimeoutMs: 10000
