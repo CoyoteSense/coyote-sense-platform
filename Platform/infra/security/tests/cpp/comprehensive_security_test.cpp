@@ -391,7 +391,7 @@ bool test_token_storage() {
     
     OAuth2Token token;
     token.access_token = "test-token";
-    token.client_id = "test-client";
+    token.token_type = "Bearer";
     
     // Store token
     ASSERT_TRUE(storage->store_token("test-client", token));

@@ -527,10 +527,10 @@ function global:Invoke-CSharpTests {
         
         # Run tests
         Write-Host "ℹ Executing C# tests..." -ForegroundColor Blue
-        $testArgs = @("test", "--no-build", "--logger", "trx", "--results-directory", $ReportsDir)
+        $testArgs = @("test", "CoyoteSense.Security.Client.Tests.csproj", "--no-build", "--logger", "trx", "--results-directory", $ReportsDir)
         
         if ($GenerateReports) {
-            $testArgs += @("--collect:XPlat Code Coverage")
+            $testArgs += @("--collect", '"XPlat Code Coverage"')
         }
         
         # Add timeout and exclude problematic performance tests
@@ -539,33 +539,17 @@ function global:Invoke-CSharpTests {
         
         Write-Host "ℹ Running with 60-second timeout and excluding performance/concurrent/hanging tests..." -ForegroundColor Blue
         
-        try {
-            # Use PowerShell job with timeout for additional safety
-            $job = Start-Job -ScriptBlock {
-                param($args, $verbose)
-                Set-Location $using:csharpTestDir
-                if ($verbose) {
-                    & dotnet @args
-                } else {
-                    & dotnet @args *> $null
-                }
-                return $LASTEXITCODE
-            } -ArgumentList $testArgs, $Verbose
-            
-            if (Wait-Job $job -Timeout 90) {
-                $jobResult = Receive-Job $job
-                $testResult = ($jobResult -eq 0)
-            } else {
-                Stop-Job $job
-                Write-Host "Tests timed out after 90 seconds" -ForegroundColor Yellow
-                $testResult = $false
-            }
-            
-            Remove-Job $job -Force
-        } catch {
-            Write-Host "Test execution failed: $($_.Exception.Message)" -ForegroundColor Red
-            $testResult = $false
+        # Run tests directly like other languages, but handle output redirection carefully
+        if ($Verbose) {
+            & dotnet @testArgs
+            $testExitCode = $LASTEXITCODE
+        } else {
+            # Use Start-Process to avoid output redirection issues with $LASTEXITCODE
+            $process = Start-Process -FilePath "dotnet" -ArgumentList $testArgs -Wait -PassThru -NoNewWindow
+            $testExitCode = $process.ExitCode
         }
+        
+        $testResult = ($testExitCode -eq 0)
         
         # Move coverage files
         if ($GenerateReports) {

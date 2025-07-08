@@ -1,15 +1,15 @@
 import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
-import { OAuth2AuthClient, OAuth2AuthClientFactory } from '../../../typescript/oauth2-auth-client';
+import { AuthClient, AuthClientFactory } from '../../../src/ts/factory/auth-client-factory';
 import {
-    OAuth2Config,
-    OAuth2TokenResponse,
-    OAuth2Error,
-    OAuth2GrantType,
-    OAuth2TokenIntrospectionResponse,
-    OAuth2ServerDiscoveryResponse,
-    OAuth2TokenStorage,
-    OAuth2Logger
-} from '../../../typescript/oauth2-auth-client';
+    AuthClientConfig,
+    TokenResponse,
+    AuthError,
+    AuthMode,
+    IntrospectResponse,
+    ServerDiscoveryResponse,
+    AuthTokenStorage,
+    AuthLogger
+} from '../../../src/ts/interfaces/auth-interfaces';
 
 // Mock implementations
 class MockOAuth2TokenStorage implements OAuth2TokenStorage {
