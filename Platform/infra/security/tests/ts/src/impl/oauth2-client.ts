@@ -14,6 +14,30 @@ import {
   PKCEParams
 } from '../interfaces/auth-interfaces';
 
+// For Node.js environments, we need to handle Buffer
+const getBuffer = (): typeof Buffer => {
+  try {
+    return Buffer;
+  } catch {
+    // Fallback for environments without Buffer
+    return {
+      from: (str: string, encoding: BufferEncoding = 'utf8') => {
+        if (encoding === 'base64url') {
+          // Convert base64url to base64
+          const base64 = str.replace(/-/g, '+').replace(/_/g, '/');
+          const padded = base64.padEnd(base64.length + (4 - base64.length % 4) % 4, '=');
+          return {
+            toString: () => atob(padded)
+          };
+        }
+        return {
+          toString: () => str
+        };
+      }
+    } as any;
+  }
+};
+
 // Re-export everything for easier importing
 export {
   AuthClientConfig,
@@ -43,6 +67,37 @@ export class OAuth2AuthClient {
     tokenStorage?: OAuth2TokenStorage,
     logger?: OAuth2Logger
   ) {
+    // Validate configuration
+    if (!config.clientId || config.clientId.trim() === '') {
+      throw new Error('Client ID is required');
+    }
+
+    if (!config.tokenUrl) {
+      throw new Error('Token URL is required');
+    }
+
+    try {
+      new URL(config.tokenUrl);
+    } catch {
+      throw new Error('Invalid token URL');
+    }
+
+    if (config.redirectUri) {
+      try {
+        new URL(config.redirectUri);
+      } catch {
+        throw new Error('Invalid redirect URI');
+      }
+    }
+
+    if (config.requestTimeoutMs !== undefined && config.requestTimeoutMs <= 0) {
+      throw new Error('Request timeout must be positive');
+    }
+
+    if (config.maxRetryAttempts !== undefined && config.maxRetryAttempts < 0) {
+      throw new Error('Max retry attempts must be non-negative');
+    }
+
     this.config = config;
     this.tokenStorage = tokenStorage;
     this.logger = logger;
@@ -53,14 +108,8 @@ export class OAuth2AuthClient {
     try {
       this.logger?.debug('Starting client credentials flow');
       
-      const body = new URLSearchParams({
-        grant_type: 'client_credentials',
-        client_id: this.config.clientId
-      });
-
-      if (this.config.clientSecret) {
-        body.append('client_secret', this.config.clientSecret);
-      }
+      const body = new URLSearchParams();
+      body.append('grant_type', 'client_credentials');
 
       if (scopes?.length) {
         body.append('scope', scopes.join(' '));
@@ -68,11 +117,22 @@ export class OAuth2AuthClient {
         body.append('scope', this.config.scopes.join(' '));
       }
 
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      };
+
+      // Use Basic Authentication if client secret is provided
+      if (this.config.clientSecret) {
+        const credentials = btoa(`${this.config.clientId}:${this.config.clientSecret}`);
+        headers['Authorization'] = `Basic ${credentials}`;
+      } else {
+        // Fall back to including client_id in body
+        body.append('client_id', this.config.clientId);
+      }
+
       const response = await fetch(this.config.tokenUrl, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
-        },
+        headers,
         body: body.toString()
       });
 
@@ -89,7 +149,12 @@ export class OAuth2AuthClient {
       
       if (this.tokenStorage) {
         await this.tokenStorage.setToken('access_token', token.access_token);
+        if (token.refresh_token) {
+          await this.tokenStorage.setToken('refresh_token', token.refresh_token);
+        }
       }
+
+      this.logger?.info('Client credentials token obtained');
 
       return {
         success: true,
@@ -235,25 +300,30 @@ export class OAuth2AuthClient {
   // Refresh Token
   async refreshTokenAsync(refreshToken: string, scopes?: string[]): Promise<OAuth2AuthResult> {
     try {
-      const body = new URLSearchParams({
-        grant_type: 'refresh_token',
-        refresh_token: refreshToken,
-        client_id: this.config.clientId
-      });
-
-      if (this.config.clientSecret) {
-        body.append('client_secret', this.config.clientSecret);
-      }
+      const body = new URLSearchParams();
+      body.append('grant_type', 'refresh_token');
+      body.append('refresh_token', refreshToken);
 
       if (scopes?.length) {
         body.append('scope', scopes.join(' '));
       }
 
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      };
+
+      // Use Basic Authentication if client secret is provided
+      if (this.config.clientSecret) {
+        const credentials = btoa(`${this.config.clientId}:${this.config.clientSecret}`);
+        headers['Authorization'] = `Basic ${credentials}`;
+      } else {
+        // Fall back to including client_id in body
+        body.append('client_id', this.config.clientId);
+      }
+
       const response = await fetch(this.config.tokenUrl, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
-        },
+        headers,
         body: body.toString()
       });
 
@@ -267,6 +337,14 @@ export class OAuth2AuthClient {
       }
 
       const token = await response.json() as TokenResponse;
+      
+      if (this.tokenStorage) {
+        await this.tokenStorage.setToken('access_token', token.access_token);
+        if (token.refresh_token) {
+          await this.tokenStorage.setToken('refresh_token', token.refresh_token);
+        }
+      }
+
       return {
         success: true,
         token
@@ -350,7 +428,9 @@ export class OAuth2AuthClient {
       throw new Error('Discovery URL not configured');
     }
 
-    const response = await fetch(this.config.discoveryUrl);
+    const response = await fetch(this.config.discoveryUrl, {
+      method: 'GET'
+    });
     
     if (!response.ok) {
       throw new Error(`Server discovery failed: ${response.status}`);
@@ -422,26 +502,68 @@ export class OAuth2AuthClient {
     const token = await this.getStoredAccessToken();
     if (!token) return true;
 
-    // For demonstration purposes, return false
-    // In real implementation, would check token expiry
-    return false;
+    // Check if token is a JWT and parse its expiry
+    try {
+      const payloadPart = token.split('.')[1];
+      if (!payloadPart) return true;
+
+      const buffer = getBuffer();
+      const payload = JSON.parse(buffer.from(payloadPart, 'base64url').toString());
+      const exp = payload.exp;
+      
+      if (!exp) return true;
+
+      const now = Math.floor(Date.now() / 1000);
+      const refreshThreshold = this.config.tokenRefreshThresholdSeconds || 300;
+      
+      // Return true if token expires within the refresh threshold
+      return exp <= (now + refreshThreshold);
+    } catch (error) {
+      // If we can't parse the token, assume it needs refresh
+      return true;
+    }
   }
 
-  async getValidAccessToken(): Promise<TokenResponse> {
+  async getValidAccessToken(): Promise<string> {
     const needsRefresh = await this.needsTokenRefresh();
     if (needsRefresh) {
-      return this.getTokenWithClientCredentials();
+      // Check if we have a refresh token
+      const refreshToken = await this.getStoredRefreshToken();
+      if (refreshToken) {
+        const tokenResponse = await this.getTokenWithRefreshToken(refreshToken);
+        return tokenResponse.access_token;
+      } else {
+        // Fall back to client credentials
+        const tokenResponse = await this.getTokenWithClientCredentials();
+        return tokenResponse.access_token;
+      }
     }
 
     const accessToken = await this.getStoredAccessToken();
     if (!accessToken) {
-      return this.getTokenWithClientCredentials();
+      const tokenResponse = await this.getTokenWithClientCredentials();
+      return tokenResponse.access_token;
     }
 
-    return {
-      access_token: accessToken,
-      token_type: 'Bearer'
-    };
+    return accessToken;
+  }
+
+  // Token refresh method
+  async getTokenWithRefreshToken(refreshToken: string): Promise<TokenResponse> {
+    const result = await this.refreshTokenAsync(refreshToken);
+    if (!result.success || !result.token) {
+      // Handle different error types with specific message formats
+      if (result.error === 'network_error') {
+        // For network errors, use the error description directly
+        throw new Error(`OAuth2 request failed: ${result.errorDescription}`);
+      } else if (result.errorDescription) {
+        // For OAuth2 errors, use the standard format
+        throw new Error(`OAuth2 request failed: ${result.error} - ${result.errorDescription}`);
+      } else {
+        throw new Error(`OAuth2 request failed: ${result.error}`);
+      }
+    }
+    return result.token;
   }
 
   // Auto-refresh (stub implementation)
@@ -470,15 +592,37 @@ export class OAuth2AuthClient {
   async getTokenWithClientCredentials(scopes?: string[]): Promise<TokenResponse> {
     const result = await this.clientCredentialsAsync(scopes);
     if (!result.success || !result.token) {
-      throw new Error(result.error || 'Failed to get token');
+      // Handle different error types with specific message formats
+      if (result.error === 'network_error') {
+        // For network errors, use the error description directly
+        throw new Error(`OAuth2 request failed: ${result.errorDescription}`);
+      } else if (result.errorDescription) {
+        // For OAuth2 errors, use the standard format
+        throw new Error(`OAuth2 request failed: ${result.error} - ${result.errorDescription}`);
+      } else {
+        throw new Error(`OAuth2 request failed: ${result.error}`);
+      }
     }
     return result.token;
   }
 
   async getTokenWithJWTBearer(jwtToken: string, scopes?: string[]): Promise<TokenResponse> {
+    if (!jwtToken || jwtToken.trim() === '') {
+      throw new Error('JWT assertion is required');
+    }
+    
     const result = await this.jwtBearerAsync(jwtToken, scopes);
     if (!result.success || !result.token) {
-      throw new Error(result.error || 'Failed to get token');
+      // Handle different error types with specific message formats
+      if (result.error === 'network_error') {
+        // For network errors, use the error description directly
+        throw new Error(`OAuth2 request failed: ${result.errorDescription}`);
+      } else if (result.errorDescription) {
+        // For OAuth2 errors, use the standard format
+        throw new Error(`OAuth2 request failed: ${result.error} - ${result.errorDescription}`);
+      } else {
+        throw new Error(`OAuth2 request failed: ${result.error}`);
+      }
     }
     return result.token;
   }
@@ -606,8 +750,14 @@ export class OAuth2AuthClientFactory {
       config.discoveryUrl = process.env.OAUTH2_DISCOVERY_URL;
     }
 
-    if (!config.clientId || !config.authorizationUrl || !config.tokenUrl) {
-      throw new Error('Required OAuth2 environment variables not set');
+    if (!config.clientId) {
+      throw new Error('Required environment variable OAUTH2_CLIENT_ID is not set');
+    }
+    if (!config.authorizationUrl) {
+      throw new Error('Required environment variable OAUTH2_AUTHORIZATION_URL is not set');
+    }
+    if (!config.tokenUrl) {
+      throw new Error('Required environment variable OAUTH2_TOKEN_URL is not set');
     }
 
     return new OAuth2AuthClient(config as AuthClientConfig, tokenStorage, logger);

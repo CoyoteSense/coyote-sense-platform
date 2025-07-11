@@ -314,7 +314,7 @@ describeIntegration('AuthClient Integration Tests', () => {
             expect(accessToken).toBeTruthy();
             
             // Verify the token is active
-            const introspection = await client.introspectToken(accessToken.access_token);
+            const introspection = await client.introspectToken(accessToken);
             expect(introspection.active).toBe(true);
         });
     });

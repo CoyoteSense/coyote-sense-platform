@@ -27,14 +27,14 @@
     "emitDecoratorMetadata": true,
     "baseUrl": "./",
     "paths": {
-      "@/*": ["../../../typescript/*"],
+      "@/*": ["../../../src/ts/*"],
       "@/tests/*": ["./*"]
     },
     "types": ["jest", "node"]
   },
   "include": [
     "**/*.ts",
-    "../../../typescript/**/*.ts"
+    "../../../src/ts/**/*.ts"
   ],
   "exclude": [
     "node_modules",

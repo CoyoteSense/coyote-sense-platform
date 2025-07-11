@@ -179,12 +179,12 @@ const mockFetch = jest.fn() as jest.MockedFunction<typeof fetch>;
 global.fetch = mockFetch;
 
 // Helper function to create mock Response
-function createMockResponse(data: any, options: { ok?: boolean, status?: number } = {}): Response {
+function createMockResponse(data: any, status: number = 200, headers: Record<string, string> = {}): Response {
     return {
-        ok: options.ok ?? true,
-        status: options.status ?? 200,
-        statusText: 'OK',
-        headers: new Headers(),
+        ok: status >= 200 && status < 300,
+        status,
+        statusText: status === 200 ? 'OK' : 'Error',
+        headers: new Headers(headers),
         redirected: false,
         type: 'basic',
         url: '',
@@ -195,7 +195,7 @@ function createMockResponse(data: any, options: { ok?: boolean, status?: number 
         arrayBuffer: async () => new ArrayBuffer(0),
         blob: async () => new Blob(),
         formData: async () => new FormData(),
-        clone: () => createMockResponse(data, options)
+        clone: () => createMockResponse(data, status, headers)
     } as Response;
 }
 
@@ -256,11 +256,9 @@ describe('OAuth2AuthClient', () => {
     describe('Client Credentials Flow', () => {
         it('should successfully obtain token with client credentials', async () => {
             const tokenResponse = OAuth2TestDataFactory.createTokenResponse();
-            mockFetch.mockResolvedValueOnce({
-                ok: true,
-                status: 200,
-                json: async () => tokenResponse
-            });
+            mockFetch.mockResolvedValueOnce(
+                createMockResponse(tokenResponse, 200)
+            );
 
             const result = await client.getTokenWithClientCredentials();
 
@@ -281,17 +279,15 @@ describe('OAuth2AuthClient', () => {
 
         it('should include scopes in client credentials request', async () => {
             const tokenResponse = OAuth2TestDataFactory.createTokenResponse();
-            mockFetch.mockResolvedValueOnce({
-                ok: true,
-                status: 200,
-                json: async () => tokenResponse
-            });
+            mockFetch.mockResolvedValueOnce(
+                createMockResponse(tokenResponse, 200)
+            );
 
             await client.getTokenWithClientCredentials(['read', 'write']);
 
             const fetchCall = mockFetch.mock.calls[0];
             const body = fetchCall[1].body;
-            expect(body).toContain('scope=read%20write');
+            expect(body).toMatch(/scope=read(\+|%20)write/);
         });
 
         it('should handle client credentials flow errors', async () => {
@@ -299,11 +295,8 @@ describe('OAuth2AuthClient', () => {
                 error: 'invalid_client',
                 error_description: 'Client authentication failed'
             };
-            mockFetch.mockResolvedValueOnce({
-                ok: false,
-                status: 401,
-                json: async () => errorResponse
-            });
+            mockFetch.mockResolvedValueOnce(createMockResponse(errorResponse
+            , 401));
 
             await expect(client.getTokenWithClientCredentials())
                 .rejects.toThrow('OAuth2 request failed: invalid_client - Client authentication failed');
@@ -314,11 +307,8 @@ describe('OAuth2AuthClient', () => {
         it('should successfully obtain token with JWT assertion', async () => {
             const jwtToken = OAuth2TestDataFactory.createJWTToken();
             const tokenResponse = OAuth2TestDataFactory.createTokenResponse();
-            mockFetch.mockResolvedValueOnce({
-                ok: true,
-                status: 200,
-                json: async () => tokenResponse
-            });
+            mockFetch.mockResolvedValueOnce(createMockResponse(tokenResponse
+            , 200));
 
             const result = await client.getTokenWithJWTBearer(jwtToken);
 
@@ -338,11 +328,8 @@ describe('OAuth2AuthClient', () => {
         it('should include JWT assertion in request body', async () => {
             const jwtToken = OAuth2TestDataFactory.createJWTToken();
             const tokenResponse = OAuth2TestDataFactory.createTokenResponse();
-            mockFetch.mockResolvedValueOnce({
-                ok: true,
-                status: 200,
-                json: async () => tokenResponse
-            });
+            mockFetch.mockResolvedValueOnce(createMockResponse(tokenResponse
+            , 200));
 
             await client.getTokenWithJWTBearer(jwtToken, ['admin']);
 
@@ -382,11 +369,8 @@ describe('OAuth2AuthClient', () => {
 
         it('should successfully exchange authorization code for token', async () => {
             const tokenResponse = OAuth2TestDataFactory.createTokenResponse();
-            mockFetch.mockResolvedValueOnce({
-                ok: true,
-                status: 200,
-                json: async () => tokenResponse
-            });
+            mockFetch.mockResolvedValueOnce(createMockResponse(tokenResponse
+            , 200));
 
             const result = await client.getTokenWithAuthorizationCode('test-code');
 
@@ -406,11 +390,8 @@ describe('OAuth2AuthClient', () => {
         it('should include PKCE verifier in token exchange', async () => {
             const tokenResponse = OAuth2TestDataFactory.createTokenResponse();
             const pkceParams = OAuth2TestDataFactory.createPKCEParams();
-            mockFetch.mockResolvedValueOnce({
-                ok: true,
-                status: 200,
-                json: async () => tokenResponse
-            });
+            mockFetch.mockResolvedValueOnce(createMockResponse(tokenResponse
+            , 200));
 
             await client.getTokenWithAuthorizationCode('test-code', pkceParams.code_verifier);
 
@@ -425,11 +406,8 @@ describe('OAuth2AuthClient', () => {
             const newTokenResponse = OAuth2TestDataFactory.createTokenResponse({
                 access_token: 'new-access-token'
             });
-            mockFetch.mockResolvedValueOnce({
-                ok: true,
-                status: 200,
-                json: async () => newTokenResponse
-            });
+            mockFetch.mockResolvedValueOnce(createMockResponse(newTokenResponse
+            , 200));
 
             const result = await client.refreshToken('refresh-token');
 
@@ -445,11 +423,8 @@ describe('OAuth2AuthClient', () => {
 
         it('should include scopes in refresh request', async () => {
             const newTokenResponse = OAuth2TestDataFactory.createTokenResponse();
-            mockFetch.mockResolvedValueOnce({
-                ok: true,
-                status: 200,
-                json: async () => newTokenResponse
-            });
+            mockFetch.mockResolvedValueOnce(createMockResponse(newTokenResponse
+            , 200));
 
             await client.refreshToken('refresh-token', ['read']);
 
@@ -462,11 +437,8 @@ describe('OAuth2AuthClient', () => {
     describe('Token Introspection', () => {
         it('should successfully introspect token', async () => {
             const introspectionResponse = OAuth2TestDataFactory.createIntrospectionResponse();
-            mockFetch.mockResolvedValueOnce({
-                ok: true,
-                status: 200,
-                json: async () => introspectionResponse
-            });
+            mockFetch.mockResolvedValueOnce(createMockResponse(introspectionResponse
+            , 200));
 
             const result = await client.introspectToken('test-token');
 
@@ -482,11 +454,8 @@ describe('OAuth2AuthClient', () => {
 
         it('should handle inactive token introspection', async () => {
             const introspectionResponse = OAuth2TestDataFactory.createIntrospectionResponse(false);
-            mockFetch.mockResolvedValueOnce({
-                ok: true,
-                status: 200,
-                json: async () => introspectionResponse
-            });
+            mockFetch.mockResolvedValueOnce(createMockResponse(introspectionResponse
+            , 200));
 
             const result = await client.introspectToken('inactive-token');
 
@@ -496,10 +465,7 @@ describe('OAuth2AuthClient', () => {
 
     describe('Token Revocation', () => {
         it('should successfully revoke token', async () => {
-            mockFetch.mockResolvedValueOnce({
-                ok: true,
-                status: 200
-            });
+            mockFetch.mockResolvedValueOnce(createMockResponse({}, 200));
 
             await expect(client.revokeToken('test-token')).resolves.not.toThrow();
 
@@ -513,10 +479,7 @@ describe('OAuth2AuthClient', () => {
         });
 
         it('should specify token type hint in revocation', async () => {
-            mockFetch.mockResolvedValueOnce({
-                ok: true,
-                status: 200
-            });
+            mockFetch.mockResolvedValueOnce(createMockResponse({}, 200));
 
             await client.revokeToken('test-token', 'refresh_token');
 
@@ -529,11 +492,8 @@ describe('OAuth2AuthClient', () => {
     describe('Server Discovery', () => {
         it('should successfully discover server endpoints', async () => {
             const discoveryResponse = OAuth2TestDataFactory.createDiscoveryResponse();
-            mockFetch.mockResolvedValueOnce({
-                ok: true,
-                status: 200,
-                json: async () => discoveryResponse
-            });
+            mockFetch.mockResolvedValueOnce(createMockResponse(discoveryResponse
+            , 200));
 
             const result = await client.discoverServerEndpoints();
 
@@ -547,10 +507,7 @@ describe('OAuth2AuthClient', () => {
         });
 
         it('should handle discovery errors', async () => {
-            mockFetch.mockResolvedValueOnce({
-                ok: false,
-                status: 404
-            });
+            mockFetch.mockResolvedValueOnce(createMockResponse({}, 404));
 
             await expect(client.discoverServerEndpoints())
                 .rejects.toThrow('Server discovery failed');
@@ -560,11 +517,8 @@ describe('OAuth2AuthClient', () => {
     describe('Token Storage Integration', () => {
         it('should store tokens automatically when configured', async () => {
             const tokenResponse = OAuth2TestDataFactory.createTokenResponse();
-            mockFetch.mockResolvedValueOnce({
-                ok: true,
-                status: 200,
-                json: async () => tokenResponse
-            });
+            mockFetch.mockResolvedValueOnce(createMockResponse(tokenResponse
+            , 200));
 
             await client.getTokenWithClientCredentials();
 
@@ -636,11 +590,8 @@ describe('OAuth2AuthClient', () => {
             const newTokenResponse = OAuth2TestDataFactory.createTokenResponse({
                 access_token: 'new-access-token'
             });
-            mockFetch.mockResolvedValueOnce({
-                ok: true,
-                status: 200,
-                json: async () => newTokenResponse
-            });
+            mockFetch.mockResolvedValueOnce(createMockResponse(newTokenResponse
+            , 200));
 
             const result = await client.getValidAccessToken();
 
@@ -664,34 +615,25 @@ describe('OAuth2AuthClient', () => {
 
         it('should handle timeout errors', async () => {
             // Simulate timeout
-            mockFetch.mockImplementationOnce(() => 
-                new Promise((_, reject) => 
-                    setTimeout(() => reject(new Error('Request timeout')), 100)
-                )
-            );
+            mockFetch.mockRejectedValueOnce(new Error('Request timeout'));
 
             await expect(client.getTokenWithClientCredentials())
                 .rejects.toThrow('OAuth2 request failed: Request timeout');
         });
 
         it('should handle HTTP error responses', async () => {
-            mockFetch.mockResolvedValueOnce({
-                ok: false,
-                status: 500,
-                statusText: 'Internal Server Error',
-                json: async () => ({ error: 'server_error', error_description: 'Internal server error' })
-            });
+            mockFetch.mockResolvedValueOnce(
+                createMockResponse({ error: 'server_error', error_description: 'Internal server error' }, 500)
+            );
 
             await expect(client.getTokenWithClientCredentials())
                 .rejects.toThrow('OAuth2 request failed: server_error - Internal server error');
         });
 
         it('should handle malformed JSON responses', async () => {
-            mockFetch.mockResolvedValueOnce({
-                ok: true,
-                status: 200,
-                json: async () => { throw new Error('Invalid JSON'); }
-            });
+            const mockResponse = createMockResponse({}, 200);
+            mockResponse.json = async () => { throw new Error('Invalid JSON'); };
+            mockFetch.mockResolvedValueOnce(mockResponse);
 
             await expect(client.getTokenWithClientCredentials())
                 .rejects.toThrow('OAuth2 request failed: Invalid JSON');
@@ -710,11 +652,8 @@ describe('OAuth2AuthClient', () => {
             mockFetch
                 .mockRejectedValueOnce(new Error('Network error'))
                 .mockRejectedValueOnce(new Error('Network error'))
-                .mockResolvedValueOnce({
-                    ok: true,
-                    status: 200,
-                    json: async () => OAuth2TestDataFactory.createTokenResponse()
-                });
+                .mockResolvedValueOnce(createMockResponse(OAuth2TestDataFactory.createTokenResponse()
+                , 200));
 
             const result = await client.getTokenWithClientCredentials();
 
@@ -724,11 +663,9 @@ describe('OAuth2AuthClient', () => {
         });
 
         it('should not retry on client errors (4xx)', async () => {
-            mockFetch.mockResolvedValueOnce({
-                ok: false,
-                status: 400,
-                json: async () => ({ error: 'invalid_request' })
-            });
+            mockFetch.mockResolvedValueOnce(
+                createMockResponse({ error: 'invalid_request' }, 400)
+            );
 
             await expect(client.getTokenWithClientCredentials()).rejects.toThrow();
             expect(mockFetch).toHaveBeenCalledTimes(1); // No retries for 4xx errors
@@ -736,16 +673,11 @@ describe('OAuth2AuthClient', () => {
 
         it('should retry on server errors (5xx)', async () => {
             mockFetch
-                .mockResolvedValueOnce({
-                    ok: false,
-                    status: 500,
-                    json: async () => ({ error: 'server_error' })
-                })
-                .mockResolvedValueOnce({
-                    ok: true,
-                    status: 200,
-                    json: async () => OAuth2TestDataFactory.createTokenResponse()
-                });
+                .mockResolvedValueOnce(
+                    createMockResponse({ error: 'server_error' }, 500)
+                )
+                .mockResolvedValueOnce(createMockResponse(OAuth2TestDataFactory.createTokenResponse()
+                , 200));
 
             const result = await client.getTokenWithClientCredentials();
 
@@ -757,11 +689,9 @@ describe('OAuth2AuthClient', () => {
     describe('Concurrent Access', () => {
         it('should handle concurrent token requests', async () => {
             const tokenResponse = OAuth2TestDataFactory.createTokenResponse();
-            mockFetch.mockResolvedValue({
-                ok: true,
-                status: 200,
-                json: async () => tokenResponse
-            });
+            mockFetch.mockResolvedValue(
+                createMockResponse(tokenResponse, 200)
+            );
 
             // Make multiple concurrent requests
             const promises = Array.from({ length: 5 }, () => 

@@ -306,10 +306,10 @@ run_cpp_tests() {
     # Generate coverage report if enabled
     if [ "$GENERATE_REPORTS" = true ] && command -v gcov &> /dev/null; then
         print_info "Generating C++ coverage report..."
-        gcov ../unit/*.cpp > /dev/null 2>&1
+        gcov ../src/*.cpp > /dev/null 2>&1 || true
         if command -v lcov &> /dev/null; then
-            lcov --capture --directory . --output-file "$COVERAGE_DIR/cpp_coverage.info" > /dev/null 2>&1
-            genhtml "$COVERAGE_DIR/cpp_coverage.info" --output-directory "$COVERAGE_DIR/cpp" > /dev/null 2>&1
+            lcov --capture --directory . --output-file "$COVERAGE_DIR/cpp_coverage.info" > /dev/null 2>&1 || true
+            genhtml "$COVERAGE_DIR/cpp_coverage.info" --output-directory "$COVERAGE_DIR/cpp" > /dev/null 2>&1 || true
         fi
     fi
     
@@ -330,7 +330,7 @@ run_csharp_tests() {
     
     print_section "Running C# Tests"
     
-    local csharp_test_dir="$TESTS_DIR/csharp"
+    local csharp_test_dir="$TESTS_DIR/dotnet"
     cd "$csharp_test_dir"
     
     # Restore packages
@@ -418,7 +418,7 @@ run_python_tests() {
     local pytest_args="-v --tb=short"
     
     if [ "$GENERATE_REPORTS" = true ]; then
-        pytest_args="$pytest_args --junitxml=$REPORTS_DIR/python_test_results.xml --cov=../../python --cov-report=xml:$COVERAGE_DIR/python_coverage.xml --cov-report=html:$COVERAGE_DIR/python"
+        pytest_args="$pytest_args --junitxml=$REPORTS_DIR/python_test_results.xml --cov=../src/python --cov-report=xml:$COVERAGE_DIR/python_coverage.xml --cov-report=html:$COVERAGE_DIR/python"
     fi
     
     if [ "$RUN_INTEGRATION_TESTS" = true ]; then
@@ -452,53 +452,37 @@ run_typescript_tests() {
     
     print_section "Running TypeScript Tests"
     
-    local typescript_test_dir="$TESTS_DIR/typescript"
+    local typescript_test_dir="$TESTS_DIR/ts"
     cd "$typescript_test_dir"
     
-    # Install dependencies
-    print_info "Installing Node.js dependencies..."
-    if [ "$VERBOSE" = true ]; then
-        npm install
-    else
-        npm install > /dev/null 2>&1
-    fi
+    # Use the dedicated TypeScript test runner
+    local ts_test_script="./run_ts_tests.sh"
     
-    if [ $? -ne 0 ]; then
-        print_error "Node.js dependencies installation failed"
+    if [ ! -f "$ts_test_script" ]; then
+        print_error "TypeScript test script not found: $ts_test_script"
         return 1
     fi
     
-    # Type check
-    print_info "Running TypeScript type checking..."
+    # Make script executable
+    chmod +x "$ts_test_script"
+    
+    # Run the TypeScript test script with appropriate flags
+    local ts_args=""
     if [ "$VERBOSE" = true ]; then
-        npm run type-check
-    else
-        npm run type-check > /dev/null 2>&1
+        ts_args="$ts_args --verbose"
     fi
-    
-    if [ $? -ne 0 ]; then
-        print_error "TypeScript type checking failed"
-        return 1
-    fi
-    
-    # Run tests
-    print_info "Executing TypeScript tests..."
-    
-    local jest_config=""
     if [ "$RUN_INTEGRATION_TESTS" = true ]; then
-        jest_config="--testPathPattern=(unit|integration)"
-    else
-        jest_config="--testPathPattern=unit"
+        ts_args="$ts_args --integration"
+    fi
+    if [ "$GENERATE_REPORTS" = false ]; then
+        ts_args="$ts_args --no-reports"
     fi
     
-    if [ "$GENERATE_REPORTS" = true ]; then
-        jest_config="$jest_config --coverage --coverageDirectory=$COVERAGE_DIR/typescript"
-    fi
-    
+    print_info "Executing TypeScript test runner..."
     if [ "$VERBOSE" = true ]; then
-        npm test -- $jest_config
+        bash "$ts_test_script" $ts_args
     else
-        npm test -- $jest_config > /dev/null 2>&1
+        bash "$ts_test_script" $ts_args > /dev/null 2>&1
     fi
     
     local test_result=$?
@@ -548,7 +532,11 @@ run_performance_tests() {
         echo "    \"python\": {" >> "$perf_results_file"
         
         # Run performance-specific tests
-        python3 -m pytest performance/ --json-report --json-report-file="$REPORTS_DIR/python_perf.json" > /dev/null 2>&1
+        if [ -f "run_python_tests.py" ]; then
+            python3 run_python_tests.py --performance --json-report --json-report-file="$REPORTS_DIR/python_perf.json" > /dev/null 2>&1
+        else
+            python3 -m pytest performance/ --json-report --json-report-file="$REPORTS_DIR/python_perf.json" > /dev/null 2>&1 || true
+        fi
         
         echo "      \"status\": \"completed\"" >> "$perf_results_file"
         echo "    }" >> "$perf_results_file"
@@ -557,7 +545,7 @@ run_performance_tests() {
     
     if [ "$RUN_TYPESCRIPT_TESTS" = true ]; then
         print_info "Running TypeScript performance tests..."
-        cd "$TESTS_DIR/typescript"
+        cd "$TESTS_DIR/ts"
         
         if [ "$first_result" = false ]; then
             echo "    ," >> "$perf_results_file"

@@ -1,5 +1,5 @@
 """
-Security Infrastructure Component - Python Tests
+Security Infrastructure Component - Tests
 
-Python test package for the security infrastructure component.
+Test package for the security infrastructure component.
 """
