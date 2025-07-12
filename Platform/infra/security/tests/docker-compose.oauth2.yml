@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  # Simple OAuth2 Server using Node.js
+  oauth2-server:
+    image: node:18-alpine
+    container_name: oauth2-server
+    ports:
+      - "8081:8080"
+    working_dir: /app
+    volumes:
+      - ./docker/simple-oauth2:/app
+    command: sh -c "npm install && node server.js"
+    networks:
+      - oauth2-test
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/.well-known/oauth2"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  oauth2-test:
+    driver: bridge

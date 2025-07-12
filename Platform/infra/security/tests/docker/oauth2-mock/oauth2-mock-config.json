@@ -1,0 +1,111 @@
+{
+  "issuer": "http://localhost:8081",
+  "authorization_endpoint": "http://localhost:8081/auth",
+  "token_endpoint": "http://localhost:8081/token",
+  "userinfo_endpoint": "http://localhost:8081/userinfo",
+  "introspection_endpoint": "http://localhost:8081/introspect",
+  "revocation_endpoint": "http://localhost:8081/revoke",
+  "jwks_uri": "http://localhost:8081/.well-known/jwks.json",
+  "response_types_supported": [
+    "code",
+    "token",
+    "id_token",
+    "code token",
+    "code id_token",
+    "token id_token",
+    "code token id_token"
+  ],
+  "subject_types_supported": [
+    "public"
+  ],
+  "id_token_signing_alg_values_supported": [
+    "RS256"
+  ],
+  "scopes_supported": [
+    "openid",
+    "profile",
+    "email",
+    "api.read",
+    "api.write"
+  ],
+  "token_endpoint_auth_methods_supported": [
+    "client_secret_basic",
+    "client_secret_post"
+  ],
+  "claims_supported": [
+    "sub",
+    "iss",
+    "aud",
+    "exp",
+    "iat",
+    "auth_time",
+    "nonce",
+    "email",
+    "email_verified",
+    "name",
+    "family_name",
+    "given_name"
+  ],
+  "grant_types_supported": [
+    "authorization_code",
+    "implicit",
+    "refresh_token",
+    "client_credentials"
+  ],
+  "clients": [
+    {
+      "client_id": "test-client-id",
+      "client_secret": "test-client-secret",
+      "redirect_uris": [
+        "http://localhost:3000/callback",
+        "https://localhost:3000/callback",
+        "https://test.example.com/callback"
+      ],
+      "grant_types": [
+        "authorization_code",
+        "refresh_token",
+        "client_credentials"
+      ],
+      "response_types": [
+        "code"
+      ],
+      "scope": "openid profile email api.read api.write"
+    },
+    {
+      "client_id": "integration-test-client",
+      "client_secret": "integration-test-secret",
+      "redirect_uris": [
+        "http://localhost:3000/callback",
+        "https://test-app.example.com/callback"
+      ],
+      "grant_types": [
+        "authorization_code",
+        "refresh_token",
+        "client_credentials"
+      ],
+      "response_types": [
+        "code"
+      ],
+      "scope": "api.read api.write"
+    },
+    {
+      "client_id": "performance-test-client",
+      "client_secret": "performance-test-secret",
+      "grant_types": [
+        "client_credentials"
+      ],
+      "scope": "api.read api.write"
+    }
+  ],
+  "users": [
+    {
+      "sub": "test-user-123",
+      "email": "testuser@example.com",
+      "email_verified": true,
+      "name": "Test User",
+      "given_name": "Test",
+      "family_name": "User",
+      "password": "testpass"
+    }
+  ]
+}

@@ -1,0 +1,104 @@
+{
+  "realm": "coyote-test",
+  "enabled": true,
+  "registrationAllowed": false,
+  "resetPasswordAllowed": false,
+  "bruteForceProtected": false,
+  "clients": [
+    {
+      "clientId": "test-client-id",
+      "secret": "test-client-secret",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "redirectUris": [
+        "http://localhost:3000/callback",
+        "https://localhost:3000/callback",
+        "https://test.example.com/callback"
+      ],
+      "webOrigins": [
+        "http://localhost:3000",
+        "https://localhost:3000"
+      ],
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": true,
+      "publicClient": false,
+      "protocol": "openid-connect",
+      "defaultClientScopes": [
+        "web-origins",
+        "role_list",
+        "profile",
+        "roles",
+        "email"
+      ],
+      "optionalClientScopes": [
+        "address",
+        "phone",
+        "offline_access",
+        "microprofile-jwt"
+      ]
+    },
+    {
+      "clientId": "integration-test-client",
+      "secret": "integration-test-secret",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "redirectUris": [
+        "http://localhost:3000/callback",
+        "https://test-app.example.com/callback"
+      ],
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": true,
+      "publicClient": false,
+      "protocol": "openid-connect"
+    }
+  ],
+  "users": [
+    {
+      "username": "testuser",
+      "email": "testuser@example.com",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Test",
+      "lastName": "User",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "testpass",
+          "temporary": false
+        }
+      ]
+    }
+  ],
+  "roles": {
+    "realm": [
+      {
+        "name": "user",
+        "description": "User role"
+      },
+      {
+        "name": "admin",
+        "description": "Admin role"
+      }
+    ]
+  },
+  "clientScopes": [
+    {
+      "name": "api.read",
+      "description": "Read API access",
+      "protocol": "openid-connect",
+      "attributes": {
+        "consent.screen.text": "Read access to API"
+      }
+    },
+    {
+      "name": "api.write",
+      "description": "Write API access",
+      "protocol": "openid-connect",
+      "attributes": {
+        "consent.screen.text": "Write access to API"
+      }
+    }
+  ]
+}
