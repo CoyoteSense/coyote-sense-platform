@@ -36,7 +36,7 @@ function Write-ColorOutput {
     Write-Host "${Color}${Message}${Reset}"
 }
 
-Write-ColorOutput "🧪 TypeScript OAuth2 Integration Tests" $Blue
+Write-ColorOutput "[TEST] TypeScript OAuth2 Integration Tests" $Blue
 Write-ColorOutput "=====================================" $Blue
 
 # Check if we're in the correct directory
