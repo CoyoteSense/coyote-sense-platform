@@ -1,5 +1,6 @@
 ﻿# OAuth2 Client Libraries Test Runner for Windows
 # Comprehensive test execution script for all OAuth2 authentication client libraries
+# By default, runs unit tests and mock tests, excluding real OAuth2 server integration tests
 
 param(
     [switch]$Help,
@@ -9,12 +10,13 @@ param(
     [switch]$SkipCSharp,
     [switch]$SkipPython,
     [switch]$SkipTypeScript,
-    [switch]$Integration,
+    [switch]$Integration,  # Set this flag to include real OAuth2 server integration tests
     [switch]$Performance,
     [switch]$NoReports,
-    [string]$ServerUrl = $(if ($env:OAUTH2_TEST_SERVER_URL) { $env:OAUTH2_TEST_SERVER_URL } else { "https://localhost:5001" }),
+    [string]$ServerUrl = $(if ($env:OAUTH2_TEST_SERVER_URL) { $env:OAUTH2_TEST_SERVER_URL } else { "http://localhost:8081" }),
     [string]$ClientId = $(if ($env:OAUTH2_TEST_CLIENT_ID) { $env:OAUTH2_TEST_CLIENT_ID } else { "test-client-id" }),
     [string]$ClientSecret = $(if ($env:OAUTH2_TEST_CLIENT_SECRET) { $env:OAUTH2_TEST_CLIENT_SECRET } else { "test-client-secret" })
+)
 )
 
 # Configuration

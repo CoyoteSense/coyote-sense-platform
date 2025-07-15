@@ -68,6 +68,13 @@ Desktop.ini
 Testing/
 LastTest.log
 
+# Test reports and coverage
+**/tests/reports/
+**/tests/coverage/
+TestResults/
+*.cobertura.xml
+coverage.xml
+
 # Ninja build system
 .ninja_deps
 .ninja_log
@@ -212,4 +219,3 @@ logs/
 Thumbs.db
 ehthumbs.db
 Desktop.ini
-TestResults/

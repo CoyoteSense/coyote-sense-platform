@@ -79,14 +79,7 @@ class SimpleOAuth2Client {
             throw new Error(`OAuth2 token request failed: ${response.status} ${response.statusText} - ${errorText}`);
         }
 
-        const responseText = await response.text();
-        console.log('🐛 Raw response:', responseText);
-        
-        try {
-            return JSON.parse(responseText) as OAuth2TokenResponse;
-        } catch (parseError) {
-            throw new Error(`Failed to parse token response: ${parseError} - Raw response: ${responseText}`);
-        }
+        return await response.json() as OAuth2TokenResponse;
     }
 
     /**
@@ -141,18 +134,10 @@ class SimpleOAuth2Client {
         });
 
         if (!response.ok) {
-            const errorText = await response.text();
             throw new Error(`Server info request failed: ${response.status} ${response.statusText}`);
         }
 
-        const responseText = await response.text();
-        console.log('🐛 Raw discovery response:', responseText);
-        
-        try {
-            return JSON.parse(responseText);
-        } catch (parseError) {
-            throw new Error(`Failed to parse discovery response: ${parseError} - Raw response: ${responseText}`);
-        }
+        return await response.json();
     }
 }
 

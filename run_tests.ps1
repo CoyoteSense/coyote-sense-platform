@@ -76,7 +76,7 @@ function Run-CSharpTests {
     
     if (-not (Test-Command "dotnet")) {
         Write-ColorOutput "[SKIP] .NET SDK not found - skipping C# tests" $Yellow
-        return $false
+        return $true  # Return true for skip, not false
     }
     
     $testProjects = @(
@@ -160,7 +160,7 @@ function Run-TypeScriptTests {
     
     if (-not (Test-Command "npm")) {
         Write-ColorOutput "[SKIP] Node.js/npm not found - skipping TypeScript tests" $Yellow
-        return $false
+        return $true  # Return true for skip, not false
     }
     
     $testDirs = @(
@@ -186,10 +186,10 @@ function Run-TypeScriptTests {
                 # Run unit tests (exclude integration tests)
                 Write-ColorOutput "[INFO] Running unit tests..." $Cyan
                 if ($Coverage) {
-                    npm run test:coverage --silent
+                    npm run test:coverage -- unit/ --silent
                 }
                 else {
-                    npm test -- --testPathIgnorePatterns="/integration/" --silent
+                    npm test -- unit/ --silent
                 }
                 
                 if ($LASTEXITCODE -ne 0) {
