@@ -44,11 +44,11 @@ function Start-OAuth2Server {
     $DockerCmd = "docker"
     try {
         docker compose version 2>$null | Out-Null
-        $DockerArgs = "compose", "-f", $DockerComposeFile, "up", "-d", "oauth2-mock"
+        $DockerArgs = "compose", "-f", $DockerComposeFile, "up", "-d", "oauth2-server"
     } catch {
         if (Get-Command docker-compose -ErrorAction SilentlyContinue) {
             $DockerCmd = "docker-compose"
-            $DockerArgs = "-f", $DockerComposeFile, "up", "-d", "oauth2-mock"
+            $DockerArgs = "-f", $DockerComposeFile, "up", "-d", "oauth2-server"
         } else {
             Write-Error "Neither 'docker compose' nor 'docker-compose' is available"
             return $false

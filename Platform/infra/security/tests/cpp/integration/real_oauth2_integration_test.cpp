@@ -361,7 +361,13 @@ TEST_F(RealOAuth2IntegrationTest, DiscoveryEndpoint_ShouldReturnValidConfigurati
     // Verify discovery response structure
     ASSERT_TRUE(discovery_response.contains("issuer")) << "Missing issuer in discovery response";
     ASSERT_TRUE(discovery_response.contains("token_endpoint")) << "Missing token_endpoint in discovery response";
-    ASSERT_TRUE(discovery_response.contains("grant_types_supported")) << "Missing grant_types_supported in discovery response";
+    
+    // Check for optional grant_types_supported field (not required by OAuth2 spec)
+    if (discovery_response.contains("grant_types_supported")) {
+        std::cout << "✓ Optional grant_types_supported field present" << std::endl;
+    } else {
+        std::cout << "ⓘ Optional grant_types_supported field not present (this is OK)" << std::endl;
+    }
 
     // Verify expected values
     EXPECT_EQ(discovery_response["issuer"].get<std::string>(), server_url_) << "Issuer should match server URL";

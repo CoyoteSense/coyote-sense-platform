@@ -1,17 +1,22 @@
 cmake_minimum_required(VERSION 3.16)
+
+# vcpkg integration
+if(DEFINED ENV{VCPKG_ROOT} AND NOT DEFINED CMAKE_TOOLCHAIN_FILE)
+    set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+        CACHE STRING "")
+    message(STATUS "Using vcpkg toolchain: ${CMAKE_TOOLCHAIN_FILE}")
+endif()
+
 project(CoyoteSenseCppOAuth2IntegrationTests)
 
 # Set C++ standard
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Find required packages
-find_package(PkgConfig REQUIRED)
-find_package(GTest REQUIRED)
-find_package(nlohmann_json REQUIRED)
-
-# Find libcurl
-pkg_check_modules(CURL REQUIRED libcurl)
+# Find required packages via vcpkg
+find_package(GTest CONFIG REQUIRED)
+find_package(CURL CONFIG REQUIRED)
+find_package(nlohmann_json CONFIG REQUIRED)
 
 # Include directories
 include_directories(${GTEST_INCLUDE_DIRS})
@@ -26,14 +31,12 @@ add_executable(real_oauth2_integration_test
 
 # Link libraries
 target_link_libraries(real_oauth2_integration_test
-    ${GTEST_LIBRARIES}
-    ${CURL_LIBRARIES}
+    PRIVATE
+    GTest::gtest
+    GTest::gtest_main
+    CURL::libcurl
     nlohmann_json::nlohmann_json
-    pthread
 )
-
-# Add compiler flags
-target_compile_options(real_oauth2_integration_test PRIVATE ${CURL_CFLAGS})
 
 # Enable testing
 enable_testing()

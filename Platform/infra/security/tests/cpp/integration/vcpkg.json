@@ -1,0 +1,10 @@
+{
+  "name": "coyote-security-oauth2-integration-tests",
+  "version": "1.0.0",
+  "description": "OAuth2 integration tests for CoyoteSense security module",
+  "dependencies": [
+    "gtest",
+    "curl",
+    "nlohmann-json"
+  ]
+}

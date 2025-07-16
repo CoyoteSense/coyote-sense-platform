@@ -68,7 +68,7 @@ function Write-Section {
 
 function Test-OAuth2ServerRunning {
     try {
-        Invoke-RestMethod -Uri "$ServerUrl/health" -Method GET -TimeoutSec 5 | Out-Null
+        Invoke-RestMethod -Uri "$ServerUrl/.well-known/oauth2" -Method GET -TimeoutSec 5 | Out-Null
         return $true
     }
     catch {
@@ -254,9 +254,71 @@ function Test-CppIntegration {
                 $testResults.Cpp.Failed = 1
             }
         } else {
-            Write-ColorOutput "No C++ build tools found (make, cl), skipping C++ tests" $Yellow
-            Write-ColorOutput "Please install Visual Studio Build Tools or make" $Yellow
-            $testResults.Cpp.Skipped = 1
+            # Try to find and set up Visual Studio environment and use CMake with vcpkg
+            Write-ColorOutput "Searching for Visual Studio installation..." $Blue
+            
+            $vsInstallPath = Get-ChildItem "C:\Program Files*\Microsoft Visual Studio\*\*" -Directory -ErrorAction SilentlyContinue | 
+                            Where-Object { Test-Path (Join-Path $_.FullName "VC\Auxiliary\Build\vcvarsall.bat") } |
+                            Select-Object -First 1
+            
+            if ($vsInstallPath) {
+                $vcvarsall = Join-Path $vsInstallPath.FullName "VC\Auxiliary\Build\vcvarsall.bat"
+                Write-ColorOutput "Found Visual Studio at: $($vsInstallPath.FullName)" $Blue
+                Write-ColorOutput "Building with CMake and vcpkg..." $Blue
+                
+                # Create build directory
+                if (Test-Path "build") { Remove-Item -Recurse -Force "build" }
+                New-Item -ItemType Directory -Path "build" | Out-Null
+                
+                # Create a temporary batch file to set up environment and build with CMake
+                $tempBatch = "setup_and_build_cmake.bat"
+                
+                $batchContent = @"
+@echo off
+call "$vcvarsall" x64
+if errorlevel 1 (
+    echo Failed to set up Visual Studio environment
+    exit /b 1
+)
+echo Visual Studio environment set up successfully
+
+cd build
+cmake .. -DCMAKE_TOOLCHAIN_FILE="%VCPKG_ROOT%/scripts/buildsystems/vcpkg.cmake"
+if errorlevel 1 (
+    echo CMake configuration failed
+    exit /b 1
+)
+
+cmake --build . --config Release
+if errorlevel 1 (
+    echo Build failed
+    exit /b 1
+)
+
+echo Build completed successfully
+ctest -C Release --output-on-failure
+"@
+                
+                Set-Content -Path $tempBatch -Value $batchContent -Encoding ASCII
+                
+                Write-ColorOutput "Running CMake build and test process..." $Blue
+                $process = Start-Process -FilePath "cmd.exe" -ArgumentList "/c", $tempBatch -NoNewWindow -Wait -PassThru
+                
+                # Clean up temp file
+                Remove-Item $tempBatch -ErrorAction SilentlyContinue
+                
+                if ($process.ExitCode -eq 0) {
+                    Write-ColorOutput "C++ integration tests PASSED" $Green
+                    $testResults.Cpp.Passed = 1
+                } else {
+                    Write-ColorOutput "C++ integration tests FAILED" $Red
+                    $testResults.Cpp.Failed = 1
+                }
+            } else {
+                Write-ColorOutput "No C++ build tools found (make, cl, Visual Studio), skipping C++ tests" $Yellow
+                Write-ColorOutput "Please install Visual Studio Build Tools or make" $Yellow
+                $testResults.Cpp.Skipped = 1
+            }
         }
     }
     catch {

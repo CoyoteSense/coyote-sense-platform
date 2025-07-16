@@ -72,23 +72,40 @@ function Test-Dependencies {
         return $false
     }
     
-    # Check for C++ compiler
-    if (!(Get-Command g++ -ErrorAction SilentlyContinue) -and !(Get-Command clang++ -ErrorAction SilentlyContinue) -and !(Get-Command cl -ErrorAction SilentlyContinue)) {
-        Write-Error "C++ compiler not found. Please install GCC, Clang, or Visual Studio."
-        return $false
-    }
-    
     Write-Info "Found CMake: $(cmake --version | Select-Object -First 1)"
     
+    # Check for C++ compiler
     if (Get-Command g++ -ErrorAction SilentlyContinue) {
         Write-Info "Found G++: $(g++ --version | Select-Object -First 1)"
+        return $true
     } elseif (Get-Command clang++ -ErrorAction SilentlyContinue) {
         Write-Info "Found Clang++: $(clang++ --version | Select-Object -First 1)"
+        return $true
     } elseif (Get-Command cl -ErrorAction SilentlyContinue) {
-        Write-Info "Found MSVC: $(cl 2>&1 | Select-Object -First 1)"
+        Write-Info "Found MSVC in PATH: $(cl 2>&1 | Select-Object -First 1)"
+        return $true
+    } else {
+        # Try to find and set up Visual Studio environment
+        Write-Info "Searching for Visual Studio installation..."
+        
+        $vsInstallPath = Get-ChildItem "C:\Program Files*\Microsoft Visual Studio\*\*" -Directory -ErrorAction SilentlyContinue | 
+                        Where-Object { Test-Path (Join-Path $_.FullName "VC\Auxiliary\Build\vcvarsall.bat") } |
+                        Select-Object -First 1
+        
+        if ($vsInstallPath) {
+            $vcvarsall = Join-Path $vsInstallPath.FullName "VC\Auxiliary\Build\vcvarsall.bat"
+            Write-Info "Found Visual Studio at: $($vsInstallPath.FullName)"
+            Write-Info "Setting up Visual Studio environment..."
+            
+            # Note: We'll set up the environment in the build function
+            $global:VsInstallPath = $vsInstallPath.FullName
+            $global:VcVarsAll = $vcvarsall
+            return $true
+        } else {
+            Write-Error "C++ compiler not found. Please install GCC, Clang, or Visual Studio."
+            return $false
+        }
     }
-    
-    return $true
 }
 
 function Build-CppIntegrationTests {
@@ -104,26 +121,72 @@ function Build-CppIntegrationTests {
     Set-Location $buildDir
     
     try {
-        # Configure with CMake
-        Write-Info "Configuring with CMake..."
-        cmake .. -DCMAKE_BUILD_TYPE=Debug
-        
-        if ($LASTEXITCODE -ne 0) {
-            Write-Error "CMake configuration failed"
-            return $false
+        # Set up Visual Studio environment if needed
+        if ($global:VcVarsAll -and !(Get-Command cl -ErrorAction SilentlyContinue)) {
+            Write-Info "Setting up Visual Studio environment..."
+            # We need to call vcvarsall and then run cmake in the same session
+            # Create a temporary batch file to set up environment and run cmake
+            $tempBatch = Join-Path $buildDir "setup_and_build.bat"
+            
+            $batchContent = @"
+@echo off
+call "$($global:VcVarsAll)" x64
+if errorlevel 1 (
+    echo Failed to set up Visual Studio environment
+    exit /b 1
+)
+echo Visual Studio environment set up successfully
+cmake .. -DCMAKE_BUILD_TYPE=Debug -G "NMake Makefiles"
+if errorlevel 1 (
+    echo CMake configuration failed
+    exit /b 1
+)
+nmake
+if errorlevel 1 (
+    echo Build failed
+    exit /b 1
+)
+echo Build completed successfully
+"@
+            
+            Set-Content -Path $tempBatch -Value $batchContent -Encoding ASCII
+            
+            Write-Info "Running Visual Studio build process..."
+            $process = Start-Process -FilePath "cmd.exe" -ArgumentList "/c", $tempBatch -NoNewWindow -Wait -PassThru
+            
+            # Clean up temp file
+            Remove-Item $tempBatch -ErrorAction SilentlyContinue
+            
+            if ($process.ExitCode -eq 0) {
+                Write-Success "C++ integration tests built successfully with Visual Studio"
+                return $true
+            } else {
+                Write-Error "Visual Studio build failed"
+                return $false
+            }
+            
+        } else {
+            # Use regular cmake build process
+            Write-Info "Configuring with CMake..."
+            cmake .. -DCMAKE_BUILD_TYPE=Debug
+            
+            if ($LASTEXITCODE -ne 0) {
+                Write-Error "CMake configuration failed"
+                return $false
+            }
+            
+            # Build
+            Write-Info "Building..."
+            cmake --build . --config Debug
+            
+            if ($LASTEXITCODE -ne 0) {
+                Write-Error "Build failed"
+                return $false
+            }
+            
+            Write-Success "C++ integration tests built successfully"
+            return $true
         }
-        
-        # Build
-        Write-Info "Building..."
-        cmake --build . --config Debug
-        
-        if ($LASTEXITCODE -ne 0) {
-            Write-Error "Build failed"
-            return $false
-        }
-        
-        Write-Success "C++ integration tests built successfully"
-        return $true
         
     } catch {
         Write-Error "Build process failed: $_"
