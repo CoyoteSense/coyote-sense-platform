@@ -17,7 +17,6 @@ param(
     [string]$ClientId = $(if ($env:OAUTH2_TEST_CLIENT_ID) { $env:OAUTH2_TEST_CLIENT_ID } else { "test-client-id" }),
     [string]$ClientSecret = $(if ($env:OAUTH2_TEST_CLIENT_SECRET) { $env:OAUTH2_TEST_CLIENT_SECRET } else { "test-client-secret" })
 )
-)
 
 # Configuration
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
