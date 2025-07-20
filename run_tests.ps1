@@ -33,10 +33,40 @@
 
 param(
     [switch]$Coverage = $false,
-    [ValidateSet('csharp', 'cpp', 'typescript', 'all')]
+    [ValidateSet('csharp', 'cpp', 'typescript', 'python', 'all')]
     [string]$Language = 'all',
     [switch]$Verbose = $false
 )
+
+# Python test runner
+function Run-PythonTests {
+    Write-Section "Python Tests (Unit/Mock)"
+    if (-not (Test-Command "python")) {
+        Write-ColorOutput "[SKIP] Python not found - skipping Python tests" $Yellow
+        return $true
+    }
+    $testDir = "Platform/infra/security/tests/python"
+    $runner = "run_python_tests.py"
+    if (Test-Path "$testDir/$runner") {
+        Push-Location $testDir
+        try {
+            Write-ColorOutput "[RUN] Testing Python in $testDir" $Cyan
+            python $runner
+            if ($LASTEXITCODE -ne 0) {
+                Write-ColorOutput "[FAIL] Python tests failed" $Red
+                return $false
+            } else {
+                Write-ColorOutput "[PASS] Python tests passed" $Green
+                return $true
+            }
+        } finally {
+            Pop-Location
+        }
+    } else {
+        Write-ColorOutput "[SKIP] Python test runner not found: $testDir/$runner" $Yellow
+        return $true
+    }
+}
 
 # Color output functions
 $Red = "`e[31m"
@@ -232,17 +262,19 @@ if (-not (Test-Path "Platform\infra\security")) {
 
 $overallSuccess = $true
 
+
 # Run tests based on language filter
 if ($Language -eq 'all' -or $Language -eq 'csharp') {
     $overallSuccess = (Run-CSharpTests) -and $overallSuccess
 }
-
 if ($Language -eq 'all' -or $Language -eq 'cpp') {
     $overallSuccess = (Run-CppTests) -and $overallSuccess
 }
-
 if ($Language -eq 'all' -or $Language -eq 'typescript') {
     $overallSuccess = (Run-TypeScriptTests) -and $overallSuccess
+}
+if ($Language -eq 'all' -or $Language -eq 'python') {
+    $overallSuccess = (Run-PythonTests) -and $overallSuccess
 }
 
 # Summary

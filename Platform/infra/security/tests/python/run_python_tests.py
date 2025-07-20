@@ -10,7 +10,7 @@ from pathlib import Path
 
 def run_python_tests():
     """Run Python tests with timeout protection"""
-    print("🐍 Running Python OAuth2 Authentication Tests...")
+    print("Running Python OAuth2 Authentication Tests...")
     
     # Test files to run
     test_files = [
@@ -43,38 +43,38 @@ def run_python_tests():
         )
         
         elapsed = time.time() - start_time
-        print(f"\n⏱️  Tests completed in {elapsed:.2f} seconds")
+        print(f"\nTests completed in {elapsed:.2f} seconds")
         
         # Print output
         if result.stdout:
-            print("\n📊 Test Output:")
+            print("\nTest Output:")
             print(result.stdout)
         
         if result.stderr and 'DeprecationWarning' not in result.stderr:
-            print("\n⚠️  Warnings/Errors:")
+            print("\nWarnings/Errors:")
             print(result.stderr)
         
         # Parse results
         output_lines = result.stdout.split('\n') if result.stdout else []
         for line in output_lines:
             if 'passed' in line and ('failed' in line or 'error' in line or 'skipped' in line):
-                print(f"\n🎯 Final Result: {line.strip()}")
+                print(f"\nFinal Result: {line.strip()}")
                 break
         
         # Return success/failure
         success = result.returncode == 0
         if success:
-            print("✅ All Python tests completed successfully!")
+            print("All Python tests completed successfully!")
         else:
-            print(f"❌ Tests failed with exit code: {result.returncode}")
+            print(f"Tests failed with exit code: {result.returncode}")
         
         return success
         
     except subprocess.TimeoutExpired:
-        print("⏰ Tests timed out - likely completed but cleanup hung")
+        print("Tests timed out - likely completed but cleanup hung")
         return True  # Assume success on timeout
     except Exception as e:
-        print(f"💥 Error running tests: {e}")
+        print(f"Error running tests: {e}")
         return False
 
 if __name__ == "__main__":
