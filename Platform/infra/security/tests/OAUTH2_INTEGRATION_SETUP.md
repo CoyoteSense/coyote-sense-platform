@@ -30,6 +30,16 @@
 .\run_integration_tests.ps1 -Language ts    # TypeScript only
 ```
 
+> **Note for C++ Integration Tests on Windows:**
+>
+> To run C++ integration tests, you **must** launch your terminal from a [Visual Studio Developer Command Prompt](https://learn.microsoft.com/en-us/cpp/build/building-on-the-command-line?view=msvc-170#developer_command_prompt) (or use `Developer PowerShell for VS`). This ensures the `cl.exe` compiler and all required environment variables are available. If you run from a standard PowerShell or Command Prompt, C++ tests will be skipped with a message about missing build tools or `cl.exe` not found.
+>
+> **How to open:**
+> - Open the Start Menu, search for "Developer Command Prompt for VS" or "Developer PowerShell for VS" (matching your Visual Studio version), and launch it.
+> - Navigate to your project directory and run the integration test commands as above.
+>
+> If you still see C++ tests being skipped, verify that `cl.exe` is available by running `cl` in your terminal. If not, ensure Visual Studio Build Tools are installed and you are using the correct environment.
+
 ### 3. Stop OAuth2 Server
 ```powershell
 # PowerShell (Windows)

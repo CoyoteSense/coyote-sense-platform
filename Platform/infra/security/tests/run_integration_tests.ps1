@@ -34,7 +34,7 @@
 #>
 
 param(
-    [ValidateSet("cs", "cpp", "ts", "all")]
+    [ValidateSet("cs", "cpp", "ts", "py", "all")]
     [string]$Language = "all",
     [switch]$SkipServerCheck,
     [switch]$Coverage,
@@ -122,6 +122,7 @@ $testResults = @{
     "CSharp" = @{ "Passed" = 0; "Failed" = 0; "Skipped" = 0 }
     "Cpp" = @{ "Passed" = 0; "Failed" = 0; "Skipped" = 0 }
     "TypeScript" = @{ "Passed" = 0; "Failed" = 0; "Skipped" = 0 }
+    "Python" = @{ "Passed" = 0; "Failed" = 0; "Skipped" = 0 }
 }
 
 Write-Section "CoyoteSense OAuth2 Integration Test Suite"
@@ -406,15 +407,69 @@ function Test-TypeScriptIntegration {
     }
 }
 
+# Function to run Python integration tests
+function Test-PythonIntegration {
+    Write-Section "Python OAuth2 Integration Tests"
+    
+    $pythonTestPath = "Platform\infra\security\tests\python"
+    if (-not (Test-Path $pythonTestPath)) {
+        Write-ColorOutput "WARNING: Python test directory not found: $pythonTestPath" $Yellow
+        $testResults.Python.Skipped = 1
+        return
+    }
+
+    Push-Location $pythonTestPath
+    try {
+        # Check if dependencies are installed
+        if (-not (Test-Path "venv") -and -not (Test-Path ".venv")) {
+            Write-ColorOutput "Installing Python test dependencies..." $Blue
+            pip install -r requirements.txt
+            if ($LASTEXITCODE -ne 0) {
+                Write-ColorOutput "Failed to install Python dependencies" $Red
+                $testResults.Python.Failed = 1
+                return
+            }
+        }
+
+        Write-ColorOutput "Running Python OAuth2 integration tests..." $Blue
+        
+        $pytestArgs = @("integration/real_oauth2_integration_test.py", "-v", "-s", "--tb=short")
+        if ($Coverage) { $pytestArgs += "--cov=integration", "--cov-report=html" }
+        if ($Verbose) { $pytestArgs += "--verbose" }
+        
+        $pytestCommand = "python -m pytest " + ($pytestArgs -join " ")
+        Write-ColorOutput "Command: $pytestCommand" $Blue
+        
+        Invoke-Expression $pytestCommand
+        
+        if ($LASTEXITCODE -eq 0) {
+            Write-ColorOutput "Python integration tests PASSED" $Green
+            $testResults.Python.Passed = 1
+        } else {
+            Write-ColorOutput "Python integration tests FAILED" $Red
+            $testResults.Python.Failed = 1
+        }
+    }
+    catch {
+        Write-ColorOutput "Python integration test execution failed: $_" $Red
+        $testResults.Python.Failed = 1
+    }
+    finally {
+        Pop-Location
+    }
+}
+
 # Run integration tests based on language filter
 switch ($Language) {
     "cs" { Test-CSharpIntegration }
     "cpp" { Test-CppIntegration }
     "ts" { Test-TypeScriptIntegration }
+    "py" { Test-PythonIntegration }
     "all" { 
         Test-CSharpIntegration
         Test-CppIntegration
         Test-TypeScriptIntegration
+        Test-PythonIntegration
     }
 }
 
