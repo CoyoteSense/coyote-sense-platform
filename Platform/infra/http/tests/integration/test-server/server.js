@@ -26,10 +26,40 @@ const limiter = rateLimit({
 });
 app.use('/api/', limiter);
 
-// File upload handling
+// File upload handling with secure configuration for multer 2.x
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    // Create uploads directory if it doesn't exist
+    const uploadDir = '/tmp/uploads/';
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    // Generate secure filename to prevent path traversal
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const ext = path.extname(file.originalname);
+    const name = path.basename(file.originalname, ext);
+    cb(null, `${name}-${uniqueSuffix}${ext}`);
+  }
+});
+
 const upload = multer({ 
-  dest: '/tmp/uploads/',
-  limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
+  storage: storage,
+  limits: { 
+    fileSize: 10 * 1024 * 1024, // 10MB limit
+    files: 1 // Limit to 1 file per request
+  },
+  fileFilter: (req, file, cb) => {
+    // Basic file type validation
+    const allowedMimes = ['text/plain', 'application/json', 'image/jpeg', 'image/png', 'image/gif'];
+    if (allowedMimes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file type'), false);
+    }
+  }
 });
 
 // Request logging middleware for testing
@@ -203,21 +233,60 @@ app.get('/api/large/:size', (req, res) => {
   });
 });
 
-// File upload testing
-app.post('/api/upload', upload.single('file'), (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ error: 'No file uploaded' });
-  }
-  
-  res.json({
-    message: 'File uploaded successfully',
-    file: {
-      originalname: req.file.originalname,
-      mimetype: req.file.mimetype,
-      size: req.file.size,
-      filename: req.file.filename
-    },
-    timestamp: new Date().toISOString()
+// File upload testing with error handling
+app.post('/api/upload', (req, res, next) => {
+  upload.single('file')(req, res, (err) => {
+    if (err) {
+      // Handle multer errors to prevent DoS
+      if (err instanceof multer.MulterError) {
+        if (err.code === 'LIMIT_FILE_SIZE') {
+          return res.status(413).json({ 
+            error: 'File too large',
+            message: 'File size exceeds 10MB limit'
+          });
+        }
+        if (err.code === 'LIMIT_FILE_COUNT') {
+          return res.status(413).json({ 
+            error: 'Too many files',
+            message: 'Only one file allowed per request'
+          });
+        }
+        return res.status(400).json({ 
+          error: 'Upload error',
+          message: err.message
+        });
+      }
+      
+      // Handle other errors (like file type validation)
+      if (err.message === 'Invalid file type') {
+        return res.status(400).json({ 
+          error: 'Invalid file type',
+          message: 'Only text, JSON, and image files are allowed'
+        });
+      }
+      
+      // Log unexpected errors but don't expose details
+      console.error('Upload error:', err);
+      return res.status(500).json({ 
+        error: 'Internal server error',
+        message: 'File upload failed'
+      });
+    }
+    
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+    
+    res.json({
+      message: 'File uploaded successfully',
+      file: {
+        originalname: req.file.originalname,
+        mimetype: req.file.mimetype,
+        size: req.file.size,
+        filename: req.file.filename
+      },
+      timestamp: new Date().toISOString()
+    });
   });
 });
 

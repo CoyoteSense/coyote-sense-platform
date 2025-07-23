@@ -25,6 +25,9 @@
   ],
   "author": "CoyoteSense Platform Team",
   "license": "MIT",
+  "overrides": {
+    "form-data": "^4.0.0"
+  },
   "devDependencies": {
     "@types/jest": "^29.5.5",
     "@types/node": "^20.6.0",
