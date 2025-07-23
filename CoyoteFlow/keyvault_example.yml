@@ -1,0 +1,60 @@
+project:
+  name: "KeyVaultExample"
+  description: "Example CoyoteFlow configuration using KeyVault unit"
+  version: "1.0"
+
+units:
+  # Mandatory infrastructure units
+  - id: redis-broker
+    type: infraUnit
+    mandatory: true
+    channels: [ keyvault.requests, keyvault.events, keyvault.audit ]
+
+  - id: configurator
+    type: managementUnit
+    mandatory: true
+    depends_on: [ redis-broker ]
+
+  # KeyVault unit
+  - id: keyvault
+    type: coreUnit
+    mandatory: true
+    language: csharp
+    depends_on: [ redis-broker, configurator ]
+    configuration:
+      vaultUrl: "https://keyvault:8443"
+      masterKey: "${MASTER_KEY}"
+      authMethod: "unit-role"
+      tokenTtlMinutes: 15
+      auditLogging: true
+    resources:
+      cpu: "500m"
+      memory: "512Mi"
+      ports: [8443]
+
+  # Example client unit that uses KeyVault
+  - id: test-client
+    type: unit
+    language: csharp
+    depends_on: [ keyvault ]
+    configuration:
+      unitId: "test-client"
+      unitRole: "client"
+    resources:
+      cpu: "200m"
+      memory: "256Mi"
+
+channels:
+  - name: keyvault.requests
+    description: "KeyVault authentication and secret requests"
+    
+  - name: keyvault.events
+    description: "KeyVault operational events"
+    
+  - name: keyvault.audit
+    description: "KeyVault audit logs"
+
+runtime:
+  mode: mock  # Use mock mode for testing
+  debug:
+    logLevel: "DEBUG" 

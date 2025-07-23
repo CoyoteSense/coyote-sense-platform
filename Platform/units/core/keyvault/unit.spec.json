@@ -1,26 +1,72 @@
 {
-  "$schema": "https://coyote.ai/schemas/unit-spec-v1.json",
-  "unitId": "keyvault",
-  "version": "0.0.1",
-  "category": "core",
-  "description": "TODO: keyvault description",
-  "language": "cpp",
-  "entry": "worker/",
-  "imageName": "ghcr.io/coyote/keyvault",
-  "modes": [
-    "production",
-    "recording",
-    "replay",
-    "simulation",
-    "debug",
-    "testing"
-  ],
-  "channels": {
-    "subscribe": [],
-    "publish": []
+  "name": "keyvault",
+  "version": "1.0.0",
+  "description": "Secure secret management and key storage unit for CoyoteSense platform",
+  "type": "core",
+  "language": "csharp",
+  "actor": true,
+  "mandatory": true,
+  "dependencies": {
+    "infrastructure": [
+      "security",
+      "http",
+      "log"
+    ],
+    "units": []
+  },
+  "configuration": {
+    "vaultUrl": {
+      "type": "string",
+      "description": "KeyVault service URL",
+      "default": "https://localhost:8443",
+      "required": true
+    },
+    "masterKey": {
+      "type": "string",
+      "description": "Master encryption key (base64 encoded)",
+      "required": true,
+      "secret": true
+    },
+    "authMethod": {
+      "type": "string",
+      "enum": ["unit-role", "mtls", "service-principal", "kubernetes-jwt"],
+      "default": "unit-role",
+      "description": "Authentication method for units"
+    },
+    "tokenTtlMinutes": {
+      "type": "integer",
+      "default": 15,
+      "description": "Bearer token time-to-live in minutes"
+    },
+    "auditLogging": {
+      "type": "boolean",
+      "default": true,
+      "description": "Enable comprehensive audit logging"
+    }
   },
   "resources": {
-    "cpu": "100m",
-    "memory": "128Mi"
+    "cpu": "500m",
+    "memory": "512Mi",
+    "ports": [8443],
+    "volumes": []
+  },
+  "channels": {
+    "publishes": [
+      "keyvault.events",
+      "keyvault.audit"
+    ],
+    "subscribes": [
+      "keyvault.requests"
+    ]
+  },
+  "health": {
+    "endpoint": "/health",
+    "interval": "30s"
+  },
+  "metrics": {
+    "requests_per_second": "counter",
+    "authentication_failures": "counter",
+    "secret_operations": "counter",
+    "response_time_ms": "histogram"
   }
 }
